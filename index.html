@@ -57,6 +57,7 @@ body.light .sum-flag-green{background:rgba(14,122,58,0.08) !important;}
 .subtab:hover{color:var(--text2)!important;border-bottom-color:var(--border3)!important}
 .subtab.active{color:var(--amber)!important;border-bottom-color:var(--amber)!important}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body class="light">
 <div id="pw-gate" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column">
@@ -727,12 +728,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       <div class="brand-sub">FRED Macro Dashboard · Treasury Yields, Spreads, Inflation, Credit</div>
     </div>
     <div class="toolbar-sep"></div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <input id="fredKeyInput" type="text" placeholder="FRED API Key" style="background:var(--bg);border:1px solid var(--border2);border-radius:3px;padding:5px 10px;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;width:280px;outline:none;">
-      <button id="fredConnectBtn" onclick="connectFred()" style="background:var(--amber);border:none;border-radius:3px;padding:5px 14px;color:#000;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.06em">CONNECT</button>
-      <button onclick="refreshFred()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);padding:5px 10px;border-radius:3px;cursor:pointer;font-size:13px;font-family:inherit">↻</button>
-      <span id="fredStatus" style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text3)"></span>
-    </div>
+    <span id="fredStatus" style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text3)"></span>
   </div>
   <!-- Subtab bar -->
   <div style="display:flex;align-items:center;height:42px;border-bottom:1px solid var(--border);background:var(--bg1);padding:0 16px;">
@@ -1515,9 +1511,9 @@ if (topIdx !== undefined && topBtns[topIdx]) topBtns[topIdx].classList.add('acti
 if(t==='cal' && !calInited){initCal(); setCalView('month');}
 if(t==='energy' && !energyInited){initEnergy();}
 if(t==='sd'){renderSD();}
-if(t==='exp'){try{renderExports();}catch(e){}}
+if(t==='exp'){try{renderExports();}catch(e){console.warn('Exports render error:',e);}}
 if(t==='cot' && !cotInited){initCot();}
-if(t==='seasonal' && !seasonalInited){initSeasonal();}
+if(t==='seasonal'){if(!seasonalInited){initSeasonal();}else{try{renderSeasonal();}catch(e){}}}
 if(t==='macro' && !macroInited){initMacro();}
 if(t==='reg' && !regInited){initRegression();}
 if(t==='cash' && !cashInited){initCash();}
@@ -1561,9 +1557,9 @@ document.getElementById(tab + '-page-wrap').classList.add('active');
 window.scrollTo(0,0);
 if(tab==='energy' && !energyInited){initEnergy();}
 if(tab==='sd'){renderSD();}
-if(tab==='exp'){try{renderExports();}catch(e){}}
+if(tab==='exp'){try{renderExports();}catch(e){console.warn('Exports render error:',e);}}
 if(tab==='cot' && !cotInited){initCot();}
-if(tab==='seasonal' && !seasonalInited){initSeasonal();}
+if(tab==='seasonal'){if(!seasonalInited){initSeasonal();}else{try{renderSeasonal();}catch(e){}}}
 if(tab==='reg' && !regInited){initRegression();}
 if(tab==='cash' && !cashInited){initCash();}
 if(tab==='aafc' && !aafcInited){initAafc();}
@@ -2693,6 +2689,57 @@ renderCal();
 }
 }
 const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function renderCalSideList() {
+  var sl = document.getElementById('cal-side-list');
+  if (!sl || !CAL_EVENTS) return;
+  var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  var evsByDay = [];
+  for (var d = 1; d <= daysInMonth; d++) {
+    var ds = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var evs = CAL_EVENTS[ds] || [];
+    if (evs.length > 0) evsByDay.push({ day: d, date: ds, evs: evs });
+  }
+  if (!evsByDay.length) { sl.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:12px;">No events this month.</div>'; return; }
+
+  var html = '';
+  var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var curWeek = -1;
+  for (var i = 0; i < evsByDay.length; i++) {
+    var item = evsByDay[i];
+    var dt = new Date(calYear, calMonth, item.day);
+    var wk = getISOWeek(dt);
+    if (wk !== curWeek) {
+      curWeek = wk;
+      html += '<div class="cal-side-week">Week ' + wk + '</div>';
+    }
+    var dayLbl = dayNames[dt.getDay()] + ' ' + String(item.day).padStart(2, '0');
+    for (var j = 0; j < item.evs.length; j++) {
+      var ev = item.evs[j];
+      var dotColor = '#999';
+      if (ev.cls.indexOf('fomc') >= 0) dotColor = '#b71c1c';
+      else if (ev.cls.indexOf('wasde') >= 0) dotColor = '#1b5e20';
+      else if (ev.cls.indexOf('eia') >= 0) dotColor = '#e65100';
+      else if (ev.cls.indexOf('cot') >= 0) dotColor = '#0d47a1';
+      else if (ev.cls.indexOf('jobs') >= 0) dotColor = '#4527a0';
+      else if (ev.cls.indexOf('cb-') >= 0) dotColor = '#880e4f';
+      else if (ev.cls.indexOf('export') >= 0) dotColor = '#00695c';
+      else if (ev.cls.indexOf('nopa') >= 0) dotColor = '#33691e';
+      html += '<div class="cal-side-ev"><span class="cal-side-date">' + dayLbl + '</span>';
+      html += '<span class="cal-side-dot" style="background:' + dotColor + '"></span>';
+      html += '<span class="cal-side-lbl">' + ev.label + '</span></div>';
+    }
+  }
+  sl.innerHTML = html;
+}
+
+function getISOWeek(d) {
+  var dt = new Date(d.getTime());
+  dt.setDate(dt.getDate() + 4 - (dt.getDay() || 7));
+  var yearStart = new Date(dt.getFullYear(), 0, 1);
+  return Math.ceil(((dt - yearStart) / 86400000 + 1) / 7);
+}
+
 function renderCal(){
 if(calView==='crop'){ renderCropCal(); return; }
 document.getElementById('cal-month-lbl').textContent = MONTH_NAMES[calMonth]+' '+calYear;
@@ -2722,6 +2769,7 @@ html+=`<div class="cal-event ${ev.cls}" title="${ev.note||''}">${ev.label}</div>
 html+='</div>';
 }
 body.innerHTML=html;
+renderCalSideList();
 } else if(calView==='list') {
 body.className='cal-list';
 let html='';
@@ -2754,6 +2802,8 @@ body.className='';
 body.innerHTML = renderExpiryView(calYear, calMonth);
 }
 document.getElementById('cal-dow').style.display = (calView==='month') ? '' : 'none';
+var sideList = document.getElementById('cal-side-list');
+if (sideList) sideList.style.display = (calView==='month') ? '' : 'none';
 }
 function getNthWd(y, m, weekday, n){
 if(n > 0){
@@ -8039,7 +8089,7 @@ const FRED_SERIES = {
     {id:"UNRATE",l:"Unemp %",c:"#5b9cf0",lim:24,yAxis:'y'},{id:"ICSA",l:"Claims",c:"#40c8b0",lim:52,yAxis:'y1'}]}
 };
 
-async function fredFetch(sid, limit) {
+async async function fredFetch(sid, limit) {
   var base = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + sid + '&api_key=' + fredApiKey + '&file_type=json&sort_order=desc&limit=' + limit;
   var proxies = [
     function(u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
@@ -8059,29 +8109,18 @@ async function fredFetch(sid, limit) {
 function initMacro() {
   macroInited = true;
   buildFredDashboard();
-  var ki = document.getElementById('fredKeyInput');
-  if (ki) ki.value = fredApiKey;
   if (fredApiKey) { refreshFred(); }
 }
 
-function connectFred() {
-  fredApiKey = document.getElementById('fredKeyInput').value.trim();
-  if (!fredApiKey) return;
-  localStorage.setItem('fredApiKey', fredApiKey);
-  refreshFred();
-}
+// connectFred removed - key hardcoded
 
 async function refreshFred() {
   if (!fredApiKey) return;
-  var btn = document.getElementById('fredConnectBtn');
   var st = document.getElementById('fredStatus');
   var lb = document.getElementById('fredLoadBar');
   var lp = document.getElementById('fredLoadProg');
-  btn.disabled = true;
-  btn.textContent = 'LOADING...';
   if (lb) lb.style.display = '';
-  st.textContent = 'Fetching...';
-  st.style.color = 'var(--text3)';
+  if (st) { st.textContent = 'Loading FRED data...'; st.style.color = 'var(--text3)'; }
 
   var allSeries = [];
   Object.values(FRED_SERIES).forEach(function(grp) { grp.s.forEach(function(s) { allSeries.push(s); }); });
@@ -8102,11 +8141,11 @@ async function refreshFred() {
 
   updateFredCharts();
   if (lb) lb.style.display = 'none';
-  btn.disabled = false;
-  btn.textContent = 'CONNECT';
-  st.textContent = '✓ ' + ok + '/' + allSeries.length + ' series loaded';
-  st.style.color = 'var(--green)';
-  if (fail > 0) st.textContent += ' (' + fail + ' failed)';
+  if (st) {
+    st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series';
+    st.style.color = 'var(--green)';
+    if (fail > 0) st.textContent += ' (' + fail + ' failed)';
+  }
 }
 
 function updateFredMetric(s) {
@@ -8160,7 +8199,7 @@ function updateFredCharts() {
     var canvas = document.getElementById('fredChart-' + k);
     if (!canvas) return;
 
-    if (fredCharts[k]) fredCharts[k].destroy();
+    if (fredCharts[k]) { try { fredCharts[k].destroy(); } catch(e){} }
 
     var datasets = [];
     grp.s.forEach(function(s) {
@@ -8182,6 +8221,7 @@ function updateFredCharts() {
       scales.y1 = { position: 'left', ticks: { color: textC, font: { size: 10 } }, grid: { display: false } };
     }
 
+    if(typeof Chart === "undefined") return;
     fredCharts[k] = new Chart(canvas, {
       type: 'line',
       data: { datasets: datasets },
