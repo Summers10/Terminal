@@ -104,6 +104,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <button class="nav-tab subtab" onclick="switchSubTab('analysis','reg')">REGRESSION</button>
     <button class="nav-tab subtab" onclick="switchSubTab('analysis','cash')">CASH</button>
   </div>
+</div>
 <!-- ════════════════════════════════════════════════
      S&D PAGE
 ════════════════════════════════════════════════ -->
@@ -1480,18 +1481,22 @@ function renderSummaryPage(){
     document.getElementById('sum-energy-tbl').innerHTML = ehtml;
   }
 
-} catch(e) { console.warn('Summary page render deferred:', e.message); }}
+} catch(e) { console.warn('Summary page render deferred:', e.message); }
+}
 
 function switchTab(t){
+try {
 document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
 document.querySelectorAll('#topnav .nav-tab').forEach(b=>b.classList.remove('active'));
-document.getElementById(t+'-page-wrap').classList.add('active');
+var pw = document.getElementById(t+'-page-wrap');
+if (pw) pw.classList.add('active');
 window.scrollTo(0,0);
-// Hide subtab bar for non-grouped tabs
 var sb = document.getElementById('subtab-bar');
 if (sb) sb.style.display = 'none';
-document.getElementById('subtab-fund').style.display = 'none';
-document.getElementById('subtab-analysis').style.display = 'none';
+var sf = document.getElementById('subtab-fund');
+if (sf) sf.style.display = 'none';
+var sa = document.getElementById('subtab-analysis');
+if (sa) sa.style.display = 'none';
 // Highlight correct top nav
 var topBtns = document.querySelectorAll('#topnav .nav-tab');
 var topMap = {'sum':0,'fund':1,'analysis':2,'macro':3,'cal':4};
@@ -1516,10 +1521,12 @@ if(t==='cash' && !cashInited){initCash();}
 if(t==='aafc' && !aafcInited){initAafc();}
 if(t==='gsw' && !gswInited){initGsw();}
 if(t==='spreads' && !spreadsInited){initSpreads();}
-if(t==='sum'){renderSummaryPage();}
+if(t==='sum'){try{renderSummaryPage();}catch(e){}}
+} catch(e) { console.error('switchTab error:', e); }
 }
 
 function switchGroup(group, defaultTab) {
+try {
 document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
 document.querySelectorAll('#topnav .nav-tab').forEach(b=>b.classList.remove('active'));
 var sb = document.getElementById('subtab-bar');
@@ -1531,9 +1538,11 @@ var topBtns = document.querySelectorAll('#topnav .nav-tab');
 var topMap = {'fund':1,'analysis':2};
 if (topMap[group] !== undefined && topBtns[topMap[group]]) topBtns[topMap[group]].classList.add('active');
 switchSubTab(group, defaultTab);
+} catch(e) { console.error('switchGroup error:', e); }
 }
 
 function switchSubTab(group, tab) {
+try {
 document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
 var subDiv = document.getElementById('subtab-' + group);
 subDiv.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
@@ -1557,6 +1566,7 @@ if(tab==='cash' && !cashInited){initCash();}
 if(tab==='aafc' && !aafcInited){initAafc();}
 if(tab==='gsw' && !gswInited){initGsw();}
 if(tab==='spreads' && !spreadsInited){initSpreads();}
+} catch(e) { console.error('switchSubTab error:', e); }
 }
 const _WBC_MAP={bs:"Beginning stocks",im:"Import",pr:"Production",su:"Supply",fu:"Food use",so:"Seed & other",fw:"Feed waste",dt:"Domestic total",ex:"Export",td:"Total demand",es:"Ending stocks"};
 const _WBC_RAW={"2010-11":{HRW:{bs:385,im:0.9,pr:1006.1,su:1392,Food:359.2,Seed:32,Residual:-2.6,Domestic:388.5,Exports:616.9,"Total use":1005.4,es:386.5},HRS:{bs:234,im:27.8,pr:564,su:825.8,Food:247.4,Seed:14,Residual:39.7,Domestic:301.1,Exports:339.7,"Total use":640.8,es:185},SRW:{bs:242,im:28.5,pr:219.2,su:489.7,Food:150,Seed:16.3,Residual:43.3,Domestic:209.6,Exports:109.2,"Total use":318.7,es:171},WW:{bs:80,im:7,pr:272.2,su:359.2,Food:85,Seed:6,Residual:1.3,Domestic:92.3,Exports:182,"Total use":274.2,es:85},DUR:{bs:34.6,im:32.7,pr:101.5,su:168.8,Food:84.1,Seed:2.4,Residual:3.2,Domestic:89.7,Exports:43.7,"Total use":133.4,es:35.5},Total:{bs:975.6,im:96.9,pr:2163,su:3235.6,Food:925.6,Seed:70.7,Residual:84.8,Domestic:1081.1,Exports:1291.4,"Total use":2372.6,es:863}},"2011-12":{HRW:{bs:386.5,im:0.5,pr:782.9,su:1169.9,Food:403.6,Seed:33.1,Residual:18.7,Domestic:455.4,Exports:397.3,"Total use":852.7,es:317.1},HRS:{bs:185,im:43.2,pr:396.2,su:624.4,Food:222.8,Seed:18.9,Residual:-10.9,Domestic:230.8,Exports:242.5,"Total use":473.4,es:151},SRW:{bs:171,im:24.2,pr:452.7,su:647.9,Food:155,Seed:15.1,Residual:127.6,Domestic:297.7,Exports:165.3,"Total use":462.9,es:185},WW:{bs:85,im:7.9,pr:314.3,su:407.2,Food:85,Seed:5.2,Residual:34.1,Domestic:124.3,Exports:218.9,"Total use":343.2,es:64},DUR:{bs:35.5,im:37.4,pr:47,su:119.9,Food:75,Seed:3.2,Residual:-10.9,Domestic:67.3,Exports:27.1,"Total use":94.4,es:25.5},Total:{bs:863,im:113.1,pr:1993.1,su:2969.2,Food:941.4,Seed:75.6,Residual:158.5,Domestic:1175.5,Exports:1051.1,"Total use":2226.6,es:742.6}},"2012-13":{HRW:{bs:317.1,im:17.7,pr:997.9,su:1332.8,Food:403.8,Seed:33.5,Residual:170.9,Domestic:608.2,Exports:381.8,"Total use":989.9,es:342.8},HRS:{bs:151,im:57.2,pr:503.5,su:711.7,Food:230,Seed:13.1,Residual:71,Domestic:314.1,Exports:232.6,"Total use":546.7,es:165},SRW:{bs:185,im:4.5,pr:412.7,su:602.2,Food:152,Seed:19.1,Residual:113.3,Domestic:284.5,Exports:193.7,"Total use":478.2,es:124},WW:{bs:64,im:7.4,pr:256.7,su:328.1,Food:85,Seed:5.5,Residual:-0.7,Domestic:89.8,Exports:175.2,"Total use":265.1,es:63},DUR:{bs:25.5,im:37.5,pr:81.5,su:144.5,Food:80,Seed:1.9,Residual:10.9,Domestic:92.8,Exports:28.7,"Total use":121.5,es:23.1},Total:{bs:742.6,im:124.3,pr:2252.3,su:3119.2,Food:950.8,Seed:73.1,Residual:365.3,Domestic:1389.3,Exports:1012.1,"Total use":2401.4,es:717.9}},"2013-14":{HRW:{bs:342.8,im:18.7,pr:747.4,su:1108.9,Food:370.1,Seed:34,Residual:22.1,Domestic:426.2,Exports:446,"Total use":872.2,es:236.8},HRS:{bs:165,im:93.1,pr:490.6,su:748.8,Food:267,Seed:16.2,Residual:51,Domestic:334.1,Exports:245.6,"Total use":579.8,es:169},SRW:{bs:124,im:5.3,pr:568.5,su:697.7,Food:155,Seed:16.1,Residual:131.1,Domestic:302.2,Exports:282.6,"Total use":584.7,es:113},WW:{bs:63,im:7.2,pr:270.5,su:340.7,Food:85,Seed:5.5,Residual:29.8,Domestic:120.3,Exports:170.4,"Total use":290.7,es:50},DUR:{bs:23.1,im:48.2,pr:58,su:129.2,Food:78,Seed:1.9,Residual:-3.9,Domestic:76,Exports:31.7,"Total use":107.7,es:21.5},Total:{bs:717.9,im:172.5,pr:2135,su:3025.3,Food:955.1,Seed:73.7,Residual:230.1,Domestic:1258.8,Exports:1176.2,"Total use":2435.1,es:590.3}},"2014-15":{HRW:{bs:236.8,im:9.9,pr:738.6,su:985.3,Food:369.8,Seed:32.7,Residual:16.6,Domestic:419.1,Exports:272.5,"Total use":691.5,es:293.7},HRS:{bs:169,im:77.7,pr:555.5,su:802.2,Food:266,Seed:24,Residual:26.5,Domestic:316.5,Exports:273.7,"Total use":590.2,es:212},SRW:{bs:113,im:3.4,pr:454.5,su:570.9,Food:160,Seed:13.5,Residual:109.3,Domestic:282.8,Exports:134.1,"Total use":416.9,es:154},WW:{bs:50,im:9.8,pr:223.5,su:283.3,Food:85,Seed:5.4,Residual:-21.2,Domestic:69.2,Exports:147.1,"Total use":216.3,es:67},DUR:{bs:21.5,im:50.6,pr:54.1,su:126.1,Food:77.4,Seed:3.8,Residual:-17.7,Domestic:63.6,Exports:36.9,"Total use":100.5,es:25.7},Total:{bs:590.3,im:151.2,pr:2026.3,su:2767.8,Food:958.3,Seed:79.4,Residual:113.4,Domestic:1151.1,Exports:864.3,"Total use":2015.4,es:752.4}},"2015-16":{HRW:{bs:293.7,im:6.2,pr:830.4,su:1130.4,Food:391.2,Seed:29.7,Residual:36.7,Domestic:457.7,Exports:227.2,"Total use":684.9,es:445.5},HRS:{bs:212,im:62.1,pr:567.6,su:841.7,Food:251,Seed:16.6,Residual:48.4,Domestic:316,Exports:253.7,"Total use":569.7,es:272},SRW:{bs:154,im:4.5,pr:359.1,su:517.6,Food:153,Seed:11.7,Residual:76,Domestic:240.7,Exports:120.2,"Total use":361,es:156.6},WW:{bs:67,im:6.2,pr:220.8,su:294,Food:83,Seed:5.5,Residual:-15.5,Domestic:73,Exports:147.3,"Total use":220.3,es:73.7},DUR:{bs:25.7,im:33.8,pr:84,su:143.5,Food:78.9,Seed:3.6,Residual:3.8,Domestic:86.3,Exports:29.4,"Total use":115.7,es:27.8},Total:{bs:752.4,im:112.8,pr:2061.9,su:2927.1,Food:957.2,Seed:67.2,Residual:149.4,Domestic:1173.8,Exports:777.8,"Total use":1951.5,es:975.6}},"2016-17":{HRW:{bs:445.5,im:5,pr:1082,su:1532.6,Food:384.7,Seed:26.2,Residual:79.5,Domestic:490.4,Exports:452.9,"Total use":943.3,es:589.3},HRS:{bs:272,im:66.6,pr:491.3,su:829.9,Food:250,Seed:15.5,Residual:10,Domestic:275.5,Exports:319.4,"Total use":594.9,es:235},SRW:{bs:156.6,im:8.3,pr:345.2,su:510.1,Food:150,Seed:11,Residual:42.9,Domestic:203.9,Exports:91.2,"Total use":295.1,es:215},WW:{bs:73.7,im:7.7,pr:286.2,su:367.7,Food:85,Seed:5.2,Residual:9.7,Domestic:99.9,Exports:162.8,"Total use":262.7,es:105},DUR:{bs:27.8,im:30.3,pr:103.9,su:162,Food:79.2,Seed:3.4,Residual:18.5,Domestic:101.1,Exports:24.6,"Total use":125.7,es:36.3},Total:{bs:975.6,im:118,pr:2308.7,su:3402.3,Food:948.8,Seed:61.3,Residual:160.7,Domestic:1170.8,Exports:1050.9,"Total use":2221.7,es:1180.6}},"2017-18":{HRW:{bs:589.3,im:6.7,pr:750.1,su:1346.2,Food:391.6,Seed:25.6,Residual:-25.5,Domestic:391.8,Exports:373.5,"Total use":765.2,es:580.9},HRS:{bs:235,im:88,pr:384.2,su:707.2,Food:254,Seed:18,Residual:14.9,Domestic:286.9,Exports:229.3,"Total use":516.2,es:191},SRW:{bs:215,im:4.3,pr:293.2,su:512.5,Food:154,Seed:11.6,Residual:50.8,Domestic:216.4,Exports:91.1,"Total use":307.5,es:205},WW:{bs:105,im:7.5,pr:258.6,su:371.1,Food:85,Seed:5.3,Residual:-0.7,Domestic:89.6,Exports:194.5,"Total use":284.1,es:87},DUR:{bs:36.3,im:51.4,pr:54.8,su:142.5,Food:79.5,Seed:3,Residual:7.5,Domestic:89.9,Exports:17.7,"Total use":107.6,es:34.9},Total:{bs:1180.6,im:158,pr:1740.9,su:3079.5,Food:964.1,Seed:63.4,Residual:47.1,Domestic:1074.6,Exports:906,"Total use":1980.6,es:1098.9}},"2018-19":{HRW:{bs:580.9,im:4.9,pr:662.2,su:1248.1,Food:383.5,Seed:25.2,Residual:-8.4,Domestic:400.4,Exports:331.9,"Total use":732.3,es:515.8},HRS:{bs:191,im:67.3,pr:587,su:845.3,Food:255,Seed:16.6,Residual:51.9,Domestic:323.5,Exports:258.8,"Total use":582.3,es:263},SRW:{bs:205,im:4.6,pr:285.6,su:495.2,Food:151,Seed:10.6,Residual:47.6,Domestic:209.2,Exports:128,"Total use":337.2,es:158},WW:{bs:87,im:5.7,pr:272.4,su:365.1,Food:85,Seed:5.2,Residual:-9.7,Domestic:80.5,Exports:196.5,"Total use":277.1,es:88},DUR:{bs:34.9,im:52,pr:78.2,su:165.1,Food:79.9,Seed:1.8,Residual:6.6,Domestic:88.4,Exports:21.8,"Total use":110.2,es:55},Total:{bs:1098.9,im:134.6,pr:1885.4,su:3118.8,Food:954.4,Seed:59.5,Residual:88.1,Domestic:1102,Exports:937.1,"Total use":2039.1,es:1079.8}},"2019-20":{HRW:{bs:515.8,im:1.9,pr:844.9,su:1362.6,Food:378.2,Seed:24,Residual:76.4,Domestic:478.6,Exports:377.6,"Total use":856.3,es:506.4},HRS:{bs:263,im:52.2,pr:519.9,su:835.2,Food:265,Seed:18.4,Residual:2.7,Domestic:286,Exports:269.1,"Total use":555.2,es:280},SRW:{bs:158,im:3.5,pr:239.8,su:401.3,Food:148,Seed:10.7,Residual:45.2,Domestic:203.9,Exports:92.4,"Total use":296.3,es:105},WW:{bs:88,im:5.5,pr:273.4,su:367,Food:85,Seed:5.6,Residual:-6.6,Domestic:84,Exports:187.9,"Total use":272,es:95},DUR:{bs:55,im:40.7,pr:54,su:149.7,Food:85.4,Seed:2.8,Residual:-22.5,Domestic:65.7,Exports:42,"Total use":107.7,es:41.9},Total:{bs:1079.8,im:103.9,pr:1932,su:3115.7,Food:961.6,Seed:61.5,Residual:95.2,Domestic:1118.4,Exports:969,"Total use":2087.4,es:1028.3}},"2020-21":{HRW:{bs:506.4,im:4.1,pr:653.6,su:1164,Food:376.8,Seed:26.3,Residual:-6.9,Domestic:396.2,Exports:340,"Total use":736.2,es:427.8},HRS:{bs:280,im:46.8,pr:531.2,su:858,Food:263,Seed:16.8,Residual:57.6,Domestic:337.5,Exports:285.5,"Total use":623,es:235},SRW:{bs:105,im:4.9,pr:264.2,su:374.1,Food:148,Seed:12.7,Residual:59,Domestic:219.7,Exports:69.4,"Total use":289.1,es:85},WW:{bs:95,im:7,pr:301.6,su:403.6,Food:85,Seed:5.7,Residual:-27.6,Domestic:63.1,Exports:270.5,"Total use":333.6,es:70},DUR:{bs:41.9,im:37.4,pr:69.1,su:148.4,Food:87.7,Seed:2.3,Residual:2.6,Domestic:92.6,Exports:28.5,"Total use":121.1,es:27.3},Total:{bs:1028.3,im:100.2,pr:1819.7,su:2948.1,Food:960.5,Seed:63.8,Residual:84.8,Domestic:1109.1,Exports:993.9,"Total use":2103,es:845.2}},"2021-22":{HRW:{bs:427.8,im:4.1,pr:749.9,su:1181.8,Food:410.6,Seed:25.8,Residual:74.2,Domestic:510.6,Exports:315.5,"Total use":826.1,es:355.7},HRS:{bs:235,im:43.5,pr:297.1,su:575.5,Food:245,Seed:11.8,Residual:-30.8,Domestic:226,Exports:207.5,"Total use":433.5,es:142},SRW:{bs:85,im:3.6,pr:360.7,su:449.3,Food:154,Seed:12.5,Residual:72.3,Domestic:238.8,Exports:111.5,"Total use":350.3,es:99},WW:{bs:70,im:5.4,pr:201,su:276.4,Food:83,Seed:5.5,Residual:-13,Domestic:75.5,Exports:146.9,"Total use":222.4,es:54},DUR:{bs:27.3,im:39.6,pr:37.6,su:104.5,Food:78.8,Seed:2.1,Residual:-14.4,Domestic:66.5,Exports:14.4,"Total use":80.8,es:23.7},Total:{bs:845.2,im:96.2,pr:1646.3,su:2587.6,Food:971.4,Seed:57.7,Residual:88.3,Domestic:1117.4,Exports:795.7,"Total use":1913.1,es:674.4}},"2022-23":{HRW:{bs:355.7,im:4.7,pr:531,su:891.3,Food:373,Seed:28.8,Residual:42.2,Domestic:444.1,Exports:224.4,"Total use":668.5,es:222.8},HRS:{bs:142,im:55.5,pr:446.5,su:643.9,Food:266,Seed:17.4,Residual:-8.8,Domestic:274.5,Exports:214.4,"Total use":488.9,es:155},SRW:{bs:99,im:4,pr:336.1,su:439.1,Food:163,Seed:13.9,Residual:65,Domestic:241.9,Exports:107.2,"Total use":349.1,es:90},WW:{bs:54,im:6.5,pr:272.1,su:332.7,Food:85,Seed:5.6,Residual:-23.2,Domestic:67.4,Exports:191.3,"Total use":258.7,es:74},DUR:{bs:23.7,im:50.9,pr:64,su:138.6,Food:84.7,Seed:2.7,Residual:0.4,Domestic:87.7,Exports:23.2,"Total use":110.9,es:27.7},Total:{bs:674.4,im:121.6,pr:1649.7,su:2445.7,Food:971.7,Seed:68.4,Residual:75.5,Domestic:1115.5,Exports:760.6,"Total use":1876.2,es:569.6}},"2023-24":{HRW:{bs:222.8,im:18,pr:596,su:836.9,Food:383.5,Seed:26.6,Residual:18.5,Domestic:428.6,Exports:133.9,"Total use":562.5,es:274.4},HRS:{bs:155,im:62.7,pr:465.4,su:683.1,Food:253,Seed:15.1,Residual:-10.4,Domestic:257.7,Exports:235.5,"Total use":493.1,es:190},SRW:{bs:90,im:6,pr:449,su:545,Food:158,Seed:11.5,Residual:91.4,Domestic:260.8,Exports:158.1,"Total use":419,es:126},WW:{bs:74,im:6.2,pr:234.1,su:314.4,Food:84,Seed:5.8,Residual:-12.5,Domestic:77.4,Exports:152,"Total use":229.4,es:85},DUR:{bs:27.7,im:44.9,pr:59.3,su:132,Food:82.8,Seed:3.1,Residual:-1.3,Domestic:84.5,Exports:26.4,"Total use":110.9,es:21.1},Total:{bs:569.6,im:137.8,pr:1803.9,su:2511.3,Food:961.3,Seed:62,Residual:85.6,Domestic:1109,Exports:705.9,"Total use":1814.9,es:696.4}},"2024-25":{HRW:{bs:274.4,im:6.5,pr:773.4,su:1054.3,Food:386.6,Seed:26.3,Residual:24.8,Domestic:437.7,Exports:214.7,"Total use":652.4,es:401.9},HRS:{bs:190,im:79.3,pr:504.8,su:774.1,Food:258,Seed:14.5,Residual:32.6,Domestic:305.1,Exports:251,"Total use":556.1,es:218},SRW:{bs:126,im:5.1,pr:344.4,su:475.5,Food:153,Seed:11.8,Residual:66,Domestic:230.8,Exports:117.7,"Total use":348.5,es:127},WW:{bs:85,im:6.9,pr:276,su:367.9,Food:84,Seed:5.7,Residual:-25.1,Domestic:64.6,Exports:223.3,"Total use":287.9,es:80},DUR:{bs:21.1,im:51.2,pr:80.1,su:152.3,Food:87.9,Seed:2.8,Residual:14.6,Domestic:105.3,Exports:19.1,"Total use":124.4,es:27.9},Total:{bs:696.4,im:149,pr:1978.7,su:2824.1,Food:969.5,Seed:61.1,Residual:112.9,Domestic:1143.5,Exports:825.9,"Total use":1969.4,es:854.7}}};
@@ -7989,7 +7999,7 @@ function initRegression(){
   renderRegression();
 }
 
-renderSummaryPage();
+try { renderSummaryPage(); } catch(e) { console.warn('Initial summary render:', e); }
 
 // ══ MACRO DASHBOARD (FRED) ══
 let macroInited = false;
