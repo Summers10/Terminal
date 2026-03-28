@@ -4715,10 +4715,10 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     console.log('  GSDB: ' + STEO.gsdb.length + ' quarters');
 
     // ── 3. OPEC Spare Capacity (annual) ──
-    var opecData = await steoFetch(['COSC_OPEC']);
+    var opecData = await steoFetch(['COPS_OPEC']);
     var opecByYear = {};
     opecData.forEach(function(r) {
-      if (r._sid !== 'COSC_OPEC') return;
+      if (r._sid !== 'COPS_OPEC') return;
       var yr = parseInt(r.period.substring(0,4));
       if (!opecByYear[yr]) opecByYear[yr] = [];
       opecByYear[yr].push(parseFloat(r.value) || 0);
@@ -4730,23 +4730,23 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     console.log('  OPEC spare: ' + STEO.opec.length + ' years');
 
     // ── 4. OECD Days of Supply ──
-    var oecdData = await steoFetch(['T3ESDCOCDO_WORLD']);
-    STEO.oecd_days = oecdData.filter(function(r){return r._sid==='T3ESDCOCDO_WORLD';}).map(function(r) {
+    var oecdData = await steoFetch(['PASC_OECD_T3']);
+    STEO.oecd_days = oecdData.filter(function(r){return r._sid==='PASC_OECD_T3';}).map(function(r) {
       var v = parseFloat(r.value) || 0;
       return [r.period + '-01', v, v * 0.78, v];
     });
     console.log('  OECD days: ' + STEO.oecd_days.length);
 
     // ── 5. World Production by Country/Region (annual avg, 2023-2027) ──
-    var prodIds = ['COPR_OPEC','COPR_US','COPR_CA','COPR_MX','COPR_RS','COPR_AZ','COPR_KZ',
-                   'COPR_TM','COPR_AR','COPR_BR','COPR_CO','PAPR_WORLD','PAPR_NON_OPEC'];
+    var prodIds = ['COPR_OPEC','COPRPUS','PAPR_CA','COPR_MX','COPR_RS','COPR_AJ','COPR_KZ',
+                   'PAPR_TX','PAPR_AR','PAPR_BR','PAPR_CO','PAPR_WORLD','PAPR_NONOPEC'];
     var prodData = await steoFetch(prodIds);
     var years = [2023,2024,2025,2026,2027];
     var prodMap = {
-      'COPR_OPEC':'OPEC Countries','COPR_US':'United States','COPR_CA':'Canada',
-      'COPR_MX':'Mexico','COPR_RS':'Russia','COPR_AZ':'Azerbaijan','COPR_KZ':'Kazakhstan',
-      'COPR_TM':'Turkmenistan','COPR_AR':'Argentina','COPR_BR':'Brazil','COPR_CO':'Colombia',
-      'PAPR_WORLD':'World Total','PAPR_NON_OPEC':'Other Non-OPEC'
+      'COPR_OPEC':'OPEC Countries','COPRPUS':'United States','PAPR_CA':'Canada',
+      'COPR_MX':'Mexico','COPR_RS':'Russia','COPR_AJ':'Azerbaijan','COPR_KZ':'Kazakhstan',
+      'PAPR_TX':'Turkmenistan','PAPR_AR':'Argentina','PAPR_BR':'Brazil','PAPR_CO':'Colombia',
+      'PAPR_WORLD':'World Total','PAPR_NONOPEC':'Other Non-OPEC'
     };
     STEO.wprod = {};
     for (var sid in prodMap) {
@@ -4755,11 +4755,11 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     console.log('  wprod: ' + Object.keys(STEO.wprod).length + ' regions');
 
     // ── 6. Consumption by Region (annual avg, 2023-2027) ──
-    var consIds = ['PATC_OECD','PATC_NON_OECD','PATC_US','PATC_WORLD','PATC_CN','PATC_IN'];
+    var consIds = ['PATC_OECD','PATC_NON_OECD','PATC_US','PATC_WORLD','PATC_CH','PATC_IN'];
     var consData = await steoFetch(consIds);
     var consMap = {
       'PATC_OECD':'OECD','PATC_NON_OECD':'Non-OECD','PATC_US':'United States',
-      'PATC_WORLD':'World Total','PATC_CN':'China','PATC_IN':'India'
+      'PATC_WORLD':'World Total','PATC_CH':'China','PATC_IN':'India'
     };
     STEO.cbyregion = {};
     for (var sid in consMap) {
@@ -4768,7 +4768,7 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     console.log('  cbyregion: ' + Object.keys(STEO.cbyregion).length + ' regions');
 
     // ── 7. US Crude Production (monthly) ──
-    STEO.usprod = bySeriesMonthly(prodData, 'COPR_US');
+    STEO.usprod = bySeriesMonthly(prodData, 'COPRPUS');
     console.log('  usprod: ' + STEO.usprod.length + ' months');
 
     // ── 8. World Consumption (monthly) ──
@@ -4780,12 +4780,12 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     console.log('  wcons: ' + STEO.wcons.length + ' months');
 
     // ── 9. US Crude Stocks (monthly, total + SPR + commercial) ──
-    var stockData = await steoFetch(['COPS_US','COSPR_US']);
+    var stockData = await steoFetch(['COSXPUS','COSQPUS']);
     var commByMonth = {};
     var sprByMonth = {};
     stockData.forEach(function(r) {
-      if (r._sid === 'COPS_US') commByMonth[r.period] = parseFloat(r.value) || 0;
-      if (r._sid === 'COSPR_US') sprByMonth[r.period] = parseFloat(r.value) || 0;
+      if (r._sid === 'COSXPUS') commByMonth[r.period] = parseFloat(r.value) || 0;
+      if (r._sid === 'COSQPUS') sprByMonth[r.period] = parseFloat(r.value) || 0;
     });
     STEO.uscrd = Object.keys(commByMonth).sort().map(function(p) {
       var comm = commByMonth[p] || 0;
@@ -4795,12 +4795,12 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     console.log('  uscrd: ' + STEO.uscrd.length + ' months');
 
     // ── 10. Gasoline & Distillate Stocks (monthly) ──
-    var gdData = await steoFetch(['MGTSTUS','DFTRSTUS']);
+    var gdData = await steoFetch(['MGTSPUS','DAPSPUS']);
     var gasByMonth = {};
     var distByMonth = {};
     gdData.forEach(function(r) {
-      if (r._sid === 'MGTSTUS') gasByMonth[r.period] = parseFloat(r.value) || 0;
-      if (r._sid === 'DFTRSTUS') distByMonth[r.period] = parseFloat(r.value) || 0;
+      if (r._sid === 'MGTSPUS') gasByMonth[r.period] = parseFloat(r.value) || 0;
+      if (r._sid === 'DAPSPUS') distByMonth[r.period] = parseFloat(r.value) || 0;
     });
     STEO.gd_stocks = Object.keys(gasByMonth).sort().map(function(p) {
       return [p + '-01', gasByMonth[p] || 0, distByMonth[p] || 0];
