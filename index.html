@@ -7112,7 +7112,6 @@ b.classList.toggle('active', b.textContent === SEASONAL_PRICES[k].name));
 renderSeasonal();
 }
 function renderSeasonal(){
-try {
 const cfg = SEASONAL_PRICES[seasonalKey];
 if(!cfg) return;
 const d = cfg.data;
@@ -7220,7 +7219,6 @@ html += '</div>';
 document.getElementById('seasonal-content').innerHTML = html;
 requestAnimationFrame(() => drawSeasonalChart(cfg, avg5, avg15, latestDay, avg5Now, avg15Now, nd, latestVal));
 }
-} catch(e) { console.error('renderSeasonal error:', e); }
 function _seasonalCard(label, value, sub, delta){
 const cls = delta == null ? '' : delta > 0 ? 'color:var(--green)' : delta < 0 ? 'color:var(--red)' : '';
 return `<div class="energy-card">
@@ -8095,7 +8093,7 @@ const FRED_SERIES = {
     {id:"UNRATE",l:"Unemp %",c:"#5b9cf0",lim:24,yAxis:'y'},{id:"ICSA",l:"Claims",c:"#40c8b0",lim:52,yAxis:'y1'}]}
 };
 
-async async function fredFetch(sid, limit) {
+async function fredFetch(sid, limit) {
   var base = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + sid + '&api_key=' + fredApiKey + '&file_type=json&sort_order=desc&limit=' + limit;
   var proxies = [
     function(u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
