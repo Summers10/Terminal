@@ -57,7 +57,6 @@ body.light .sum-flag-green{background:rgba(14,122,58,0.08) !important;}
 .subtab:hover{color:var(--text2)!important;border-bottom-color:var(--border3)!important}
 .subtab.active{color:var(--amber)!important;border-bottom-color:var(--amber)!important}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body class="light">
 <div id="pw-gate" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column">
@@ -7093,13 +7092,18 @@ const _SEAS_ENC = {ZC:{name:"Corn",unit:"\u00a2/bu",exchange:"CBOT",my:"Sep\u201
 let seasonalKey = 'ZC';
 const SEASONAL_PRICES=(function(){const o={};for(const[k,v]of Object.entries(_SEAS_ENC)){const nd={};for(const[yr,f]of Object.entries(v.data)){const p=[];let d=0;for(let i=0;i<f.length;i+=2){d+=f[i];p.push([d,f[i+1]])}nd[yr]=p}o[k]={name:v.name,unit:v.unit,exchange:v.exchange,my:v.my,data:nd}}return o})();
 function initSeasonal(){
+try {
 seasonalInited = true;
+console.log('initSeasonal starting, seasonalKey=' + seasonalKey);
 const btns = document.getElementById('seasonal-btns');
 const order = ['ZC','ZW','KE','ZS','ZM','ZL','RS','MATIF_W','MATIF_RS','PALM','CL','HO','RB','NG'];
-btns.innerHTML = order.filter(k=>SEASONAL_PRICES[k]).map(k =>
+var avail = order.filter(k=>SEASONAL_PRICES[k]);
+console.log('Seasonal avail:', avail.length);
+btns.innerHTML = avail.map(k =>
 `<button class="gsw-grain-btn${k===seasonalKey?' active':''}" onclick="setSeasonalKey('${k}')">${SEASONAL_PRICES[k].name}</button>`
 ).join('');
 renderSeasonal();
+} catch(e) { console.error('initSeasonal error:', e); }
 }
 function setSeasonalKey(k){
 seasonalKey = k;
@@ -7108,6 +7112,7 @@ b.classList.toggle('active', b.textContent === SEASONAL_PRICES[k].name));
 renderSeasonal();
 }
 function renderSeasonal(){
+try {
 const cfg = SEASONAL_PRICES[seasonalKey];
 if(!cfg) return;
 const d = cfg.data;
@@ -7215,6 +7220,7 @@ html += '</div>';
 document.getElementById('seasonal-content').innerHTML = html;
 requestAnimationFrame(() => drawSeasonalChart(cfg, avg5, avg15, latestDay, avg5Now, avg15Now, nd, latestVal));
 }
+} catch(e) { console.error('renderSeasonal error:', e); }
 function _seasonalCard(label, value, sub, delta){
 const cls = delta == null ? '' : delta > 0 ? 'color:var(--green)' : delta < 0 ? 'color:var(--red)' : '';
 return `<div class="energy-card">
@@ -8235,6 +8241,16 @@ function updateFredCharts() {
   });
 }
 
+</script>
+<script>
+// Load Chart.js dynamically so failure doesn't block anything
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  s.async = true;
+  s.onerror = function(){ console.warn('Chart.js CDN unavailable - macro charts disabled'); };
+  document.head.appendChild(s);
+})();
 </script>
 </body>
 </html>
