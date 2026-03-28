@@ -1264,11 +1264,11 @@ function renderSummaryPage(){
   document.getElementById('sum-spread-tbl').innerHTML = shtml;
 
   // === ENERGY MINI-SUMMARY ===
-  if(typeof EIA !== 'undefined' && EIA.records){
-    document.getElementById('sum-eia-asof').textContent = 'Week ending ' + EIA.latest_date;
+  if(typeof EIA !== 'undefined' && EIA.records && EIA.records.length > 0){
+    document.getElementById('sum-eia-asof').textContent = 'Week ending ' + (EIA.latest_date || '');
     const last = EIA.records[EIA.records.length - 1];
     const wk = String(last.w);
-    const band = _EIA_RAW.band[wk] || {};
+    const band = (EIA.band && EIA.band[wk]) || {};
     const cats = [
       {key:'crude_ex_spr', label:'Crude (ex SPR)', div:1000},
       {key:'cushing', label:'Cushing', div:1000},
@@ -4541,29 +4541,37 @@ let NGS = {records:[], band:{}};
   // ── Natural Gas Storage ──
   try {
     if (el) el.textContent = 'Loading natural gas...';
-    var ngUrl = 'https://api.eia.gov/v2/natural-gas/stor/wkly/data/'
-      + '?api_key=' + EIA_KEY
-      + '&frequency=weekly&data[0]=value'
-      + '&facets[process][]=SAY'
-      + '&sort[0][column]=period&sort[0][direction]=asc'
-      + '&offset=0&length=5000';
-    var ngResp = await fetch(ngUrl);
-    if (ngResp.ok) {
+    var ngSeriesMap = {
+      'NW2_EPG0_SWO_R48_BCF': 'total',
+      'NW2_EPG0_SWO_R31_BCF': 'east',
+      'NW2_EPG0_SWO_R32_BCF': 'midwest',
+      'NW2_EPG0_SWO_R33_BCF': 'south_central'
+    };
+    var ngSeriesIds = Object.keys(ngSeriesMap);
+    var ngAllData = [];
+    for (var nsi = 0; nsi < ngSeriesIds.length; nsi++) {
+      var nsid = ngSeriesIds[nsi];
+      var ngUrl = 'https://api.eia.gov/v2/natural-gas/stor/wkly/data/'
+        + '?api_key=' + EIA_KEY
+        + '&frequency=weekly&data[0]=value'
+        + '&facets[series][]=' + nsid
+        + '&sort[0][column]=period&sort[0][direction]=asc&length=5000';
+      var ngResp = await fetch(ngUrl);
+      if (!ngResp.ok) continue;
       var ngJson = await ngResp.json();
-      var ngData = ngJson.response && ngJson.response.data ? ngJson.response.data : [];
-
-      // Map regions
-      var regionMap = {
-        'NUS': 'total',
-        'R1X': 'east',
-        'R2X': 'midwest',
-        'R3X': 'south_central'
-      };
-
+      var ngRows = ngJson.response && ngJson.response.data ? ngJson.response.data : [];
+      for (var nri = 0; nri < ngRows.length; nri++) {
+        ngRows[nri]._region = ngSeriesMap[nsid];
+      }
+      ngAllData = ngAllData.concat(ngRows);
+      if (el) el.textContent = 'Loading nat gas... ' + (nsi+1) + '/4';
+    }
+    var ngData = ngAllData;
+    if (ngData.length > 0) {
       var ngByDate = {};
       for (var i = 0; i < ngData.length; i++) {
         var r = ngData[i];
-        var region = regionMap[r.duoarea];
+        var region = r._region;
         if (!region) continue;
         if (!ngByDate[r.period]) ngByDate[r.period] = {};
         ngByDate[r.period][region] = parseInt(r.value) || 0;
@@ -4636,10 +4644,14 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
         + '&sort[0][column]=period&sort[0][direction]=asc&length=5000';
       try {
         var resp = await fetch(url);
-        if (!resp.ok) continue;
+        if (!resp.ok) { console.warn('STEO ' + seriesIds[i] + ': HTTP ' + resp.status); continue; }
         var json = await resp.json();
         var rows = json.response && json.response.data ? json.response.data : [];
-        for (var r = 0; r < rows.length; r++) rows[r]._sid = seriesIds[i];
+        console.log('  STEO ' + seriesIds[i] + ': ' + rows.length + ' rows');
+        for (var r = 0; r < rows.length; r++) {
+          rows[r]._sid = seriesIds[i];
+          if (!rows[r].value && rows[r].value !== 0) continue;
+        }
         allData = allData.concat(rows);
       } catch(e) { console.warn('STEO skip ' + seriesIds[i]); }
     }
@@ -5121,6 +5133,7 @@ natgas:        {label:'Nat Gas Storage (Total L48)', short:'NAT GAS', unit:'Bcf'
 const METRICS = Object.keys(ENERGY_META);
 function initEnergy(){
 energyInited = true;
+if (!EIA.records.length && !NGS.records.length) { console.warn('initEnergy: no data yet'); return; }
 renderSTEO();
 document.getElementById('energy-asof').textContent = 'EIA DATA: WEEK ENDING '+EIA.latest_date.toUpperCase()+' · RELEASED '+EIA.release_date.toUpperCase();
 renderEnergyScoreboard();
