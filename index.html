@@ -1012,6 +1012,7 @@ if(seasonalInited) renderSeasonal();
 }
 let sumInited = false;
 function renderSummaryPage(){
+  try {
   // === COMMODITY OVERVIEW TABLE ===
   const comms = [
     {name:'Corn', sym:'ZC', cotName:'Corn', regComm:'Corn'},
@@ -1301,7 +1302,7 @@ function renderSummaryPage(){
     document.getElementById('sum-energy-tbl').innerHTML = ehtml;
   }
 
-}
+} catch(e) { console.warn('Summary page render deferred:', e.message); }}
 
 function switchTab(t){
 document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -4556,13 +4557,15 @@ let NGS = {records:[], band:{}};
         + '&frequency=weekly&data[0]=value'
         + '&facets[series][]=' + nsid
         + '&sort[0][column]=period&sort[0][direction]=asc&length=5000';
+      console.log('  NG fetching: ' + nsid);
       var ngResp = await fetch(ngUrl);
-      if (!ngResp.ok) continue;
+      if (!ngResp.ok) { console.warn('  NG ' + nsid + ': HTTP ' + ngResp.status); continue; }
       var ngJson = await ngResp.json();
       var ngRows = ngJson.response && ngJson.response.data ? ngJson.response.data : [];
       for (var nri = 0; nri < ngRows.length; nri++) {
         ngRows[nri]._region = ngSeriesMap[nsid];
       }
+      console.log('  NG series ' + nsid + ': ' + ngRows.length + ' rows');
       ngAllData = ngAllData.concat(ngRows);
       if (el) el.textContent = 'Loading nat gas... ' + (nsi+1) + '/4';
     }
@@ -4627,6 +4630,7 @@ let NGS = {records:[], band:{}};
     energyInited = false;
     initEnergy();
     if (el) el.textContent = 'EIA live · thru ' + (EIA.latest_date || '—');
+    try { renderSummaryPage(); } catch(e2) {}
   } catch(e) { console.error('Energy init error:', e); }
 })();
 let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],wcons:[],uscrd:[],gd_stocks:[]};
@@ -5133,12 +5137,13 @@ natgas:        {label:'Nat Gas Storage (Total L48)', short:'NAT GAS', unit:'Bcf'
 const METRICS = Object.keys(ENERGY_META);
 function initEnergy(){
 energyInited = true;
-if (!EIA.records.length && !NGS.records.length) { console.warn('initEnergy: no data yet'); return; }
-renderSTEO();
-document.getElementById('energy-asof').textContent = 'EIA DATA: WEEK ENDING '+EIA.latest_date.toUpperCase()+' · RELEASED '+EIA.release_date.toUpperCase();
-renderEnergyScoreboard();
-drawEnergyChart();
-renderEnergyTable();
+if (!EIA || !EIA.records || (!EIA.records.length && (!NGS || !NGS.records || !NGS.records.length))) { console.warn('initEnergy: no data yet'); return; }
+try { renderSTEO(); } catch(e) { console.warn('renderSTEO error:', e.message); }
+var asof = document.getElementById('energy-asof');
+if (asof) asof.textContent = EIA.latest_date ? 'EIA DATA · WEEK ENDING ' + EIA.latest_date : 'Loading EIA data...';
+try { renderEnergyScoreboard(); } catch(e) { console.warn('Scoreboard error:', e.message); }
+try { drawEnergyChart(); } catch(e) { console.warn('Energy chart error:', e.message); }
+try { renderEnergyTable(); } catch(e) { console.warn('Energy table error:', e.message); }
 }
 function setEnergyMetric(m){
 energyMetric = m;
