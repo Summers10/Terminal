@@ -5136,14 +5136,17 @@ ethanol:       {label:'Fuel Ethanol Stocks', short:'ETHANOL', unit:'Kb', color:'
 natgas:        {label:'Nat Gas Storage (Total L48)', short:'NAT GAS', unit:'Bcf', color:'#38bdf8', src:'ngs'}};
 const METRICS = Object.keys(ENERGY_META);
 function initEnergy(){
+try {
 energyInited = true;
-if (!EIA || !EIA.records || (!EIA.records.length && (!NGS || !NGS.records || !NGS.records.length))) { console.warn('initEnergy: no data yet'); return; }
+if (!EIA || !EIA.records || !EIA.records.length) { console.warn('initEnergy: no EIA data yet'); return; }
 try { renderSTEO(); } catch(e) { console.warn('renderSTEO error:', e.message); }
 var asof = document.getElementById('energy-asof');
-if (asof) asof.textContent = EIA.latest_date ? 'EIA DATA · WEEK ENDING ' + EIA.latest_date : 'Loading EIA data...';
+if (asof && EIA.latest_date) asof.textContent = 'EIA DATA · WEEK ENDING ' + String(EIA.latest_date);
+else if (asof) asof.textContent = 'Loading EIA data...';
 try { renderEnergyScoreboard(); } catch(e) { console.warn('Scoreboard error:', e.message); }
 try { drawEnergyChart(); } catch(e) { console.warn('Energy chart error:', e.message); }
 try { renderEnergyTable(); } catch(e) { console.warn('Energy table error:', e.message); }
+} catch(fatal) { console.error('initEnergy fatal:', fatal); }
 }
 function setEnergyMetric(m){
 energyMetric = m;
@@ -5156,6 +5159,7 @@ function getLatestRef(metric){
 const meta = ENERGY_META[metric];
 const DS = meta.src === 'ngs' ? NGS : EIA;
 const field = meta.src === 'ngs' ? 'total' : metric;
+if(!DS || !DS.records) return {};
 const recs2026 = DS.records.filter(r=>r.y===2026);
 if(!recs2026.length) return {};
 const latest = recs2026[recs2026.length-1];
