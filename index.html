@@ -623,8 +623,6 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <span class="energy-chart-sub" id="energy-chart-sub">Weekly Ending Stocks · Thousand Barrels</span>
         <div class="energy-chart-legend">
           <span><span class="energy-legend-dot" style="background:#f5a623;height:3px;"></span>2026 YTD</span>
-          <span><span class="energy-legend-dot" style="background:rgba(91,156,240,0.6);height:2px;border-top:1px dotted rgba(91,156,240,0.6);"></span>2025</span>
-          <span><span class="energy-legend-dot" style="background:rgba(100,120,140,0.4);height:2px;border-top:1px dashed rgba(100,120,140,0.4);"></span>2024</span>
           <span><span class="energy-legend-dot" style="background:rgba(245,166,35,0.5);height:2px;border-style:dashed;"></span>5yr Avg</span>
           <span><span class="energy-legend-dot" style="background:rgba(180,130,60,0.35);height:8px;border-radius:2px;"></span>5yr Range</span>
         </div>
@@ -669,7 +667,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         </div>
       </div>
       <div class="panel" style="margin-bottom:0;">
-        <div class="panel-hdr"><span class="panel-title">U.S. CRUDE STOCKS</span><span class="panel-sub">million bbl · 2021–2025 Range Band</span></div>
+        <div class="panel-hdr"><span class="panel-title">U.S. CRUDE STOCKS</span><span class="panel-sub">million bbl · total (comm + SPR) · 5yr range band</span></div>
         <div style="border:1px solid var(--border2);border-top:none;padding:10px 12px;background:var(--bg);">
           <canvas id="steo-uscrd-canvas" style="display:block;width:100%;height:260px;"></canvas>
         </div>
@@ -5144,6 +5142,25 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
       var spr = sprByMonth[p] || 0;
       return [p + '-01', comm + spr, spr, comm];
     });
+    // Compute 5-year range band for total US crude stocks by month
+    var uscrdByMonth = {};
+    var cYr = new Date().getFullYear();
+    STEO.uscrd.forEach(function(row){
+      var yr = parseInt(row[0].slice(0,4));
+      var mo = row[0].slice(5,7);
+      if (yr >= cYr - 5 && yr < cYr) {
+        if (!uscrdByMonth[mo]) uscrdByMonth[mo] = [];
+        uscrdByMonth[mo].push(row[1]); // total stocks
+      }
+    });
+    STEO.uscrd = STEO.uscrd.map(function(row){
+      var mo = row[0].slice(5,7);
+      var hist = uscrdByMonth[mo];
+      if (hist && hist.length >= 2) {
+        return [row[0], row[1], Math.min.apply(null, hist), Math.max.apply(null, hist)];
+      }
+      return [row[0], row[1], null, null];
+    });
     console.log('  uscrd: ' + STEO.uscrd.length + ' months');
 
     // ── 10. Gasoline & Distillate Stocks (monthly) ──
@@ -5634,11 +5651,7 @@ for(const [x,y] of avgPts.slice(1)) ctx.lineTo(x,y);
 ctx.stroke();
 ctx.setLineDash([]);
 }
-const lineStyles = [
-{yr:2024, color:isDark?'rgba(100,120,140,0.4)':'rgba(100,120,140,0.35)', width:1.5, dash:[4,3], alpha:1},
-{yr:2025, color:isDark?'rgba(91,156,240,0.6)':'rgba(68,136,221,0.5)', width:1.5, dash:[2,2], alpha:1},
-{yr:2026, color:meta.color, width:3, dash:[], alpha:1},
-];
+const lineStyles = [{yr:2026, color:meta.color, width:3, dash:[], alpha:1},];
 for(const {yr,color,width,dash,alpha} of lineStyles){
 const pts = weeks.map(wk => {
 const v = byYrWk[yr] && byYrWk[yr][wk];
@@ -7956,7 +7969,7 @@ function buildFredDashboard() {
     {id:"DGS30",l:"30Y",c:"#1a3d80"},
     {id:"DFF",l:"FF Rate",c:"#C4302B"},{id:"SOFR",l:"SOFR",c:"#D4850A"}
   ];
-  html += '<div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">';
+  html += '<div class="metrics-grid" style="grid-template-columns:repeat(' + rateIds.length + ',1fr)">';
   rateIds.forEach(function(s) {
     html += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
     html += '<div class="metric-value" id="fv-' + s.id + '">\u2014</div>';
