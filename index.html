@@ -647,29 +647,15 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
       <div class="panel" style="margin-bottom:0;">
-        <div class="panel-hdr"><span class="panel-title">OECD DAYS OF SUPPLY</span><span class="panel-sub">commercial crude + liquids</span></div>
-        <div style="border:1px solid var(--border2);border-top:none;padding:10px 12px;background:var(--bg);">
-          <canvas id="steo-oecd-canvas" style="display:block;width:100%;height:260px;"></canvas>
-        </div>
-      </div>
-      <div class="panel" style="margin-bottom:0;">
         <div class="panel-hdr"><span class="panel-title">OPEC SPARE CAPACITY</span><span class="panel-sub">million bbl/d · Annual</span></div>
         <div style="border:1px solid var(--border2);border-top:none;padding:10px 12px;background:var(--bg);">
           <canvas id="steo-opec-canvas" style="display:block;width:100%;height:260px;"></canvas>
         </div>
       </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
       <div class="panel" style="margin-bottom:0;">
         <div class="panel-hdr"><span class="panel-title">WTI CRUDE OIL</span><span class="panel-sub">$/bbl · Monthly · Hist + STEO Forecast</span></div>
         <div style="border:1px solid var(--border2);border-top:none;padding:10px 12px;background:var(--bg);">
           <canvas id="steo-wti-canvas" style="display:block;width:100%;height:260px;"></canvas>
-        </div>
-      </div>
-      <div class="panel" style="margin-bottom:0;">
-        <div class="panel-hdr"><span class="panel-title">U.S. CRUDE STOCKS</span><span class="panel-sub">million bbl · total (comm + SPR) · 5yr range band</span></div>
-        <div style="border:1px solid var(--border2);border-top:none;padding:10px 12px;background:var(--bg);">
-          <canvas id="steo-uscrd-canvas" style="display:block;width:100%;height:260px;"></canvas>
         </div>
       </div>
     </div>
@@ -7848,8 +7834,8 @@ const FRED_SERIES = {
     {id:"DFII10",l:"10Y Real",c:"#6366f1",lim:252}]},
   fed:{title:"FED POLICY RATES",sub:"Fed Funds & SOFR",s:[
     {id:"DFF",l:"Fed Funds",c:"#C4302B",lim:252},{id:"SOFR",l:"SOFR",c:"#D4850A",lim:252}]},
-  credit:{title:"CREDIT SPREADS",sub:"OAS (bps)",s:[
-    {id:"BAMLH0A0HYM2",l:"HY OAS",c:"#b83838",lim:252},{id:"BAMLC0A4CBBB",l:"BBB OAS",c:"#8b5cf6",lim:252}]},
+  credit:{title:"CREDIT SPREADS",sub:"Option-adjusted spread (%)",dual:true,s:[
+    {id:"BAMLH0A0HYM2",l:"HY OAS",c:"#b83838",lim:252,yAxis:'y'},{id:"BAMLC0A4CBBB",l:"BBB OAS",c:"#8b5cf6",lim:252,yAxis:'y1'}]},
   labor:{title:"LABOR MARKET",sub:"Unemployment & claims",dual:true,s:[
     {id:"UNRATE",l:"Unemp %",c:"#5b9cf0",lim:24,yAxis:'y'},{id:"ICSA",l:"Claims",c:"#40c8b0",lim:104,yAxis:'y1'}]}
 };
@@ -7985,7 +7971,7 @@ function buildFredDashboard() {
   var chartPanels = [
     {k:'inflation', title:'INFLATION EXPECTATIONS', sub:'Breakevens & 10Y real yield'},
     {k:'fed', title:'FED POLICY RATES', sub:'Fed Funds & SOFR'},
-    {k:'credit', title:'CREDIT SPREADS', sub:'Option-adjusted spread (bps)'},
+    {k:'credit', title:'CREDIT SPREADS', sub:'Option-adjusted spread (%)'},
     {k:'labor', title:'LABOR MARKET', sub:'Unemployment rate & initial claims'},
     {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'}
   ];
