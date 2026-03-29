@@ -11,7 +11,7 @@ body.light .sum-flag-red{background:rgba(196,48,43,0.08) !important;}
 .sum-flag-green{background:rgba(46,143,82,0.12) !important;}
 body.light .sum-flag-green{background:rgba(14,122,58,0.08) !important;}
 .info-btn{background:none;border:1px solid var(--border2);color:var(--text3);width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;font-weight:700;font-family:serif;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0}.info-btn:hover{border-color:var(--amber);color:var(--amber)}.info-btn.active{background:var(--amber);color:#000;border-color:var(--amber)}.info-panel{display:none;padding:12px 18px;background:var(--bg2);border:1px solid var(--border2);border-top:2px solid var(--amber);font-size:13px;color:var(--text2);line-height:1.7;letter-spacing:.02em}.info-panel.show{display:block}.info-panel strong{color:var(--amber);font-weight:800;letter-spacing:.06em}
-.grd{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:14px;align-items:stretch}
+.grd{display:grid;grid-template-columns:repeat(auto-fit,minmax(560px,1fr));gap:14px;align-items:stretch}
 @media(max-width:520px){.grd{grid-template-columns:1fr}}
 .metrics-grid{display:grid;border-bottom:none}
 .metric-cell{padding:10px 12px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg);position:relative}
@@ -23,7 +23,7 @@ body.light .sum-flag-green{background:rgba(14,122,58,0.08) !important;}
 .metric-chg{font-size:11px;font-weight:800;letter-spacing:.02em}
 .metric-date{font-size:9px;color:var(--text4);letter-spacing:.06em;margin-top:4px;text-transform:uppercase}
 .metric-1w{font-size:10px;font-weight:700}
-.chart-wrap{padding:10px 14px 12px;background:var(--bg)}.cc{position:relative;flex:1;min-height:260px;width:100%}
+.chart-wrap{padding:10px 14px 12px;background:var(--bg);display:flex;flex-direction:column}.cc{position:relative;flex:1;min-height:260px;width:100%}
 .ycc{height:280px;position:relative}
 .ycw{grid-column:1/-1}
 .ust-tbl{width:100%;border-collapse:collapse;font-family:'Courier New',monospace}
@@ -1502,6 +1502,11 @@ subDiv.querySelectorAll('.subtab').forEach(function(b) {
 if (group === 'macro') {
   document.getElementById('macro-page-wrap').classList.add('active');
   if(!macroInited){initMacro();}
+  // Force Chart.js resize after page becomes visible
+  setTimeout(function(){
+    Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} });
+    drawYieldCurveSnapshot();
+  }, 50);
   setMacroView(tab);
   window.scrollTo(0,0);
   return;
@@ -7804,7 +7809,7 @@ const FRED_SERIES = {
     {id:"T5YIE",l:"5Y B/E",c:"#0E7A3A",lim:252},{id:"T10YIE",l:"10Y B/E",c:"#2e8f52",lim:252},
     {id:"DFII10",l:"10Y Real",c:"#6366f1",lim:252}]},
   fed:{title:"FED POLICY RATES",sub:"Fed Funds & SOFR",s:[
-    {id:"FEDFUNDS",l:"Fed Funds",c:"#C4302B",lim:24},{id:"SOFR",l:"SOFR",c:"#D4850A",lim:252}]},
+    {id:"DFF",l:"Fed Funds",c:"#C4302B",lim:252},{id:"SOFR",l:"SOFR",c:"#D4850A",lim:252}]},
   credit:{title:"CREDIT SPREADS",sub:"OAS (bps)",s:[
     {id:"BAMLH0A0HYM2",l:"HY OAS",c:"#b83838",lim:252},{id:"BAMLC0A4CBBB",l:"BBB OAS",c:"#8b5cf6",lim:252}]},
   labor:{title:"LABOR MARKET",sub:"Unemployment & claims",dual:true,s:[
@@ -7813,16 +7818,26 @@ const FRED_SERIES = {
 
 async function fredFetch(sid, limit) {
   var base = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + sid + '&api_key=' + fredApiKey + '&file_type=json&sort_order=desc&limit=' + limit;
+  var parse = function(json) {
+    if (json.observations) return json.observations.filter(function(o) { return o.value !== '.'; }).map(function(o) { return { d: o.date, v: parseFloat(o.value) }; });
+    return null;
+  };
+  // Try direct first (FRED supports CORS)
+  try {
+    var resp = await fetch(base);
+    if (resp.ok) { var r = parse(await resp.json()); if (r && r.length) return r; }
+  } catch(e) {}
+  // Fallback to proxies
   var proxies = [
     function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
     function(u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); }
   ];
   for (var pi = 0; pi < proxies.length; pi++) {
     try {
-      var resp = await fetch(proxies[pi](base));
-      if (!resp.ok) continue;
-      var json = await resp.json();
-      if (json.observations) return json.observations.filter(function(o) { return o.value !== '.'; }).map(function(o) { return { d: o.date, v: parseFloat(o.value) }; });
+      var resp2 = await fetch(proxies[pi](base));
+      if (!resp2.ok) continue;
+      var r2 = parse(await resp2.json());
+      if (r2 && r2.length) return r2;
     } catch(e) { continue; }
   }
   return null;
@@ -7862,6 +7877,11 @@ async function refreshFred() {
   }
 
   updateFredCharts();
+  // Force resize after rendering
+  setTimeout(function(){
+    Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} });
+    drawYieldCurveSnapshot();
+  }, 100);
   if (lb) lb.style.display = 'none';
   if (st) {
     st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series';
@@ -7909,7 +7929,7 @@ function buildFredDashboard() {
     {id:"DGS2",l:"2Y",c:"#4488dd"},{id:"DGS5",l:"5Y",c:"#3366bb"},
     {id:"DGS7",l:"7Y",c:"#2255aa"},{id:"DGS10",l:"10Y",c:"#6366f1"},
     {id:"DGS30",l:"30Y",c:"#1a3d80"},
-    {id:"FEDFUNDS",l:"FF Rate",c:"#C4302B"},{id:"SOFR",l:"SOFR",c:"#D4850A"}
+    {id:"DFF",l:"FF Rate",c:"#C4302B"},{id:"SOFR",l:"SOFR",c:"#D4850A"}
   ];
   html += '<div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">';
   rateIds.forEach(function(s) {
@@ -7946,7 +7966,7 @@ function buildFredDashboard() {
     }
     html += '<div class="panel"><div class="panel-hdr"><div class="panel-title">' + p.title + '</div>';
     html += '<div class="panel-sub">' + p.sub + '</div></div>' + mh;
-    html += '<div class="chart-wrap"><div class="cc"><canvas id="fredChart-' + p.k + '"></canvas></div></div></div>';
+    html += '<div class="chart-wrap"><div class="cc"><canvas id="fredChart-' + p.k + '" style="display:block;width:100%;height:260px"></canvas></div></div></div>';
   });
   grid.innerHTML = html;
 }
@@ -7984,7 +8004,7 @@ function updateFredCharts() {
       scales.y1 = { position: 'left', ticks: { color: textC, font: { size: 10 } }, grid: { display: false } };
     }
 
-    if(typeof Chart === "undefined") return;
+    if(typeof Chart === "undefined" || !chartReady) return;
     fredCharts[k] = new Chart(canvas, {
       type: 'line',
       data: { datasets: datasets },
@@ -8138,6 +8158,7 @@ function drawYieldCurveSnapshot() {
 </script>
 <script>
 // Load Chart.js dynamically so failure doesn't block anything
+var chartReady = false;
 (function(){
   var s = document.createElement('script');
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
@@ -8147,6 +8168,17 @@ function drawYieldCurveSnapshot() {
     var a = document.createElement('script');
     a.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js';
     a.async = true;
+    a.onload = function(){
+      chartReady = true;
+      // If macro data already loaded, re-render charts now that adapter is ready
+      if (macroInited && Object.keys(fredData).length > 0) {
+        updateFredCharts();
+        setTimeout(function(){
+          Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} });
+          drawYieldCurveSnapshot();
+        }, 100);
+      }
+    };
     document.head.appendChild(a);
   };
   document.head.appendChild(s);
