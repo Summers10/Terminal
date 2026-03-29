@@ -8010,25 +8010,38 @@ function updateFredCharts() {
     if (fredCharts[k]) { try { fredCharts[k].destroy(); } catch(e){} }
 
     var datasets = [];
-    var latestStart = null;
+    var allPts = [];
     grp.s.forEach(function(s) {
       var data = fredData[s.id];
       if (!data) return;
       var pts = data.slice().sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0;}).map(function(d) { return { x: d.d, y: d.v }; });
-      if (pts.length > 0) {
-        var startDate = pts[0].x;
-        if (!latestStart || startDate > latestStart) latestStart = startDate;
-      }
-      var ds = { label: s.l, data: pts, borderColor: s.c, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3 };
-      if (grp.dual && s.yAxis) ds.yAxisID = s.yAxis;
+      allPts.push({s:s, pts:pts});
+    });
+
+    if (!allPts.length) return;
+
+    // Find latest start date across all datasets so lines begin together
+    var commonStart = null;
+    allPts.forEach(function(item) {
+      if (!item.pts.length) return;
+      var s0 = item.pts[0].x;
+      if (!commonStart || s0 > commonStart) commonStart = s0;
+    });
+
+    allPts.forEach(function(item) {
+      // Trim points to start at common date (keep all data to the right)
+      var trimmed = commonStart
+        ? item.pts.filter(function(p){ return p.x >= commonStart; })
+        : item.pts;
+      var ds = { label: item.s.l, data: trimmed, borderColor: item.s.c, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3 };
+      if (grp.dual && item.s.yAxis) ds.yAxisID = item.s.yAxis;
       datasets.push(ds);
     });
 
     if (!datasets.length) return;
 
-    // Clamp x-axis so all series start at the same point (latest first-date)
     var scales = {
-      x: { type: 'time', min: latestStart || undefined, time: { tooltipFormat: 'yyyy-MM-dd', unit: 'month' }, ticks: { color: textC, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: gridC } },
+      x: { type: 'time', time: { tooltipFormat: 'yyyy-MM-dd', unit: 'month' }, ticks: { color: textC, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: gridC } },
       y: { position: 'right', ticks: { color: textC, font: { size: 10 } }, grid: { color: gridC } }
     };
     if (grp.dual) {
