@@ -13,7 +13,7 @@ body.light .sum-flag-green{background:rgba(14,122,58,0.08) !important;}
 .info-btn{background:none;border:1px solid var(--border2);color:var(--text3);width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;font-weight:700;font-family:serif;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0}.info-btn:hover{border-color:var(--amber);color:var(--amber)}.info-btn.active{background:var(--amber);color:#000;border-color:var(--amber)}.info-panel{display:none;padding:12px 18px;background:var(--bg2);border:1px solid var(--border2);border-top:2px solid var(--amber);font-size:13px;color:var(--text2);line-height:1.7;letter-spacing:.02em}.info-panel.show{display:block}.info-panel strong{color:var(--amber);font-weight:800;letter-spacing:.06em}
 .grd{display:grid;grid-template-columns:repeat(auto-fit,minmax(560px,1fr));gap:14px;align-items:stretch}
 @media(max-width:520px){.grd{grid-template-columns:1fr}}
-.metrics-grid{display:grid;border-bottom:none}
+.metrics-grid{display:grid;border-bottom:none;width:100%}
 .metric-cell{padding:10px 12px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg);position:relative}
 .metric-cell:nth-child(even){background:var(--row-alt)}
 .metric-cell:last-child{border-right:none}
@@ -7934,16 +7934,19 @@ function updateFredMetric(s) {
   var cur = data[0];
   var prev = data[1] || cur;
   var chg = cur.v - prev.v;
-  var el = document.getElementById('fv-' + s.id);
-  if (el) el.textContent = cur.v >= 1000 ? Math.round(cur.v).toLocaleString() : cur.v.toFixed(2);
-  var chgEl = document.getElementById('fc-' + s.id);
-  if (chgEl) {
-    var sign = chg >= 0 ? '+' : '';
-    chgEl.textContent = sign + (Math.abs(chg) >= 100 ? Math.round(chg).toLocaleString() : chg.toFixed(2));
-    chgEl.className = 'metric-chg ' + (chg > 0 ? 'up' : chg < 0 ? 'dn' : '');
-  }
-  var dtEl = document.getElementById('fd-' + s.id);
-  if (dtEl) dtEl.textContent = cur.d;
+  var valText = cur.v >= 1000 ? Math.round(cur.v).toLocaleString() : cur.v.toFixed(2);
+  var sign = chg >= 0 ? '+' : '';
+  var chgText = sign + (Math.abs(chg) >= 100 ? Math.round(chg).toLocaleString() : chg.toFixed(2));
+  var chgClass = 'metric-chg ' + (chg > 0 ? 'up' : chg < 0 ? 'dn' : '');
+  // Update all matching elements (primary + any prefixed duplicates)
+  ['', '2-'].forEach(function(pfx) {
+    var el = document.getElementById('fv-' + pfx + s.id);
+    if (el) el.textContent = valText;
+    var chgEl = document.getElementById('fc-' + pfx + s.id);
+    if (chgEl) { chgEl.textContent = chgText; chgEl.className = chgClass; }
+    var dtEl = document.getElementById('fd-' + pfx + s.id);
+    if (dtEl) dtEl.textContent = cur.d;
+  });
 }
 
 function buildFredDashboard() {
@@ -7969,7 +7972,7 @@ function buildFredDashboard() {
     {id:"DGS30",l:"30Y",c:"#1a3d80"},
     {id:"DFF",l:"FF Rate",c:"#C4302B"},{id:"SOFR",l:"SOFR",c:"#D4850A"}
   ];
-  html += '<div class="metrics-grid" style="grid-template-columns:repeat(' + rateIds.length + ',1fr)">';
+  html += '<div class="metrics-grid" style="grid-template-columns:repeat(' + rateIds.length + ',1fr);width:100%;border:1px solid var(--border);border-top:none">';
   rateIds.forEach(function(s) {
     html += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
     html += '<div class="metric-value" id="fv-' + s.id + '">\u2014</div>';
@@ -7989,19 +7992,16 @@ function buildFredDashboard() {
   chartPanels.forEach(function(p) {
     var grp = FRED_SERIES[p.k];
     if (!grp) return;
-    // Skip metric cards for fed — already shown in rate strip above
-    var mh = '';
-    if (p.k !== 'fed') {
-      var cols = Math.min(grp.s.length, 4);
-      mh = '<div class="metrics-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
-      grp.s.forEach(function(s) {
-        mh += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
-        mh += '<div class="metric-value" id="fv-' + s.id + '">\u2014</div>';
-        mh += '<div class="metric-row"><span class="metric-chg" id="fc-' + s.id + '"></span></div>';
-        mh += '<div class="metric-date" id="fd-' + s.id + '"></div></div>';
-      });
-      mh += '</div>';
-    }
+    var cols = Math.min(grp.s.length, 4);
+    var idPrefix = (p.k === 'fed') ? '2-' : '';
+    var mh = '<div class="metrics-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
+    grp.s.forEach(function(s) {
+      mh += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
+      mh += '<div class="metric-value" id="fv-' + idPrefix + s.id + '">\u2014</div>';
+      mh += '<div class="metric-row"><span class="metric-chg" id="fc-' + idPrefix + s.id + '"></span></div>';
+      mh += '<div class="metric-date" id="fd-' + idPrefix + s.id + '"></div></div>';
+    });
+    mh += '</div>';
     html += '<div class="panel"><div class="panel-hdr"><div class="panel-title">' + p.title + '</div>';
     html += '<div class="panel-sub">' + p.sub + '</div></div>' + mh;
     html += '<div class="chart-wrap"><div class="cc"><canvas id="fredChart-' + p.k + '" style="display:block;width:100%;height:260px"></canvas></div></div></div>';
