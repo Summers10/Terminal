@@ -623,8 +623,10 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <span class="energy-chart-sub" id="energy-chart-sub">Weekly Ending Stocks · Thousand Barrels</span>
         <div class="energy-chart-legend">
           <span><span class="energy-legend-dot" style="background:#f5a623;height:3px;"></span>2026 YTD</span>
+          <span><span class="energy-legend-dot" style="background:rgba(91,156,240,0.6);height:2px;border-top:1px dotted rgba(91,156,240,0.6);"></span>2025</span>
+          <span><span class="energy-legend-dot" style="background:rgba(100,120,140,0.4);height:2px;border-top:1px dashed rgba(100,120,140,0.4);"></span>2024</span>
           <span><span class="energy-legend-dot" style="background:rgba(245,166,35,0.5);height:2px;border-style:dashed;"></span>5yr Avg</span>
-          <span><span class="energy-legend-dot" style="background:rgba(180,130,60,0.35);height:8px;border-radius:2px;"></span>5yr Range (2021–2025)</span>
+          <span><span class="energy-legend-dot" style="background:rgba(180,130,60,0.35);height:8px;border-radius:2px;"></span>5yr Range</span>
         </div>
       </div>
       <canvas class="energy-canvas" id="energy-canvas"></canvas>
@@ -5064,7 +5066,26 @@ let STEO = {wti:[],gsdb:[],opec:[],oecd_days:[],wprod:{},cbyregion:{},usprod:[],
     var oecdData = await steoFetch(['PASC_OECD_T3']);
     STEO.oecd_days = oecdData.filter(function(r){return r._sid==='PASC_OECD_T3';}).map(function(r) {
       var v = parseFloat(r.value) || 0;
-      return [r.period + '-01', v, v * 0.78, v];
+      return [r.period + '-01', v];
+    });
+    // Compute 5-year band for OECD by month
+    var oecdByMonth = {};
+    var curYr = new Date().getFullYear();
+    STEO.oecd_days.forEach(function(row){
+      var yr = parseInt(row[0].slice(0,4));
+      var mo = row[0].slice(5,7);
+      if (yr >= curYr - 5 && yr < curYr) {
+        if (!oecdByMonth[mo]) oecdByMonth[mo] = [];
+        oecdByMonth[mo].push(row[1]);
+      }
+    });
+    STEO.oecd_days = STEO.oecd_days.map(function(row){
+      var mo = row[0].slice(5,7);
+      var hist = oecdByMonth[mo];
+      if (hist && hist.length >= 2) {
+        return [row[0], row[1], Math.min.apply(null, hist), Math.max.apply(null, hist)];
+      }
+      return [row[0], row[1], null, null];
     });
     console.log('  OECD days: ' + STEO.oecd_days.length);
 
@@ -5613,7 +5634,11 @@ for(const [x,y] of avgPts.slice(1)) ctx.lineTo(x,y);
 ctx.stroke();
 ctx.setLineDash([]);
 }
-const lineStyles = [{yr:2026, color:meta.color, width:3, dash:[], alpha:1},];
+const lineStyles = [
+{yr:2024, color:isDark?'rgba(100,120,140,0.4)':'rgba(100,120,140,0.35)', width:1.5, dash:[4,3], alpha:1},
+{yr:2025, color:isDark?'rgba(91,156,240,0.6)':'rgba(68,136,221,0.5)', width:1.5, dash:[2,2], alpha:1},
+{yr:2026, color:meta.color, width:3, dash:[], alpha:1},
+];
 for(const {yr,color,width,dash,alpha} of lineStyles){
 const pts = weeks.map(wk => {
 const v = byYrWk[yr] && byYrWk[yr][wk];
