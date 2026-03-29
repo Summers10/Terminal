@@ -8044,7 +8044,14 @@ function updateFredCharts() {
       y: { position: 'right', ticks: { color: textC, font: { size: 10 } }, grid: { color: gridC } }
     };
     if (grp.dual) {
-      scales.y1 = { position: 'left', ticks: { color: textC, font: { size: 10 } }, grid: { display: false } };
+      // Color each axis to match its series
+      var yColor = null, y1Color = null;
+      allPts.forEach(function(item) {
+        if (item.s.yAxis === 'y') yColor = item.s.c;
+        if (item.s.yAxis === 'y1') y1Color = item.s.c;
+      });
+      if (yColor) scales.y.ticks.color = yColor;
+      scales.y1 = { position: 'left', ticks: { color: y1Color || textC, font: { size: 10 } }, grid: { display: false } };
     }
 
     if(typeof Chart === "undefined" || !chartReady) return;
