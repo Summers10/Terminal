@@ -7897,7 +7897,7 @@ function buildFredDashboard() {
   html += '<div class="panel ycw">';
   html += '<div class="panel-hdr"><div class="panel-title">YIELD CURVE SNAPSHOT</div>';
   html += '<div class="panel-sub">UST constant maturity rates · Index-spaced</div></div>';
-  html += '<div class="chart-wrap"><div class="cc" style="min-height:230px"><canvas id="yieldCurveSnap"></canvas></div></div>';
+  html += '<div class="chart-wrap"><div class="cc" style="min-height:310px"><canvas id="yieldCurveSnap"></canvas></div></div>';
   html += '</div>';
 
   // --- RATE STRIP: all UST rates + policy rates in one horizontal scorecard ---
@@ -7911,7 +7911,7 @@ function buildFredDashboard() {
     {id:"DGS30",l:"30Y",c:"#1a3d80"},
     {id:"FEDFUNDS",l:"FF Rate",c:"#C4302B"},{id:"SOFR",l:"SOFR",c:"#D4850A"}
   ];
-  html += '<div class="metrics-grid" style="grid-template-columns:repeat(' + rateIds.length + ',1fr)">';
+  html += '<div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr))">';
   rateIds.forEach(function(s) {
     html += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
     html += '<div class="metric-value" id="fv-' + s.id + '">\u2014</div>';
@@ -7922,24 +7922,28 @@ function buildFredDashboard() {
 
   // --- CHARTS: 2x2 grid ---
   var chartPanels = [
-    {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'},
     {k:'inflation', title:'INFLATION EXPECTATIONS', sub:'Breakevens & 10Y real yield'},
+    {k:'fed', title:'FED POLICY RATES', sub:'Fed Funds & SOFR'},
     {k:'credit', title:'CREDIT SPREADS', sub:'Option-adjusted spread (bps)'},
-    {k:'labor', title:'LABOR MARKET', sub:'Unemployment rate & initial claims'}
+    {k:'labor', title:'LABOR MARKET', sub:'Unemployment rate & initial claims'},
+    {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'}
   ];
   chartPanels.forEach(function(p) {
     var grp = FRED_SERIES[p.k];
     if (!grp) return;
-    // Inline scorecards above each chart
-    var cols = Math.min(grp.s.length, 4);
-    var mh = '<div class="metrics-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
-    grp.s.forEach(function(s) {
-      mh += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
-      mh += '<div class="metric-value" id="fv-' + s.id + '">\u2014</div>';
-      mh += '<div class="metric-row"><span class="metric-chg" id="fc-' + s.id + '"></span></div>';
-      mh += '<div class="metric-date" id="fd-' + s.id + '"></div></div>';
-    });
-    mh += '</div>';
+    // Skip metric cards for fed — already shown in rate strip above
+    var mh = '';
+    if (p.k !== 'fed') {
+      var cols = Math.min(grp.s.length, 4);
+      mh = '<div class="metrics-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">';
+      grp.s.forEach(function(s) {
+        mh += '<div class="metric-cell"><div class="metric-label" style="color:' + s.c + '">' + s.l + '</div>';
+        mh += '<div class="metric-value" id="fv-' + s.id + '">\u2014</div>';
+        mh += '<div class="metric-row"><span class="metric-chg" id="fc-' + s.id + '"></span></div>';
+        mh += '<div class="metric-date" id="fd-' + s.id + '"></div></div>';
+      });
+      mh += '</div>';
+    }
     html += '<div class="panel"><div class="panel-hdr"><div class="panel-title">' + p.title + '</div>';
     html += '<div class="panel-sub">' + p.sub + '</div></div>' + mh;
     html += '<div class="chart-wrap"><div class="cc"><canvas id="fredChart-' + p.k + '"></canvas></div></div></div>';
@@ -7964,7 +7968,7 @@ function updateFredCharts() {
     grp.s.forEach(function(s) {
       var data = fredData[s.id];
       if (!data) return;
-      var pts = data.slice().reverse().map(function(d) { return { x: d.d, y: d.v }; });
+      var pts = data.slice().sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0;}).map(function(d) { return { x: d.d, y: d.v }; });
       var ds = { label: s.l, data: pts, borderColor: s.c, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3 };
       if (grp.dual && s.yAxis) ds.yAxisID = s.yAxis;
       datasets.push(ds);
@@ -7973,7 +7977,7 @@ function updateFredCharts() {
     if (!datasets.length) return;
 
     var scales = {
-      x: { type: 'category', ticks: { color: textC, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: gridC } },
+      x: { type: 'time', time: { tooltipFormat: 'yyyy-MM-dd', unit: 'month' }, ticks: { color: textC, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: gridC } },
       y: { position: 'right', ticks: { color: textC, font: { size: 10 } }, grid: { color: gridC } }
     };
     if (grp.dual) {
@@ -8008,16 +8012,30 @@ function drawYieldCurveSnapshot() {
     {id:'DGS10',l:'10Y',x:10},
     {id:'DGS30',l:'30Y',x:30}
   ];
-  var pts = [];
-  mats.forEach(function(m) {
-    var d = fredData[m.id];
-    if (d && d.length) pts.push({x:m.x, y:d[0].v, l:m.l});
-  });
-  if (pts.length < 2) return;
+
+  // Build curves: current, ~7 days ago, ~3 months ago
+  function curveAtOffset(offset) {
+    var pts = [];
+    mats.forEach(function(m) {
+      var d = fredData[m.id];
+      if (d && d.length > offset) pts.push({x:m.x, y:d[offset].v, l:m.l, dt:d[offset].d});
+    });
+    return pts;
+  }
+  var ptsCur = curveAtOffset(0);
+  if (ptsCur.length < 2) return;
+
+  // Find index ~7 trading days back and ~63 trading days (~3 months) back
+  var ref = fredData['DGS10'] || fredData['DGS2'];
+  var idx7d = Math.min(5, ref ? ref.length - 1 : 5);
+  var idx3m = Math.min(63, ref ? ref.length - 1 : 63);
+  var pts7d = curveAtOffset(idx7d);
+  var pts3m = curveAtOffset(idx3m);
 
   var isDark = document.body.classList.contains('dark');
-  var W = canvas.offsetWidth || 900;
-  var H = 220;
+  var wrap = canvas.parentElement;
+  var W = wrap ? wrap.offsetWidth : (canvas.offsetWidth || 900);
+  var H = wrap ? Math.max(wrap.offsetHeight, 280) : 280;
   var dpr = window.devicePixelRatio || 1;
   canvas.width = W * dpr; canvas.height = H * dpr;
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
@@ -8026,18 +8044,18 @@ function drawYieldCurveSnapshot() {
   ctx.fillStyle = isDark ? '#050505' : '#FAFBFC';
   ctx.fillRect(0, 0, W, H);
 
-  var PAD = {t:24, b:32, l:50, r:20};
+  var PAD = {t:36, b:34, l:52, r:22};
   var pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
 
-  // Y range
-  var yVals = pts.map(function(p){return p.y;});
-  var yMin = Math.floor((Math.min.apply(null,yVals) - 0.15) * 4) / 4;
-  var yMax = Math.ceil((Math.max.apply(null,yVals) + 0.15) * 4) / 4;
+  // Y range from all curves
+  var allY = [];
+  [ptsCur, pts7d, pts3m].forEach(function(c){ c.forEach(function(p){ allY.push(p.y); }); });
+  var yMin = Math.floor((Math.min.apply(null,allY) - 0.15) * 4) / 4;
+  var yMax = Math.ceil((Math.max.apply(null,allY) + 0.15) * 4) / 4;
   if (yMax - yMin < 0.5) { yMin -= 0.25; yMax += 0.25; }
   var yRange = yMax - yMin || 1;
 
-  // X: log-ish scale — use index-based spacing for readability
-  var xP = function(i) { return PAD.l + (i / (pts.length - 1)) * pw; };
+  var xP = function(i, n) { return PAD.l + (i / (n - 1)) * pw; };
   var yP = function(v) { return PAD.t + ph - ((v - yMin) / yRange) * ph; };
 
   // Grid
@@ -8054,24 +8072,38 @@ function drawYieldCurveSnapshot() {
   }
   // X labels
   ctx.textAlign = 'center';
-  pts.forEach(function(p, i) {
+  ptsCur.forEach(function(p, i) {
     ctx.fillStyle = textC;
-    ctx.fillText(p.l, xP(i), H - PAD.b + 16);
+    ctx.fillText(p.l, xP(i, ptsCur.length), H - PAD.b + 16);
   });
 
-  // Curve line
+  // Helper to draw a curve
+  function drawCurve(pts, color, width, dash) {
+    if (pts.length < 2) return;
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+    ctx.beginPath();
+    pts.forEach(function(p, i) {
+      var cx = xP(i, pts.length);
+      if (i === 0) ctx.moveTo(cx, yP(p.y));
+      else ctx.lineTo(cx, yP(p.y));
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw 3-month ago (faintest, dashed)
+  var c3m = isDark ? 'rgba(99,102,241,0.35)' : 'rgba(99,102,241,0.3)';
+  drawCurve(pts3m, c3m, 1.5, [4, 3]);
+  // Draw 7-day ago (medium, dotted)
+  var c7d = isDark ? 'rgba(94,184,120,0.5)' : 'rgba(14,122,58,0.4)';
+  drawCurve(pts7d, c7d, 1.5, [2, 2]);
+  // Draw current (solid, bold)
   var curveC = isDark ? '#f5a623' : '#D4850A';
-  ctx.strokeStyle = curveC; ctx.lineWidth = 2.5; ctx.setLineDash([]);
-  ctx.beginPath();
-  pts.forEach(function(p, i) {
-    if (i === 0) ctx.moveTo(xP(i), yP(p.y));
-    else ctx.lineTo(xP(i), yP(p.y));
-  });
-  ctx.stroke();
+  drawCurve(ptsCur, curveC, 2.5, []);
 
-  // Dots + value labels
-  pts.forEach(function(p, i) {
-    var cx = xP(i), cy = yP(p.y);
+  // Dots + value labels on current curve
+  ptsCur.forEach(function(p, i) {
+    var cx = xP(i, ptsCur.length), cy = yP(p.y);
     ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2);
     ctx.fillStyle = curveC; ctx.fill();
     ctx.font = '700 12px "Courier New",Courier,monospace';
@@ -8079,6 +8111,28 @@ function drawYieldCurveSnapshot() {
     ctx.textAlign = 'center';
     ctx.fillText(p.y.toFixed(2), cx, cy - 10);
   });
+
+  // Legend
+  var legY = 14;
+  var legX = PAD.l + 4;
+  ctx.font = '700 10px "Courier New",Courier,monospace';
+  // Current
+  ctx.strokeStyle = curveC; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(legX, legY); ctx.lineTo(legX+18, legY); ctx.stroke();
+  ctx.fillStyle = isDark ? '#d4b896' : '#1A1D24'; ctx.textAlign = 'left';
+  ctx.fillText('Today' + (ptsCur[0].dt ? ' (' + ptsCur[0].dt + ')' : ''), legX+22, legY+3);
+  // 7d
+  var leg7x = legX + 170;
+  ctx.strokeStyle = c7d; ctx.lineWidth = 1.5; ctx.setLineDash([2,2]);
+  ctx.beginPath(); ctx.moveTo(leg7x, legY); ctx.lineTo(leg7x+18, legY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = textC;
+  ctx.fillText('7 days ago' + (pts7d.length && pts7d[0].dt ? ' (' + pts7d[0].dt + ')' : ''), leg7x+22, legY+3);
+  // 3m
+  var leg3x = leg7x + 190;
+  ctx.strokeStyle = c3m; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(leg3x, legY); ctx.lineTo(leg3x+18, legY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = textC;
+  ctx.fillText('3 months ago' + (pts3m.length && pts3m[0].dt ? ' (' + pts3m[0].dt + ')' : ''), leg3x+22, legY+3);
 }
 
 </script>
@@ -8089,6 +8143,12 @@ function drawYieldCurveSnapshot() {
   s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
   s.async = true;
   s.onerror = function(){ console.warn('Chart.js CDN unavailable - macro charts disabled'); };
+  s.onload = function(){
+    var a = document.createElement('script');
+    a.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js';
+    a.async = true;
+    document.head.appendChild(a);
+  };
   document.head.appendChild(s);
 })();
 </script>
