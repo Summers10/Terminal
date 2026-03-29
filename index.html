@@ -7112,7 +7112,7 @@ btns.innerHTML = avail.map(k =>
 `<button class="gsw-grain-btn${k===seasonalKey?' active':''}" onclick="setSeasonalKey('${k}')">${SEASONAL_PRICES[k].name}</button>`
 ).join('');
 renderSeasonal();
-} catch(e) { console.error('initSeasonal error:', e); }
+} catch(e) { console.error('initSeasonal error:', e); document.getElementById('seasonal-content').innerHTML='<div style="padding:40px;color:var(--red);font-weight:700;">SEASONAL INIT ERROR: '+e.message+'</div>'; }
 }
 function setSeasonalKey(k){
 seasonalKey = k;
@@ -7121,6 +7121,7 @@ b.classList.toggle('active', b.textContent === SEASONAL_PRICES[k].name));
 renderSeasonal();
 }
 function renderSeasonal(){
+try {
 const cfg = SEASONAL_PRICES[seasonalKey];
 if(!cfg) return;
 const d = cfg.data;
@@ -7226,7 +7227,8 @@ const diff5 = (latestVal != null && avg5Now != null) ? latestVal - avg5Now : nul
 html += _seasonalCard('vs 5YR', diff5 != null ? (diff5>=0?'+':'')+diff5.toFixed(1)+' pts' : '\u2014', 'Index pts', diff5);
 html += '</div>';
 document.getElementById('seasonal-content').innerHTML = html;
-requestAnimationFrame(() => drawSeasonalChart(cfg, avg5, avg15, latestDay, avg5Now, avg15Now, nd, latestVal));
+setTimeout(function(){ drawSeasonalChart(cfg, avg5, avg15, latestDay, avg5Now, avg15Now, nd, latestVal); }, 80);
+} catch(e) { console.error('renderSeasonal error:', e); }
 }
 function _seasonalCard(label, value, sub, delta){
 const cls = delta == null ? '' : delta > 0 ? 'color:var(--green)' : delta < 0 ? 'color:var(--red)' : '';
@@ -8108,8 +8110,8 @@ const FRED_SERIES = {
 async function fredFetch(sid, limit) {
   var base = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + sid + '&api_key=' + fredApiKey + '&file_type=json&sort_order=desc&limit=' + limit;
   var proxies = [
-    function(u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
-    function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); }
+    function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
+    function(u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); }
   ];
   for (var pi = 0; pi < proxies.length; pi++) {
     try {
@@ -8186,6 +8188,11 @@ function buildFredDashboard() {
   var grid = document.getElementById('fredDashGrid');
   if (!grid) return;
   var html = '';
+  // --- YIELD CURVE SNAPSHOT (full width, top of page) ---
+  html += '<div class="panel ycw"><div class="panel-hdr"><div class="panel-title">YIELD CURVE</div>';
+  html += '<div class="panel-sub">Current snapshot · Constant maturity rates</div></div>';
+  html += '<div class="chart-wrap"><div class="cc" style="min-height:220px"><canvas id="yieldCurveSnap"></canvas></div></div></div>';
+  // --- Rest of tiles ---
   Object.entries(FRED_SERIES).forEach(function(entry) {
     var k = entry[0], grp = entry[1];
     var cols = Math.min(grp.s.length, 4);
@@ -8197,8 +8204,13 @@ function buildFredDashboard() {
       mh += '<div class="metric-date" id="fd-' + s.id + '"></div></div>';
     });
     mh += '</div>';
-    var chartClass = k === 'curve' ? 'ycw' : '';
-    html += '<div class="panel ' + chartClass + '"><div class="panel-hdr"><div class="panel-title">' + grp.title + '</div>';
+    // Curve tile: scorecards only, no chart
+    if (k === 'curve') {
+      html += '<div class="panel"><div class="panel-hdr"><div class="panel-title">' + grp.title + '</div>';
+      html += '<div class="panel-sub">' + grp.sub + '</div></div>' + mh + '</div>';
+      return;
+    }
+    html += '<div class="panel"><div class="panel-hdr"><div class="panel-title">' + grp.title + '</div>';
     html += '<div class="panel-sub">' + grp.sub + '</div></div>' + mh;
     html += '<div class="chart-wrap"><div class="cc"><canvas id="fredChart-' + k + '"></canvas></div></div></div>';
   });
@@ -8214,6 +8226,7 @@ function updateFredCharts() {
     var k = entry[0], grp = entry[1];
     var canvas = document.getElementById('fredChart-' + k);
     if (!canvas) return;
+    if (k === 'curve') return; // curve tile is scorecards-only now
 
     if (fredCharts[k]) { try { fredCharts[k].destroy(); } catch(e){} }
 
@@ -8248,6 +8261,93 @@ function updateFredCharts() {
         interaction: { intersect: false, mode: 'index' }
       }
     });
+  });
+  // Draw the yield curve snapshot
+  drawYieldCurveSnapshot();
+}
+
+function drawYieldCurveSnapshot() {
+  var canvas = document.getElementById('yieldCurveSnap');
+  if (!canvas) return;
+  var mats = [
+    {id:'DGS3MO',l:'3M',x:0.25},
+    {id:'DGS1',l:'1Y',x:1},
+    {id:'DGS2',l:'2Y',x:2},
+    {id:'DGS5',l:'5Y',x:5},
+    {id:'DGS7',l:'7Y',x:7},
+    {id:'DGS10',l:'10Y',x:10},
+    {id:'DGS30',l:'30Y',x:30}
+  ];
+  var pts = [];
+  mats.forEach(function(m) {
+    var d = fredData[m.id];
+    if (d && d.length) pts.push({x:m.x, y:d[0].v, l:m.l});
+  });
+  if (pts.length < 2) return;
+
+  var isDark = document.body.classList.contains('dark');
+  var W = canvas.offsetWidth || 900;
+  var H = 220;
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = isDark ? '#050505' : '#FAFBFC';
+  ctx.fillRect(0, 0, W, H);
+
+  var PAD = {t:24, b:32, l:50, r:20};
+  var pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
+
+  // Y range
+  var yVals = pts.map(function(p){return p.y;});
+  var yMin = Math.floor((Math.min.apply(null,yVals) - 0.15) * 4) / 4;
+  var yMax = Math.ceil((Math.max.apply(null,yVals) + 0.15) * 4) / 4;
+  if (yMax - yMin < 0.5) { yMin -= 0.25; yMax += 0.25; }
+  var yRange = yMax - yMin || 1;
+
+  // X: log-ish scale — use index-based spacing for readability
+  var xP = function(i) { return PAD.l + (i / (pts.length - 1)) * pw; };
+  var yP = function(v) { return PAD.t + ph - ((v - yMin) / yRange) * ph; };
+
+  // Grid
+  var gridC = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  var textC = isDark ? '#5a6a7a' : '#8090A0';
+  ctx.font = '600 11px "Courier New",Courier,monospace';
+  ctx.strokeStyle = gridC; ctx.lineWidth = 0.5;
+  var yStep = yRange <= 1 ? 0.25 : 0.5;
+  for (var v = yMin; v <= yMax + 0.01; v += yStep) {
+    var py = yP(v);
+    ctx.beginPath(); ctx.moveTo(PAD.l, py); ctx.lineTo(PAD.l + pw, py); ctx.stroke();
+    ctx.fillStyle = textC; ctx.textAlign = 'right';
+    ctx.fillText(v.toFixed(2) + '%', PAD.l - 6, py + 4);
+  }
+  // X labels
+  ctx.textAlign = 'center';
+  pts.forEach(function(p, i) {
+    ctx.fillStyle = textC;
+    ctx.fillText(p.l, xP(i), H - PAD.b + 16);
+  });
+
+  // Curve line
+  var curveC = isDark ? '#f5a623' : '#D4850A';
+  ctx.strokeStyle = curveC; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  pts.forEach(function(p, i) {
+    if (i === 0) ctx.moveTo(xP(i), yP(p.y));
+    else ctx.lineTo(xP(i), yP(p.y));
+  });
+  ctx.stroke();
+
+  // Dots + value labels
+  pts.forEach(function(p, i) {
+    var cx = xP(i), cy = yP(p.y);
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = curveC; ctx.fill();
+    ctx.font = '700 12px "Courier New",Courier,monospace';
+    ctx.fillStyle = isDark ? '#d4b896' : '#1A1D24';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.y.toFixed(2), cx, cy - 10);
   });
 }
 
