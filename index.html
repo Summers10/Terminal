@@ -7823,11 +7823,15 @@ const FRED_SERIES = {
   cpi:{title:"CPI INFLATION",sub:"Year-over-year % change",s:[
     {id:"CPALTT01USM657N",l:"CPI YoY %",c:"#C4302B",lim:60}]},
   liquidity:{title:"LIQUIDITY & FED BALANCE SHEET",sub:"Trillions USD",dual:true,s:[
-    {id:"M2SL",l:"M2",c:"#5b9cf0",lim:60,yAxis:'y'},{id:"WALCL",l:"Fed B/S",c:"#D4850A",lim:104,yAxis:'y1'}]}
+    {id:"M2SL",l:"M2",c:"#5b9cf0",lim:60,yAxis:'y'},{id:"WALCL",l:"Fed B/S",c:"#D4850A",lim:104,yAxis:'y1'}]},
+  pce:{title:"PCE PRICE INDEX",sub:"Fed preferred inflation · YoY %",s:[
+    {id:"PCEPI",l:"PCE YoY %",c:"#8b5cf6",lim:60,extra:"&units=pc1"}]},
+  ism:{title:"ISM MANUFACTURING",sub:"PMI · >50 = expansion",s:[
+    {id:"NAPM",l:"PMI",c:"#40c8b0",lim:60}]}
 };
 
-async function fredFetch(sid, limit) {
-  var base = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + sid + '&api_key=' + fredApiKey + '&file_type=json&sort_order=desc&limit=' + limit;
+async function fredFetch(sid, limit, extra) {
+  var base = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + sid + '&api_key=' + fredApiKey + '&file_type=json&sort_order=desc&limit=' + limit + (extra||'');
   var parse = function(json) {
     if (json.observations) return json.observations.filter(function(o) { return o.value !== '.'; }).map(function(o) { return { d: o.date, v: parseFloat(o.value) }; });
     return null;
@@ -7877,7 +7881,7 @@ async function refreshFred() {
     var s = allSeries[i];
     if (lp) lp.style.width = ((i + 1) / allSeries.length * 100) + '%';
     try {
-      var data = await fredFetch(s.id, s.lim);
+      var data = await fredFetch(s.id, s.lim, s.extra);
       if (data && data.length > 0) {
         fredData[s.id] = data;
         ok++;
@@ -7959,7 +7963,11 @@ function buildFredDashboard() {
     {k:'fed', title:'FED POLICY RATES', sub:'Fed Funds & SOFR'},
     {k:'credit', title:'CREDIT SPREADS', sub:'Option-adjusted spread (%)'},
     {k:'labor', title:'LABOR MARKET', sub:'Unemployment rate & initial claims'},
-    {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'}
+    {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'},
+    {k:'cpi', title:'CPI INFLATION', sub:'Year-over-year % change'},
+    {k:'pce', title:'PCE PRICE INDEX', sub:'Fed preferred inflation · YoY %'},
+    {k:'liquidity', title:'LIQUIDITY & FED BALANCE SHEET', sub:'M2 money supply & Fed balance sheet'},
+    {k:'ism', title:'ISM MANUFACTURING', sub:'PMI · >50 = expansion'}
   ];
   chartPanels.forEach(function(p) {
     var grp = FRED_SERIES[p.k];
@@ -8069,7 +8077,7 @@ function drawYieldCurveSnapshot() {
     {id:'DGS30',l:'30Y',x:30}
   ];
 
-  // Build curves: current, ~7 days ago, ~3 months ago
+  // Build curves: current & ~3 months ago
   function curveAtOffset(offset) {
     var pts = [];
     mats.forEach(function(m) {
@@ -8081,11 +8089,9 @@ function drawYieldCurveSnapshot() {
   var ptsCur = curveAtOffset(0);
   if (ptsCur.length < 2) return;
 
-  // Find index ~7 trading days back and ~63 trading days (~3 months) back
+  // Find index ~63 trading days (~3 months) back
   var ref = fredData['DGS10'] || fredData['DGS2'];
-  var idx7d = Math.min(5, ref ? ref.length - 1 : 5);
   var idx3m = Math.min(63, ref ? ref.length - 1 : 63);
-  var pts7d = curveAtOffset(idx7d);
   var pts3m = curveAtOffset(idx3m);
 
   var isDark = document.body.classList.contains('dark');
@@ -8105,7 +8111,7 @@ function drawYieldCurveSnapshot() {
 
   // Y range from all curves
   var allY = [];
-  [ptsCur, pts7d, pts3m].forEach(function(c){ c.forEach(function(p){ allY.push(p.y); }); });
+  [ptsCur, pts3m].forEach(function(c){ c.forEach(function(p){ allY.push(p.y); }); });
   var yMin = Math.floor((Math.min.apply(null,allY) - 0.15) * 4) / 4;
   var yMax = Math.ceil((Math.max.apply(null,allY) + 0.15) * 4) / 4;
   if (yMax - yMin < 0.5) { yMin -= 0.25; yMax += 0.25; }
@@ -8150,9 +8156,7 @@ function drawYieldCurveSnapshot() {
   // Draw 3-month ago (faintest, dashed)
   var c3m = isDark ? 'rgba(99,102,241,0.35)' : 'rgba(99,102,241,0.3)';
   drawCurve(pts3m, c3m, 1.5, [4, 3]);
-  // Draw 7-day ago (medium, dotted)
-  var c7d = isDark ? 'rgba(94,184,120,0.5)' : 'rgba(14,122,58,0.4)';
-  drawCurve(pts7d, c7d, 1.5, [2, 2]);
+
   // Draw current (solid, bold)
   var curveC = isDark ? '#f5a623' : '#D4850A';
   drawCurve(ptsCur, curveC, 2.5, []);
@@ -8177,14 +8181,8 @@ function drawYieldCurveSnapshot() {
   ctx.beginPath(); ctx.moveTo(legX, legY); ctx.lineTo(legX+18, legY); ctx.stroke();
   ctx.fillStyle = isDark ? '#d4b896' : '#1A1D24'; ctx.textAlign = 'left';
   ctx.fillText('Today' + (ptsCur[0].dt ? ' (' + ptsCur[0].dt + ')' : ''), legX+22, legY+3);
-  // 7d
-  var leg7x = legX + 170;
-  ctx.strokeStyle = c7d; ctx.lineWidth = 1.5; ctx.setLineDash([2,2]);
-  ctx.beginPath(); ctx.moveTo(leg7x, legY); ctx.lineTo(leg7x+18, legY); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = textC;
-  ctx.fillText('7 days ago' + (pts7d.length && pts7d[0].dt ? ' (' + pts7d[0].dt + ')' : ''), leg7x+22, legY+3);
   // 3m
-  var leg3x = leg7x + 190;
+  var leg3x = legX + 170;
   ctx.strokeStyle = c3m; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
   ctx.beginPath(); ctx.moveTo(leg3x, legY); ctx.lineTo(leg3x+18, legY); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = textC;
