@@ -99,6 +99,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <button class="nav-tab subtab" onclick="switchSubTab('fund','exp')">EXPORTS</button>
     <button class="nav-tab subtab" onclick="switchSubTab('fund','aafc')">AAFC</button>
     <button class="nav-tab subtab" onclick="switchSubTab('fund','gsw')">GSW</button>
+    <button class="nav-tab subtab" onclick="switchSubTab('fund','wx')">WEATHER</button>
   </div>
   <div id="subtab-analysis" style="display:none;">
     <button class="nav-tab subtab active" onclick="switchSubTab('analysis','cot')">COT</button>
@@ -702,6 +703,17 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   <div id="aafc-page">
     <div class="aafc-toolbar" id="aafc-crop-btns"></div>
     <div id="aafc-content"></div>
+  </div>
+</div>
+
+<!-- WEATHER DASHBOARD -->
+<div class="page" id="wx-page-wrap" style="background:var(--bg);min-height:100vh;">
+  <div class="toolbar">
+    <div class="brand"><div class="brand-name">CROP WEATHER</div>
+    <div class="brand-sub">Open-Meteo · 7-Day Forecast & Recent Conditions<span id="wx-status" style="margin-left:12px;font-size:11px;"></span></div></div>
+  </div>
+  <div style="max-width:1440px;margin:0 auto;padding:0 20px 40px;">
+    <div id="wx-content" style="padding-top:14px;"><div style="color:var(--text3);padding:20px;">Loading weather data...</div></div>
   </div>
 </div>
 <div class="page" id="spreads-page-wrap" style="background:var(--bg);min-height:100vh;">
@@ -1451,7 +1463,7 @@ if (sb) sb.style.display = 'none';
 // Highlight correct top nav
 var topBtns = document.querySelectorAll('#topnav .nav-tab');
 var topMap = {'sum':0,'fund':1,'analysis':2,'macro':3,'cal':4};
-var fundPages = ['energy','sd','exp','aafc','gsw'];
+var fundPages = ['energy','sd','exp','aafc','gsw','wx'];
 var analysisPages = ['cot','spreads','reg','cash'];
 var topIdx = topMap[t];
 if (topIdx === undefined) {
@@ -1536,6 +1548,7 @@ if(tab==='reg' && !regInited){initRegression();}
 
 if(tab==='aafc' && !aafcInited){initAafc();}
 if(tab==='gsw' && !gswInited){initGsw();}
+if(tab==='wx' && !wxInited){initWx();}
 if(tab==='spreads' && !spreadsInited){initSpreads();}
 if(tab==='carry' && !carryInited){initCarry();}
 } catch(e) { console.error('switchSubTab error:', e); }
@@ -8229,6 +8242,139 @@ function drawYieldCurveSnapshot() {
   ctx.beginPath(); ctx.moveTo(leg3x, legY); ctx.lineTo(leg3x+18, legY); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = textC;
   ctx.fillText('3 months ago' + (pts3m.length && pts3m[0].dt ? ' (' + pts3m[0].dt + ')' : ''), leg3x+22, legY+3);
+}
+
+
+// === CROP WEATHER DASHBOARD (Open-Meteo) ===
+let wxInited = false;
+const WX_REGIONS = [
+  {name:'US Corn Belt',sub:'Iowa/Illinois/Indiana',lat:41.5,lon:-93.5,crop:'Corn, Soybeans'},
+  {name:'US HRW Belt',sub:'Kansas/Oklahoma',lat:38.5,lon:-98.5,crop:'Winter Wheat'},
+  {name:'US Spring Wheat',sub:'N. Dakota/Minnesota',lat:47.5,lon:-99,crop:'HRS Wheat'},
+  {name:'Canadian Prairies',sub:'Saskatchewan',lat:51.5,lon:-107,crop:'Canola, Wheat'},
+  {name:'Brazil Mato Grosso',sub:'Central-West',lat:-12.5,lon:-55.5,crop:'Soybeans, Corn'},
+  {name:'Brazil Parana',sub:'South',lat:-24,lon:-51,crop:'Soybeans, Corn'},
+  {name:'Argentina Pampas',sub:'Buenos Aires/Cordoba',lat:-34,lon:-61,crop:'Soybeans, Corn, Wheat'},
+  {name:'Ukraine',sub:'Central',lat:49,lon:32,crop:'Wheat, Corn, Sunflower'},
+  {name:'Russia South',sub:'Krasnodar/Rostov',lat:46,lon:42,crop:'Wheat'},
+  {name:'Australia East',sub:'NSW/Queensland',lat:-33,lon:148,crop:'Wheat, Canola'},
+  {name:'Australia West',sub:'Western Australia',lat:-31.5,lon:117,crop:'Wheat, Canola'},
+  {name:'China NE',sub:'Heilongjiang',lat:47,lon:127,crop:'Soybeans, Corn'},
+  {name:'China Central',sub:'Henan/Shandong',lat:34,lon:114,crop:'Wheat, Corn'}
+];
+
+async function fetchWx(lat,lon){
+  var url='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon
+    +'&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration'
+    +'&past_days=7&forecast_days=7&timezone=auto';
+  try{var r=await fetch(url);if(r.ok) return await r.json();}catch(e){}
+  return null;
+}
+
+async function initWx(){
+  wxInited=true;
+  var el=document.getElementById('wx-content');
+  var st=document.getElementById('wx-status');
+  if(st) st.textContent='Loading...';
+  if(st) st.style.color='var(--amber)';
+  var results=[];
+  for(var i=0;i<WX_REGIONS.length;i++){
+    var reg=WX_REGIONS[i];
+    var data=await fetchWx(reg.lat,reg.lon);
+    if(data && data.daily){
+      var d=data.daily;
+      var past7precip=0, fwd7precip=0, past7hi=[], past7lo=[], fwd7hi=[], fwd7lo=[];
+      for(var j=0;j<d.time.length;j++){
+        var p=d.precipitation_sum[j]||0;
+        var hi=d.temperature_2m_max[j];
+        var lo=d.temperature_2m_min[j];
+        if(j<7){past7precip+=p;past7hi.push(hi);past7lo.push(lo);}
+        else{fwd7precip+=p;fwd7hi.push(hi);fwd7lo.push(lo);}
+      }
+      var avgHi=fwd7hi.reduce(function(a,b){return a+b;},0)/Math.max(fwd7hi.length,1);
+      var avgLo=fwd7lo.reduce(function(a,b){return a+b;},0)/Math.max(fwd7lo.length,1);
+      var pastAvgHi=past7hi.reduce(function(a,b){return a+b;},0)/Math.max(past7hi.length,1);
+      var todayHi=d.temperature_2m_max[6]||0;
+      var todayLo=d.temperature_2m_min[6]||0;
+      results.push({reg:reg,past7precip:past7precip,fwd7precip:fwd7precip,
+        todayHi:todayHi,todayLo:todayLo,avgHi:avgHi,avgLo:avgLo,pastAvgHi:pastAvgHi,
+        daily:d});
+    } else { results.push({reg:reg,err:true}); }
+  }
+  if(st){st.textContent='Updated '+new Date().toLocaleTimeString();st.style.color='var(--green)';}
+  renderWx(results);
+}
+
+function renderWx(results){
+  var el=document.getElementById('wx-content');
+  if(!el) return;
+  var html='';
+  var groups=[
+    {title:'NORTH AMERICA',regions:['US Corn Belt','US HRW Belt','US Spring Wheat','Canadian Prairies']},
+    {title:'SOUTH AMERICA',regions:['Brazil Mato Grosso','Brazil Parana','Argentina Pampas']},
+    {title:'BLACK SEA',regions:['Ukraine','Russia South']},
+    {title:'AUSTRALIA',regions:['Australia East','Australia West']},
+    {title:'CHINA',regions:['China NE','China Central']}
+  ];
+  groups.forEach(function(grp){
+    html+='<div style="font-size:13px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);padding:10px 0 8px;border-bottom:2px solid var(--amber);margin-top:16px;margin-bottom:10px;">'+grp.title+'</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-bottom:6px;">';
+    grp.regions.forEach(function(rname){
+      var r=results.find(function(x){return x.reg.name===rname;});
+      if(!r) return;
+      if(r.err){
+        html+='<div style="background:var(--bg1);border:1px solid var(--border);border-radius:4px;padding:12px 14px;"><span style="color:var(--amber);font-weight:800;">'+rname+'</span> <span style="color:var(--red);font-size:12px;">Failed</span></div>';
+        return;
+      }
+      var precClass=r.fwd7precip>25?'color:var(--green);':'color:var(--red);';
+      var pastClass=r.past7precip>25?'color:var(--green);':'color:var(--red);';
+      html+='<div style="background:var(--bg1);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:0 0 4px 4px;overflow:hidden;">';
+      html+='<div style="padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">';
+      html+='<div><span style="font-size:14px;font-weight:900;letter-spacing:.08em;color:var(--amber);">'+r.reg.name+'</span>';
+      html+='<div style="font-size:11px;color:var(--text3);font-weight:600;">'+r.reg.sub+' · '+r.reg.crop+'</div></div>';
+      html+='<div style="text-align:right;"><span style="font-size:20px;font-weight:800;color:var(--text);">'+Math.round(r.todayHi)+'°</span>';
+      html+='<span style="font-size:13px;color:var(--text3);margin-left:2px;">/'+Math.round(r.todayLo)+'°C</span></div>';
+      html+='</div>';
+      // Metrics row
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;">';
+      // Past 7d precip
+      html+='<div style="padding:8px 6px;border-right:1px solid var(--border);">';
+      html+='<div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;">Past 7d</div>';
+      html+='<div style="font-size:16px;font-weight:800;'+pastClass+'">'+r.past7precip.toFixed(0)+' mm</div></div>';
+      // Next 7d precip
+      html+='<div style="padding:8px 6px;border-right:1px solid var(--border);">';
+      html+='<div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;">Next 7d</div>';
+      html+='<div style="font-size:16px;font-weight:800;'+precClass+'">'+r.fwd7precip.toFixed(0)+' mm</div></div>';
+      // Fwd avg temp
+      html+='<div style="padding:8px 6px;">';
+      html+='<div style="font-size:10px;font-weight:900;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;">7d Avg Hi</div>';
+      html+='<div style="font-size:16px;font-weight:800;color:var(--text);">'+r.avgHi.toFixed(0)+'°C</div></div>';
+      html+='</div>';
+      // Daily bar chart for precipitation
+      html+='<div style="padding:6px 10px 8px;border-top:1px solid var(--border);display:flex;align-items:flex-end;gap:2px;height:50px;">';
+      var maxP=1;
+      for(var di=0;di<r.daily.time.length;di++){var pv=r.daily.precipitation_sum[di]||0;if(pv>maxP)maxP=pv;}
+      for(var di=0;di<r.daily.time.length;di++){
+        var pv=r.daily.precipitation_sum[di]||0;
+        var bh=Math.max(2,Math.round((pv/maxP)*32));
+        var isPast=di<7;
+        var col=isPast?'var(--text3)':'var(--amber)';
+        var opacity=isPast?'0.4':'0.8';
+        var dt=r.daily.time[di]||'';
+        var dayNum=dt.slice(8,10);
+        html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;" title="'+dt+': '+pv.toFixed(1)+'mm">';
+        html+='<div style="width:100%;height:'+bh+'px;background:'+col+';opacity:'+opacity+';border-radius:1px;"></div>';
+        if(di===0||di===6||di===13) html+='<div style="font-size:8px;color:var(--text4);font-weight:700;">'+dayNum+'</div>';
+        else html+='<div style="height:10px;"></div>';
+        html+='</div>';
+      }
+      html+='</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  html+='<div style="font-size:12px;color:var(--text3);padding:12px 0;margin-top:10px;border-top:1px solid var(--border);">Source: Open-Meteo API (open-meteo.com) · No API key required · Precip <25mm/7d shown in red as dry signal</div>';
+  el.innerHTML=html;
 }
 
 </script>
