@@ -8340,7 +8340,7 @@ async function fetchWxNormals(lat, lon, startMd, endMd) {
     var s = y + '-' + startMd;
     var e = y + '-' + endMd;
     var url = 'https://archive-api.open-meteo.com/v1/archive?latitude='+lat+'&longitude='+lon
-      +'&start_date='+s+'&end_date='+e+'&daily=precipitation_sum,soil_moisture_7_to_28cm_mean';
+      +'&start_date='+s+'&end_date='+e+'&daily=precipitation_sum,soil_moisture_7_to_28cm_mean,temperature_2m_max,temperature_2m_min';
     try {
       var r = await fetch(url);
       if(!r.ok) continue;
@@ -8352,6 +8352,23 @@ async function fetchWxNormals(lat, lon, startMd, endMd) {
         if(!normals[key]) { normals[key] = 0; counts[key] = 0; }
         normals[key] += (data.daily.precipitation_sum[j] || 0);
         counts[key]++;
+        // Temp normals
+        if(data.daily.temperature_2m_max) {
+          var tv = data.daily.temperature_2m_max[j];
+          if(tv !== null && tv !== undefined) {
+            var tKey = 'tmax_' + key;
+            if(!normals[tKey]) { normals[tKey] = 0; counts[tKey] = 0; }
+            normals[tKey] += tv; counts[tKey]++;
+          }
+        }
+        if(data.daily.temperature_2m_min) {
+          var tmv = data.daily.temperature_2m_min[j];
+          if(tmv !== null && tmv !== undefined) {
+            var tmKey = 'tmin_' + key;
+            if(!normals[tmKey]) { normals[tmKey] = 0; counts[tmKey] = 0; }
+            normals[tmKey] += tmv; counts[tmKey]++;
+          }
+        }
         // Soil moisture normals
         var smKey = 'sm_' + key;
         if(data.daily.soil_moisture_7_to_28cm_mean) {
@@ -8452,6 +8469,26 @@ async function initWx() {
     }
     var fwdPctNormal = fwdNormal > 0 ? Math.round((fwdPrecip / fwdNormal) * 100) : 0;
 
+    // Temperature stats
+    var tmpSum = 0, tmpNormSum = 0, tmpCount = 0, tmpNormCount = 0;
+    var heatDays = 0, frostDays = 0, fwdHeatDays = 0, fwdFrostDays = 0;
+    for(var j = 0; j < obs.length; j++) {
+      if(obs[j].tmax !== null && obs[j].tmax !== undefined) {
+        tmpSum += obs[j].tmax; tmpCount++;
+        if(obs[j].tmax >= 35) heatDays++;
+      }
+      if(obs[j].tmin !== null && obs[j].tmin !== undefined) {
+        if(obs[j].tmin <= 0) frostDays++;
+      }
+      var tnKey = 'tmax_' + obs[j].date;
+      if(normDaily[tnKey] !== undefined) { tmpNormSum += normDaily[tnKey]; tmpNormCount++; }
+    }
+    for(var j = 0; j < fwd.length; j++) {
+      if(fwd[j].tmax !== null && fwd[j].tmax !== undefined && fwd[j].tmax >= 35) fwdHeatDays++;
+      if(fwd[j].tmin !== null && fwd[j].tmin !== undefined && fwd[j].tmin <= 0) fwdFrostDays++;
+    }
+    var tmpDep = (tmpCount && tmpNormCount) ? (tmpSum/tmpCount) - (tmpNormSum/tmpNormCount) : null;
+
     // Soil moisture: current (last 7 days avg) vs normal
     var smCur = null, smNorm = null, smCount = 0, smNormCount = 0;
     for(var j = Math.max(0, obs.length-7); j < obs.length; j++) {
@@ -8467,6 +8504,7 @@ async function initWx() {
       reg: reg, obs: obs, fwd: fwd,
       obsPrecip: obsPrecip, fwdPrecip: fwdPrecip, normDaily: normDaily,
       smCur: smCur, smNorm: smNorm, smPctNormal: smPctNormal,
+      tmpDep: tmpDep, heatDays: heatDays, frostDays: frostDays, fwdHeatDays: fwdHeatDays, fwdFrostDays: fwdFrostDays,
       normalPrecip: normalPrecip, fwdNormal: fwdNormal,
       pctNormal: pctNormal, fwdPctNormal: fwdPctNormal
     });
@@ -8523,8 +8561,9 @@ function renderWx() {
   html += '<thead><tr>';
   html += '<tr><th colspan="2" style="border-bottom:none;"></th>';
   html += '<th colspan="3" style="text-align:center;font-size:11px;letter-spacing:.10em;color:var(--text3);border-bottom:none;padding-bottom:0;">OBSERVED (60 DAYS)</th>';
-  html += '<th colspan="3" style="text-align:center;font-size:11px;letter-spacing:.10em;color:var(--amber);border-left:2px solid var(--amber);border-bottom:none;padding-bottom:0;">FORECAST (14 DAYS)</th>';
-  html += '<th style="text-align:center;font-size:11px;letter-spacing:.10em;color:var(--text3);border-left:2px solid var(--border3);border-bottom:none;padding-bottom:0;">ROOT ZONE</th>';
+  html += '<th colspan="3" style="text-align:center;font-size:11px;letter-spacing:.10em;color:var(--amber);border-left:2px solid var(--amber);border-bottom:none;padding-bottom:0;">FORECAST (14 DAYS)</th>' +
+  '<th colspan="2" style="text-align:center;font-size:11px;letter-spacing:.10em;color:var(--text3);border-left:2px solid var(--border3);border-bottom:none;padding-bottom:0;">CONDITIONS</th>';
+  
   html += '</tr><tr>';
   html += '<th style="text-align:left;">REGION</th>';
   html += '<th>CROP</th>';
@@ -8534,7 +8573,8 @@ function renderWx() {
   html += '<th style="border-left:2px solid var(--amber);">14d FCST</th>';
   html += '<th>14d NORM</th>';
   html += '<th>FCST %</th>';
-  html += '<th style="border-left:2px solid var(--border3);font-size:12px;">SOIL<br>vs Avg</th>';
+  html += '<th style="border-left:2px solid var(--border3);font-size:11px;">SOIL<br>% nml</th>';
+  html += '<th style="font-size:11px;">TEMP<br>\u0394 nml</th>';
   html += '</tr></thead><tbody>';
 
   var curMo = new Date().getMonth();
@@ -8553,7 +8593,7 @@ function renderWx() {
     var i = wxData.indexOf(w);
     if(w.reg.grp !== lastGrp) {
       lastGrp = w.reg.grp;
-      html += '<tr class="row-section"><td colspan="9">' + lastGrp + '</td></tr>';
+      html += '<tr class="row-section"><td colspan="10">' + lastGrp + '</td></tr>';
     }
     var pCol = w.pctNormal < 80 ? 'dn' : w.pctNormal > 120 ? 'up' : '';
     var pBg = w.pctNormal < 50 ? 'background:#b83838;color:#fff;' : w.pctNormal < 80 ? 'background:rgba(184,56,56,0.25);' : w.pctNormal > 150 ? 'background:#2e8f52;color:#fff;' : w.pctNormal > 120 ? 'background:rgba(46,143,82,0.25);' : '';
@@ -8579,17 +8619,24 @@ function renderWx() {
     html += '<td style="border-left:2px solid var(--amber);">' + w.fwdPrecip.toFixed(0) + ' mm</td>';
     html += '<td style="color:var(--text3);">' + w.fwdNormal.toFixed(0) + ' mm</td>';
     html += '<td style="font-weight:900;font-size:16px;text-align:center;' + fBg + '">' + w.fwdPctNormal + '%</td>';
-    // Soil moisture
+
+    // Soil moisture cell
     var smBg = '';
     if(w.smPctNormal !== null) {
       smBg = w.smPctNormal < 60 ? 'background:#b83838;color:#fff;' : w.smPctNormal < 85 ? 'background:rgba(184,56,56,0.25);' : w.smPctNormal > 130 ? 'background:#2e8f52;color:#fff;' : w.smPctNormal > 110 ? 'background:rgba(46,143,82,0.25);' : '';
     }
-    var smLabel = '\u2014';
-    if(w.smPctNormal !== null) {
-      var smTag = w.smPctNormal < 60 ? 'V.DRY' : w.smPctNormal < 85 ? 'DRY' : w.smPctNormal > 130 ? 'V.WET' : w.smPctNormal > 110 ? 'WET' : 'OK';
-      smLabel = w.smPctNormal + '% ' + smTag;
+    html += '<td style="font-weight:800;font-size:14px;text-align:center;border-left:2px solid var(--border3);' + smBg + '">' + (w.smPctNormal !== null ? w.smPctNormal + '%' : '\u2014') + '</td>';
+
+    // Temp cell - forecast departure + stress flags (no emojis)
+    var tmpTxt = '\u2014';
+    var tmpStyle = '';
+    if(w.tmpDep !== null) {
+      var sign = w.tmpDep >= 0 ? '+' : '';
+      tmpTxt = sign + w.tmpDep.toFixed(1) + '\u00b0';
+      if(w.tmpDep > 2) tmpStyle = 'color:var(--red);';
+      else if(w.tmpDep < -2) tmpStyle = 'color:#5b9cf0;';
     }
-    html += '<td style="font-weight:800;font-size:13px;text-align:center;border-left:2px solid var(--border3);white-space:nowrap;' + smBg + '">' + smLabel + '</td>';
+    html += '<td style="font-weight:800;font-size:13px;text-align:center;white-space:nowrap;' + tmpStyle + '">' + tmpTxt + '</td>';
     html += '</tr>';
   }
   html += '</tbody></table></div>';
@@ -8636,6 +8683,12 @@ function renderWxDetail() {
   html += '<canvas id="wx-daily-canvas" style="display:block;width:100%;height:120px;"></canvas>';
   html += '</div>';
 
+  // Temperature chart
+  html += '<div style="padding:10px 16px 12px;border:1px solid var(--border);border-top:none;background:var(--bg);margin-top:12px;border-top:3px solid var(--amber) !important;">';
+  html += '<div style="font-size:13px;font-weight:900;letter-spacing:.10em;color:var(--text3);text-transform:uppercase;margin-bottom:6px;">TEMPERATURE \u00b0C (daily high vs 3yr avg)</div>';
+  html += '<canvas id="wx-temp-canvas" style="display:block;width:100%;height:320px;"></canvas>';
+  html += '</div>';
+
   // Crop calendar timeline
   if(w.reg.seasons && Object.keys(w.reg.seasons).length) {
     html += '<div style="padding:10px 16px 12px;border:1px solid var(--border);border-top:none;background:var(--bg);">';
@@ -8648,7 +8701,138 @@ function renderWxDetail() {
   el.innerHTML = html;
 
   // Draw charts after DOM update
-  setTimeout(function(){ drawWxAccumChart(w); drawWxDailyChart(w); drawWxCalendar(w); }, 50);
+  setTimeout(function(){ drawWxAccumChart(w); drawWxDailyChart(w); drawWxTempChart(w); drawWxCalendar(w); }, 50);
+}
+
+function drawWxTempChart(w) {
+  var canvas = document.getElementById('wx-temp-canvas');
+  if(!canvas) return;
+  var W = canvas.parentElement.clientWidth || 800;
+  var H = 320;
+  canvas.width = W * 2; canvas.height = H * 2;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  var isDark = document.body.classList.contains('dark');
+  var textC = isDark ? '#5a6a7a' : '#8090A0';
+  var gridC = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  var PAD = {l:50, r:55, t:22, b:30};
+
+  var allDays = w.obs.concat(w.fwd);
+  var n = allDays.length;
+  if(!n) return;
+
+  var temps = [], norms = [];
+  var tMin = 999, tMax = -999;
+  for(var i = 0; i < n; i++) {
+    var t = allDays[i].tmax;
+    temps.push(t);
+    var nKey = 'tmax_' + allDays[i].date;
+    var tn = w.normDaily[nKey] !== undefined ? w.normDaily[nKey] : null;
+    norms.push(tn);
+    if(t !== null && t !== undefined) { tMin = Math.min(tMin, t); tMax = Math.max(tMax, t); }
+    if(tn !== null) { tMin = Math.min(tMin, tn); tMax = Math.max(tMax, tn); }
+  }
+  tMin = Math.floor(tMin / 5) * 5 - 5;
+  tMax = Math.ceil(tMax / 5) * 5 + 5;
+  var range = tMax - tMin || 1;
+  var plotW = W - PAD.l - PAD.r;
+  var plotH = H - PAD.t - PAD.b;
+  function tx(i) { return PAD.l + (i / (n-1)) * plotW; }
+  function ty(v) { return PAD.t + (1 - (v - tMin) / range) * plotH; }
+
+  // Grid
+  ctx.strokeStyle = gridC; ctx.lineWidth = 0.5;
+  var yStep = range <= 30 ? 5 : 10;
+  for(var v = tMin; v <= tMax; v += yStep) {
+    var yy = ty(v);
+    ctx.beginPath(); ctx.moveTo(PAD.l, yy); ctx.lineTo(W-PAD.r, yy); ctx.stroke();
+    ctx.fillStyle = textC; ctx.font = '700 12px "Courier New",monospace'; ctx.textAlign = 'right';
+    ctx.fillText(v + '\u00b0', PAD.l - 8, yy + 4);
+  }
+
+  // Heat threshold
+  if(tMax >= 33) {
+    ctx.strokeStyle = 'rgba(184,56,56,0.5)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(PAD.l, ty(35)); ctx.lineTo(W-PAD.r, ty(35)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = isDark ? '#b83838' : '#C4302B'; ctx.font = '800 10px "Courier New",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('HEAT 35\u00b0', W-PAD.r+4, ty(35)+4);
+  }
+
+  // Frost threshold
+  if(tMin <= 5) {
+    ctx.strokeStyle = 'rgba(91,156,240,0.5)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(PAD.l, ty(0)); ctx.lineTo(W-PAD.r, ty(0)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#5b9cf0'; ctx.font = '800 10px "Courier New",monospace'; ctx.textAlign = 'left';
+    ctx.fillText('FROST 0\u00b0', W-PAD.r+4, ty(0)+4);
+  }
+
+  // Obs/forecast divider
+  var obsN = w.obs.length;
+  if(obsN > 0 && obsN < n) {
+    ctx.strokeStyle = isDark ? 'rgba(245,166,35,0.3)' : 'rgba(212,133,10,0.3)';
+    ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(tx(obsN-0.5), PAD.t); ctx.lineTo(tx(obsN-0.5), H-PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = isDark ? '#f5a623' : '#D4850A'; ctx.font = '700 10px "Courier New",monospace';
+    ctx.textAlign = 'left'; ctx.fillText('FORECAST \u2192', tx(obsN-0.5)+4, PAD.t+12);
+  }
+
+  // Normal line (blue dashed)
+  ctx.strokeStyle = '#5b9cf0'; ctx.lineWidth = 2; ctx.setLineDash([6,3]); ctx.globalAlpha = 0.7;
+  ctx.beginPath(); var started = false;
+  for(var i = 0; i < n; i++) {
+    if(norms[i] !== null) { if(!started){ctx.moveTo(tx(i),ty(norms[i]));started=true;}else{ctx.lineTo(tx(i),ty(norms[i]));} }
+  }
+  ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // Observed line (amber)
+  ctx.strokeStyle = isDark ? '#f5a623' : '#D4850A'; ctx.lineWidth = 3;
+  ctx.beginPath(); started = false;
+  for(var i = 0; i < obsN; i++) {
+    if(temps[i] !== null && temps[i] !== undefined) { if(!started){ctx.moveTo(tx(i),ty(temps[i]));started=true;}else{ctx.lineTo(tx(i),ty(temps[i]));} }
+  }
+  ctx.stroke();
+
+  // Forecast line (green dashed)
+  if(obsN < n) {
+    ctx.strokeStyle = isDark ? '#e09010' : '#B8720A'; ctx.lineWidth = 2; ctx.setLineDash([5,3]);
+    ctx.beginPath(); started = false;
+    for(var i = obsN > 0 ? obsN-1 : 0; i < n; i++) {
+      if(temps[i] !== null && temps[i] !== undefined) { if(!started){ctx.moveTo(tx(i),ty(temps[i]));started=true;}else{ctx.lineTo(tx(i),ty(temps[i]));} }
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // X-axis
+  ctx.fillStyle = textC; ctx.font = '700 11px "Courier New",monospace'; ctx.textAlign = 'center';
+  var MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var lastLbl = '';
+  for(var i = 0; i < n; i++) {
+    var dt = allDays[i].date; var m = parseInt(dt.slice(5,7))-1; var day = parseInt(dt.slice(8,10));
+    if(day === 1 || day === 15 || i === 0 || i === n-1) {
+      var lbl = MO[m] + ' ' + day;
+      if(lbl !== lastLbl && tx(i) > PAD.l + 20) { ctx.fillText(lbl, tx(i), H-PAD.b+14); lastLbl = lbl; }
+    }
+  }
+
+  // End labels
+  ctx.font = '800 13px "Courier New",monospace';
+  var lastT = null;
+  for(var i = n-1; i >= 0; i--) { if(temps[i] !== null && temps[i] !== undefined) { lastT = temps[i]; break; } }
+  if(lastT !== null) { ctx.fillStyle = isDark ? '#f5a623' : '#D4850A'; ctx.textAlign = 'left'; ctx.fillText(lastT.toFixed(0) + '\u00b0', tx(n-1)+6, ty(lastT)+4); }
+  var lastN = null;
+  for(var i = n-1; i >= 0; i--) { if(norms[i] !== null) { lastN = norms[i]; break; } }
+  if(lastN !== null) { ctx.fillStyle = '#5b9cf0'; ctx.textAlign = 'left'; ctx.fillText(lastN.toFixed(0) + '\u00b0 avg', tx(n-1)+6, ty(lastN)+4); }
+
+  // Mini legend
+  ctx.font = '700 11px "Courier New",monospace'; ctx.textAlign = 'left';
+  var lx = PAD.l;
+  ctx.fillStyle = isDark ? '#f5a623' : '#D4850A'; ctx.fillText('\u2014 OBS', lx, PAD.t-6); lx += 65;
+  ctx.fillStyle = '#5b9cf0'; ctx.fillText('--- AVG', lx, PAD.t-6); lx += 65;
+  ctx.fillStyle = isDark ? '#e09010' : '#B8720A'; ctx.fillText('--- FCST', lx, PAD.t-6);
 }
 
 function drawWxCalendar(w) {
@@ -8880,8 +9064,8 @@ function drawWxAccumChart(w) {
   }
   ctx.stroke();
 
-  // Forecast line (green, dashed)
-  ctx.strokeStyle = isDark ? '#2e8f52' : '#0E7A3A';
+  // Forecast line (amber, dashed)
+  ctx.strokeStyle = isDark ? '#e09010' : '#B8720A';
   ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
   ctx.beginPath();
   started = false;
@@ -8923,7 +9107,7 @@ function drawWxAccumChart(w) {
   ctx.fillStyle = isDark ? '#5b9cf0' : '#2563EB';
   ctx.fillText(lastNorm.toFixed(0), PAD.l + pw + 4, yP(lastNorm) + 4);
   if(lastFcst !== null) {
-    ctx.fillStyle = isDark ? '#2e8f52' : '#0E7A3A';
+    ctx.fillStyle = isDark ? '#e09010' : '#B8720A';
     ctx.fillText(lastFcst.toFixed(0), PAD.l + pw + 4, yP(lastFcst) + 4);
   }
 
@@ -8943,7 +9127,7 @@ function drawWxAccumChart(w) {
   ctx.fillText('Normal', lx+22, ly+3);
   // Forecast
   lx += 80;
-  ctx.strokeStyle = isDark ? '#2e8f52' : '#0E7A3A'; ctx.lineWidth = 2; ctx.setLineDash([5,3]);
+  ctx.strokeStyle = isDark ? '#e09010' : '#B8720A'; ctx.lineWidth = 2; ctx.setLineDash([5,3]);
   ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx+18, ly); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillText('Forecast', lx+22, ly+3);
   // Deficit/surplus label
