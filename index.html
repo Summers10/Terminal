@@ -1406,35 +1406,32 @@ function renderSummaryPage(){
 
   // Render upcoming events sidebar
   try {
-    var evts = buildCalEvents();
+    var lookup = buildCalEvents();
     var today = new Date().toISOString().slice(0,10);
-    var upcoming = evts.filter(function(e){ return e.date >= today; }).sort(function(a,b){ return a.date < b.date ? -1 : 1; });
-    var seen = {};
-    var unique = [];
-    for(var ei=0; ei<upcoming.length && unique.length < 30; ei++){
-      var key = upcoming[ei].date + upcoming[ei].label;
-      if(!seen[key]){ seen[key]=1; unique.push(upcoming[ei]); }
-    }
+    var allDates = Object.keys(lookup).filter(function(d){ return d >= today; }).sort();
     var evHtml = '';
-    var lastDate = '';
+    var count = 0;
     var MO_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    for(var ei=0; ei<unique.length; ei++){
-      var ev = unique[ei];
-      if(ev.date !== lastDate){
-        var dd = new Date(ev.date + 'T12:00:00');
-        var dayLabel = DOW[dd.getDay()] + ' ' + MO_S[dd.getMonth()] + ' ' + dd.getDate();
-        var isToday = ev.date === today;
-        evHtml += '<div style="padding:6px 12px;background:' + (isToday ? 'var(--row-latest)' : 'var(--section-bg)') + ';font-size:11px;font-weight:900;letter-spacing:.10em;color:' + (isToday ? 'var(--amber)' : 'var(--text3)') + ';text-transform:uppercase;border-top:1px solid var(--border);">' + (isToday ? '\u25cf TODAY' : dayLabel) + '</div>';
-        lastDate = ev.date;
+    for(var di=0; di<allDates.length && count < 30; di++){
+      var dt = allDates[di];
+      var dayEvts = lookup[dt];
+      if(!dayEvts || !dayEvts.length) continue;
+      var dd = new Date(dt + 'T12:00:00');
+      var dayLabel = DOW[dd.getDay()] + ' ' + MO_S[dd.getMonth()] + ' ' + dd.getDate();
+      var isToday = dt === today;
+      evHtml += '<div style="padding:6px 12px;background:' + (isToday ? 'var(--row-latest)' : 'var(--section-bg)') + ';font-size:11px;font-weight:900;letter-spacing:.10em;color:' + (isToday ? 'var(--amber)' : 'var(--text3)') + ';text-transform:uppercase;border-top:1px solid var(--border);">' + (isToday ? '\u25cf TODAY' : dayLabel) + '</div>';
+      for(var ei=0; ei<dayEvts.length; ei++){
+        var ev = dayEvts[ei];
+        evHtml += '<div style="padding:4px 12px;font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);">';
+        evHtml += '<span class="' + ev.cls + '" style="padding:1px 5px;border-radius:2px;font-size:11px;white-space:nowrap;">' + ev.label + '</span>';
+        evHtml += '</div>';
+        count++;
       }
-      evHtml += '<div style="padding:4px 12px;font-size:12px;font-weight:600;color:var(--text2);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);">';
-      evHtml += '<span class="' + ev.cls + '" style="padding:1px 5px;border-radius:2px;font-size:11px;white-space:nowrap;">' + ev.label + '</span>';
-      evHtml += '</div>';
     }
     var evEl = document.getElementById('sum-events-list');
     if(evEl) evEl.innerHTML = evHtml;
-  } catch(e2){}
+  } catch(e2){ console.warn('Events sidebar:', e2); }
 } catch(e) { console.warn('Summary page render deferred:', e.message); }
 }
 
