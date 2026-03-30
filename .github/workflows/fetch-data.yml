@@ -1,0 +1,41 @@
+name: Fetch Market Data
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch USDA PSD data
+        env:
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
+        run: python scripts/fetch_usda_psd.py
+
+      - name: Fetch StatsCan crop data
+        run: python scripts/fetch_statscan.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No data changes to commit"
+          else
+            git commit -m "Auto-update market data $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
