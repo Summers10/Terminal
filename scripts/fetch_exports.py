@@ -1,4 +1,4 @@
-!/usr/bin/env python3
+#!/usr/bin/env python3
 """Fetch USDA FAS Weekly Export Sales historical data.
 Parses HTML tables from apps.fas.usda.gov/export-sales/
 Saves as data/export_sales.json matching terminal EXP_INSP/EXP_SALES format."""
@@ -144,14 +144,14 @@ def fetch_commodity(key, cfg):
     # Keep last 2 marketing years (current + previous)
     recent_mys = all_mys[-2:] if len(all_mys) >= 2 else all_mys
  
-    # Build weekly arrays (convert MT to 1000 MT)
+    # Build weekly arrays (FAS data is already in 1,000 MT)
     insp_years = {}
     sales_years = {}
  
     for my in recent_mys:
         rows = sorted(by_my[my], key=lambda r: r["date"])
-        insp_years[my] = [round(r["weekly_exports"] / 1000, 1) if r["weekly_exports"] is not None else None for r in rows]
-        sales_years[my] = [round(r["net_sales"] / 1000, 1) if r["net_sales"] is not None else None for r in rows]
+        insp_years[my] = [round(r["weekly_exports"], 1) if r["weekly_exports"] is not None else None for r in rows]
+        sales_years[my] = [round(r["net_sales"], 1) if r["net_sales"] is not None else None for r in rows]
  
     my_label = MY_LABELS.get(my_start, f"Month{my_start}")
  
