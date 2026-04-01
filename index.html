@@ -10067,13 +10067,13 @@ function showRptContent(){
   document.getElementById('rpt-loading').style.display = 'none';
   var el = document.getElementById('rpt-content');
   el.style.display = 'flex';
-  if(_nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10);
+  if(_nassData && _nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10);
   buildRptNav();
   setRptView('energy');
 }
 
 function buildRptNav(){
-  var crops = Object.keys(_nassData.crop_conditions || {});
+  var crops = _nassData ? Object.keys(_nassData.crop_conditions || {}) : [];
   if(!crops.length) crops = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
   if(crops.indexOf(_rptCrop) < 0) _rptCrop = crops[0];
   var h = '';
