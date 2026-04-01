@@ -1149,6 +1149,18 @@ function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};
 // Load PSD data from JSON (replaces embedded data)
 (function(){fetch('data/psd_data.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){_PSD_RAW=d;buildPSD();console.log('PSD loaded:',Object.keys(d));}).catch(function(e){console.warn('PSD fetch failed:',e.message);});})();
 
+// Load export sales from pipeline JSON
+(function(){fetch('data/export_sales.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
+  for(var k in d){
+    if(d[k].insp){EXP_INSP[k]=d[k].insp;}
+    if(d[k].sales){EXP_SALES[k]=d[k].sales;}
+  }
+  console.log('Export sales loaded:',Object.keys(d).join(', '));
+  // Force button rebuild on next render
+  var btns = document.getElementById('exp-comm-btns');
+  if(btns) delete btns.dataset.built;
+}).catch(function(e){console.warn('Export sales fetch failed:',e.message);});})();
+
 const _COT_KEYS = ["date","oi","pm_net","pm_l","pm_s","mm_net","mm_l","mm_s"];
 let _COT_RAW = {};
 let _COT_STATS = {};
@@ -6422,23 +6434,8 @@ document.querySelectorAll('.chart-cell').forEach(el=>ro.observe(el));
 const EXP_COMMS = [{key:'wheat',    label:'Wheat',    unit:'1,000 MT', color:'#f5a623'},
 {key:'corn',     label:'Corn',     unit:'1,000 MT', color:'#5b9cf0'},
 {key:'soybeans', label:'Soybeans', unit:'1,000 MT', color:'#22c55e'},];
-const EXP_INSP = {
-wheat:    {MY:'Jun-May', years:['24/25','25/26'], w:{'24/25':[7.4,363.6,323.1,308.6,275.9,630.9,271.5,454.2,433,502.1,470.2,576.8,605,542.2,613,710.5,531.7,359.7,393.1,276.5,244.4,236.9,301.3,133.9,433.8,322.4,198.9,405.7,376.2,381.9,414.3,196.5,201.3,554.3,264.8,577.3,232.7,378.7,380.3,224,470.9,428.7,499.6,339.1,483.5,479.6,491.7,493.5,371.4,438.4,501.2,540.1],"25/26":[115.7,363.5,256.3,553.5,447.2,432.9,761,296.7,667.7,340.8,360.6,1005.6,890.6,356.5,774.8,896,873.3,615.9,388.3,596.6,280.9,301.9,285.5,248.9,445.5,361.5,428.5,491,627.4,425.5,172,303.3,372.4,378.8,403.8,580,322.6,540,348.9,432,null,null,null,null,null,null,null,null,null,null,null,null]}},
-corn:     {MY:'Sep-Aug', years:['24/25','25/26'], w:{'24/25':[558.6,572.9,1104.1,1170.4,1059.3,501.8,999,788,917.6,698.6,957,1010.7,1045.3,1183.4,1054.5,1123.9,1002.5,863.7,1484.3,1516.7,1320.2,1352.3,1354.3,1606.2,1305.4,1266.9,1863,1686.8,1651.8,1805.9,1699.4,1880.4,1780.3,1598.1,1819.5,1411.9,1589.4,1598.3,1647.8,1691,1745.7,1471.5,1465.6,1679,1210.7,1058.6,1488.7,1229.2,1520.4,1027.9,1149,1741.6],"25/26":[687.3,1555.9,1315.9,1429.2,1830.6,1122.5,1410.1,1332.5,1540.7,1528.6,2476.8,1531.6,1897.6,1754.2,1445.6,1758.7,1399.8,1396.5,1555.6,1433.8,1671,1146.9,1512.5,1626.9,1967.4,1696,1684.8,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-soybeans: {MY:'Sep-Aug', years:['24/25','25/26'], w:{'24/25':[314.2,446.2,381,724.6,1570.5,1852.7,2382.2,2236.9,2424.2,2341.4,2372.8,2012.2,2428.9,1859.1,1686.3,1573.2,1704.1,1441.1,1408,1034.6,679.6,1135.8,1032.8,741,971.8,732.4,865.1,592.1,922.1,841.9,765.4,651.9,429.6,530.2,258.3,429.9,250.8,209.3,308.6,453.4,347.8,202.2,251.6,395.9,276.4,303.3,424,638.2,533.1,464.6,408.8,457],"25/26":[233.6,768,512.4,553,720.5,692.8,1670.9,1388.2,1028.5,868.4,1493.5,763.5,745.3,1022.2,653.5,850.9,1220,1112.6,1568.6,1279.6,1269.6,1387.7,1128.8,1290.6,811.5,1119.5,995.3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-soymeal:  {MY:'Oct-Sep', years:['24/25','25/26'], w:{'24/25':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"25/26":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-cotton:   {MY:'Aug-Jul', years:['24/25','25/26'], w:{'24/25':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"25/26":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-beef:     {MY:'Jan-Dec', years:['2025','2026'],   w:{'2025':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"2026":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-pork:     {MY:'Jan-Dec', years:['2025','2026'],   w:{'2025':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"2026":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}}};
-const EXP_SALES = {
-wheat:    {years:['24/25','25/26'], w:{'24/25':[0.8,589.7,667.2,805.3,221.7,578.5,309.3,286.6,210.4,339.9,492.7,532.1,306.9,474.9,217.3,158.9,443.7,433.6,504.1,532.9,411.4,374.7,380.1,549.6,366.8,378.2,290.2,457.9,612.4,140.6,111.3,513.4,164.8,421.5,438.9,569.6,532.7,269,338.7,783.4,-248.8,100.3,340,107.3,76.5,-145,72,69.7,58.6,-13.4,-128.8,-49.1],"25/26":[573,427.2,255.2,586,567.8,494.4,712.2,592.1,737.8,722.8,519.8,579.8,313,305.4,377.5,539.8,315.9,887.9,613.9,341.3,499.8,505.4,462.5,850.4,361.7,460.7,381.5,432.6,147.8,95.4,118.7,156.3,618.1,558.2,373.9,488,288,243,203.1,455.4,null,null,null,null,null,null,null,null,null,null,null,null]}},
-corn:     {years:['24/25','25/26'], w:{'24/25':[2120.2,847.4,535.1,1684.1,1222.1,2225.7,3602.6,2341.7,2766.5,1315.1,1494.6,1062.9,1732.4,946.9,1174.6,1711.3,777,444.9,1024.2,1661,1358.5,1477.2,1649,1453.8,778.2,909,967.3,1496.7,1039.6,1173.2,785.6,1561.9,1152.9,1014.4,1662.5,1677.2,1190.8,916.7,942.3,791.3,903.8,741.2,532.7,1262.1,97.6,643.1,340.9,170.4,-88.7,-40.2,-17.8,-280.9],"25/26":[1709.5,1231.6,1923.4,1394.8,2259.7,1326.6,2822.6,1805.3,1995,979.5,2380.4,1843.2,1792.2,1478.9,1744.1,2202.3,736.6,377.6,1139.5,4010.6,1648.4,1041.1,2069.6,1469.5,685.8,2022.6,1503.3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-soybeans: {years:['24/25','25/26'], w:{'24/25':[2427.8,1748.1,1437.7,1443.5,1129.6,1702.7,2087.5,2064.9,2037.2,1555.4,1785.6,2421.3,2312.7,1173.8,1424.2,978.4,484.7,149.6,501.3,1491.8,381.4,330.2,116.8,480.3,410.9,292.5,693.6,352.6,338.5,410.2,172.3,484.8,211.2,371.2,376.7,282.4,307.9,146,194.3,61.4,481.2,339.6,462.4,503,271.9,103.4,273.6,416.5,-377.6,-59.1,-189.2,-23.8],"25/26":[1308.1,853.9,724.5,812.2,919.4,785,1048.8,1449.8,1248.5,451.2,636.3,2320.7,1047.8,1503.2,2328.4,987.1,1177.7,877.9,1993.1,2387.9,819,436.9,281.8,798.2,407.1,383.5,456.7,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-soymeal:  {years:['24/25','25/26'], w:{'24/25':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"25/26":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-cotton:   {years:['24/25','25/26'], w:{'24/25':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"25/26":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-beef:     {years:['2025','2026'],   w:{'2025':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"2026":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}},
-pork:     {years:['2025','2026'],   w:{'2025':[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"2026":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]}}};
-let expCurrentComm = 'wheat';
+const EXP_INSP = {};
+const EXP_SALES = {};let expCurrentComm = 'wheat';
 function _commHasData(key){
 var insp = EXP_INSP[key];
 if(!insp) return false;
@@ -8394,42 +8391,47 @@ function initMacro() {
 // connectFred removed - key hardcoded
 
 async function refreshFred() {
-  if (!fredApiKey) return;
   var st = document.getElementById('fredStatus');
   var lb = document.getElementById('fredLoadBar');
   var lp = document.getElementById('fredLoadProg');
   if (lb) lb.style.display = '';
   if (st) { st.textContent = 'Loading FRED data...'; st.style.color = 'var(--text3)'; }
-
   var allSeries = [];
   Object.values(FRED_SERIES).forEach(function(grp) { grp.s.forEach(function(s) { allSeries.push(s); }); });
+  // Try pipeline JSON first (avoids CORS)
+  try {
+    var resp = await fetch('data/fred_data.json');
+    if (resp.ok) {
+      var jsonData = await resp.json();
+      var ok = 0;
+      allSeries.forEach(function(s) {
+        if (jsonData[s.id] && jsonData[s.id].length) { fredData[s.id] = jsonData[s.id]; ok++; updateFredMetric(s); }
+      });
+      if (ok > 0) {
+        console.log('FRED loaded from pipeline JSON:', ok, 'series');
+        updateFredCharts();
+        setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
+        if (lb) lb.style.display = 'none';
+        if (st) { st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series'; st.style.color = 'var(--green)'; }
+        return;
+      }
+    }
+  } catch(e) { console.log('FRED pipeline JSON not available, trying live API...'); }
+  // Fallback: live API
+  if (!fredApiKey) { if(lb) lb.style.display='none'; return; }
   var ok = 0, fail = 0;
-
   for (var i = 0; i < allSeries.length; i++) {
     var s = allSeries[i];
     if (lp) lp.style.width = ((i + 1) / allSeries.length * 100) + '%';
     try {
       var data = await fredFetch(s.id, s.lim, s.extra);
-      if (data && data.length > 0) {
-        fredData[s.id] = data;
-        ok++;
-        updateFredMetric(s);
-      } else { fail++; }
+      if (data && data.length > 0) { fredData[s.id] = data; ok++; updateFredMetric(s); } else { fail++; }
     } catch(e) { fail++; }
   }
-
   updateFredCharts();
-  // Force resize after rendering
-  setTimeout(function(){
-    Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} });
-    drawYieldCurveSnapshot();
-  }, 100);
+  setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
   if (lb) lb.style.display = 'none';
-  if (st) {
-    st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series';
-    st.style.color = 'var(--green)';
-    if (fail > 0) st.textContent += ' (' + fail + ' failed)';
-  }
+  if (st) { st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series'; st.style.color = ok > 0 ? 'var(--green)' : 'var(--red)'; }
 }
 
 function updateFredMetric(s) {
