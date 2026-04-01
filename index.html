@@ -83,7 +83,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <!-- TOP NAV -->
 <div id="topnav">
   <button class="nav-tab active" onclick="switchTab('sum')">SUMMARY</button>
-  <button class="nav-tab" onclick="switchGroup('fund','energy')">FUNDAMENTALS</button>
+  <button class="nav-tab" onclick="switchSubTab('fund','reports')">FUNDAMENTALS</button>
   <button class="nav-tab" onclick="switchGroup('analysis','cot')">ANALYSIS</button>
   <button class="nav-tab" onclick="switchGroup('macro','dashboard')">MACRO</button>
   <button class="nav-tab" onclick="switchTab('wx')">WEATHER</button>
@@ -95,11 +95,6 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 </div>
 <div id="subtab-bar" style="display:none;border-bottom:1px solid var(--border);background:var(--bg1);padding:0 16px;">
   <div id="subtab-fund" style="display:none;">
-    <button class="nav-tab subtab active" onclick="switchSubTab('fund','energy')">ENERGY</button>
-    <button class="nav-tab subtab" onclick="switchSubTab('fund','sd')">USDA</button>
-    <button class="nav-tab subtab" onclick="switchSubTab('fund','aafc')">AAFC</button>
-    <button class="nav-tab subtab" onclick="switchSubTab('fund','reports')">REPORTS</button>
-
   </div>
   <div id="subtab-analysis" style="display:none;">
     <button class="nav-tab subtab active" onclick="switchSubTab('analysis','cot')">COMMITMENT OF TRADERS</button>
@@ -727,6 +722,18 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       </div>
       <!-- RIGHT CONTENT -->
       <div id="rpt-main" style="flex:1;min-width:0;padding:0 0 0 20px;">
+        <!-- Energy view -->
+        <div class="rpt-view" id="rpt-v-energy" style="display:none;">
+          <div id="rpt-energy-content"></div>
+        </div>
+        <!-- USDA S&D view -->
+        <div class="rpt-view" id="rpt-v-sd" style="display:none;">
+          <div id="rpt-sd-content"></div>
+        </div>
+        <!-- AAFC view -->
+        <div class="rpt-view" id="rpt-v-aafc" style="display:none;">
+          <div id="rpt-aafc-content"></div>
+        </div>
         <!-- Conditions view -->
         <div class="rpt-view" id="rpt-v-conditions">
           <div id="rpt-cond-score" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;"></div>
@@ -10030,8 +10037,11 @@ var _rptPlantChart = null;
 var _rptHarvChart = null;
 
 var RPT_VIEWS = [
-  {id:'conditions', label:'Crop Conditions', section:'WEEKLY REPORTS', hasCrops:true},
-  {id:'progress',   label:'Crop Progress',   section:null, hasCrops:true},
+  {id:'energy',     label:'Energy',           section:'BALANCE SHEETS'},
+  {id:'sd',         label:'USDA (S&D)',       section:null},
+  {id:'aafc',       label:'AAFC',             section:null},
+  {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS', hasCrops:true},
+  {id:'progress',   label:'Crop Progress',    section:null, hasCrops:true},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
   {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
   {id:'cattle',     label:'Cattle on Feed',   section:'LIVESTOCK'},
@@ -10043,21 +10053,14 @@ var RPT_VIEWS = [
 
 function initReports(){
   reportsInited = true;
-  if(_nassData){ showRptContent(); return; }
-  fetch('data/nass_reports.json')
-    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-    .then(function(d){
-      _nassData = d;
-      showRptContent();
-    })
-    .catch(function(e){
-      document.getElementById('rpt-loading').innerHTML =
-        '<div style="padding:60px 0;text-align:center;">' +
-        '<div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">NO DATA AVAILABLE</div>' +
-        '<div style="font-size:13px;color:var(--text3);line-height:1.8;max-width:500px;margin:0 auto;">' +
-        'Run the GitHub Actions pipeline to fetch NASS data.<br>' +
-        'Repo → Actions → "Fetch USDA Data" → Run workflow</div></div>';
-    });
+  // Always show content immediately (Energy/USDA/AAFC don't need NASS)
+  showRptContent();
+  if(!_nassData){
+    fetch('data/nass_reports.json')
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){ _nassData = d; if(_nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); buildRptNav(); })
+      .catch(function(e){ console.warn('NASS data not available:', e.message); });
+  }
 }
 
 function showRptContent(){
@@ -10066,7 +10069,7 @@ function showRptContent(){
   el.style.display = 'flex';
   if(_nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10);
   buildRptNav();
-  setRptView('conditions');
+  setRptView('energy');
 }
 
 function buildRptNav(){
@@ -10116,6 +10119,9 @@ function setRptCrop(c, view){
 function renderRptView(){
   if(!_nassData && ['conditions','progress','stocks','acreage','cattle','hogs'].indexOf(_rptView) >= 0) return;
   switch(_rptView){
+    case 'energy': renderRptEnergy(); break;
+    case 'sd': renderRptSD(); break;
+    case 'aafc': renderRptAAFC(); break;
     case 'conditions': renderRptScoreboard(); renderRptCondTable(); renderRptGEChart(); break;
     case 'progress': renderRptProgressTable(); renderRptProgressCharts(); break;
     case 'stocks': renderRptStocks(); break;
@@ -10412,6 +10418,7 @@ function renderRptWasde(){
     el.innerHTML = '<div style="padding:40px 0;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;">LOADING S&D DATA...</div></div>';
     return;
   }
+  var cAbbr = {'United States':'U.S.','European Union':'EU','South Africa':'S. Africa'};
   var views = [
     {comm:'Corn', label:'CORN', countries:['United States','Brazil','Argentina'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
     {comm:'Soybeans', label:'SOYBEANS', countries:['United States','Brazil','Argentina'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
@@ -10428,14 +10435,14 @@ function renderRptWasde(){
     var cy = allYrs[allYrs.length - 1];
     var py = allYrs.length >= 2 ? allYrs[allYrs.length - 2] : null;
     h += '<div class="panel" style="margin-bottom:16px;">';
-    h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:13px;color:var(--text3);">' + (py ? py+' vs ':'') + cy + '</div></div>';
+    h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:13px;color:var(--text3);">' + cy + (py ? ' vs '+py : '') + '</div></div>';
     h += '<div style="overflow-x:auto;"><table class="bal-table"><thead><tr><th style="text-align:left;">Country</th>';
     v.items.forEach(function(item){
       h += py ? '<th colspan="3" style="text-align:center;border-left:1px solid var(--border2);">'+item+'</th>' : '<th style="border-left:1px solid var(--border2);">'+item+'</th>';
     });
     h += '</tr><tr><th></th>';
     v.items.forEach(function(){
-      h += py ? '<th style="border-left:1px solid var(--border2);">'+py+'</th><th class="latest">'+cy+'</th><th>Chg</th>' : '<th class="latest" style="border-left:1px solid var(--border2);">'+cy+'</th>';
+      h += py ? '<th class="latest" style="border-left:1px solid var(--border2);">'+cy+'</th><th>'+py+'</th><th>Chg</th>' : '<th class="latest" style="border-left:1px solid var(--border2);">'+cy+'</th>';
     });
     h += '</tr></thead><tbody>';
     var ri = 0;
@@ -10443,14 +10450,15 @@ function renderRptWasde(){
     showCountries.forEach(function(country){
       var cd = cdata[country]; if(!cd) return;
       var isW = country==='World';
-      h += '<tr'+(isW?' class="row-total"':(ri%2?' class="row-alt"':''))+'><td style="text-align:left;'+(isW?'font-weight:900;color:var(--amber);':'')+'">'+( isW?'WORLD':country)+'</td>';
+      var label = isW ? 'WORLD' : (cAbbr[country] || country);
+      h += '<tr'+(isW?' class="row-total"':(ri%2?' class="row-alt"':''))+'><td style="text-align:left;'+(isW?'font-weight:900;color:var(--amber);':'')+'">'+label+'</td>';
       v.items.forEach(function(item){
         var cur = cd[cy]?(cd[cy][item]||0):0;
         var prev = py&&cd[py]?(cd[py][item]||0):0;
         if(py){
           var chg = prev?((cur-prev)/prev*100):0;
-          h += '<td style="border-left:1px solid var(--border2);">'+(prev?prev.toLocaleString():'—')+'</td>';
-          h += '<td class="latest">'+(cur?cur.toLocaleString():'—')+'</td>';
+          h += '<td class="latest" style="border-left:1px solid var(--border2);">'+(cur?cur.toLocaleString():'—')+'</td>';
+          h += '<td>'+(prev?prev.toLocaleString():'—')+'</td>';
           h += '<td class="'+(chg>0.5?'up':chg<-0.5?'dn':'')+'" style="font-size:13px;">'+(prev?((chg>=0?'+':'')+chg.toFixed(1)+'%'):'—')+'</td>';
         } else {
           h += '<td class="latest" style="border-left:1px solid var(--border2);">'+(cur?cur.toLocaleString():'—')+'</td>';
@@ -10479,7 +10487,6 @@ function renderRptExportsLink(){
 }
 
 function renderRptGswLink(){
-  // Embed GSW content inline in Reports
   var container = document.getElementById('rpt-gsw-content');
   var gswPage = document.getElementById('gsw-page');
   if(gswPage && container){
@@ -10490,6 +10497,27 @@ function renderRptGswLink(){
   } else {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);">GSW data not available</div>';
   }
+}
+
+function renderRptEnergy(){
+  var c = document.getElementById('rpt-energy-content');
+  var p = document.getElementById('energy-page');
+  if(p && c && !c.hasChildNodes()){ c.appendChild(p); }
+  if(!energyInited) initEnergy();
+}
+
+function renderRptSD(){
+  var c = document.getElementById('rpt-sd-content');
+  var p = document.getElementById('sd-page');
+  if(p && c && !c.hasChildNodes()){ c.appendChild(p); }
+  renderSD();
+}
+
+function renderRptAAFC(){
+  var c = document.getElementById('rpt-aafc-content');
+  var p = document.getElementById('aafc-page');
+  if(p && c && !c.hasChildNodes()){ c.appendChild(p); }
+  if(!aafcInited) initAafc();
 }
 </script>
 
