@@ -83,7 +83,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <!-- TOP NAV -->
 <div id="topnav">
   <button class="nav-tab active" onclick="switchTab('sum')">SUMMARY</button>
-  <button class="nav-tab" onclick="switchSubTab('fund','reports')">FUNDAMENTALS</button>
+  <button class="nav-tab" onclick="showFundamentals()">FUNDAMENTALS</button>
   <button class="nav-tab" onclick="switchGroup('analysis','cot')">ANALYSIS</button>
   <button class="nav-tab" onclick="switchGroup('macro','dashboard')">MACRO</button>
   <button class="nav-tab" onclick="switchTab('wx')">WEATHER</button>
@@ -1790,6 +1790,28 @@ async function fetchNewsFeed() {
   if(st) st.textContent = 'Live';
   _newsFetched = true;
   syncSidebarHeights();
+}
+
+function showFundamentals(){
+try {
+  // Hide all pages and subtab bars
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('#topnav .nav-tab').forEach(function(b){ b.classList.remove('active'); });
+  var sb = document.getElementById('subtab-bar');
+  if(sb) sb.style.display = 'none';
+  ['fund','analysis','macro','cal'].forEach(function(g){
+    var el = document.getElementById('subtab-' + g);
+    if(el) el.style.display = 'none';
+  });
+  // Highlight FUNDAMENTALS
+  var topBtns = document.querySelectorAll('#topnav .nav-tab');
+  if(topBtns[1]) topBtns[1].classList.add('active');
+  // Show reports page
+  var rp = document.getElementById('reports-page-wrap');
+  if(rp) rp.classList.add('active');
+  window.scrollTo(0,0);
+  if(!reportsInited) initReports();
+} catch(e){ console.error('showFundamentals error:', e); }
 }
 
 function switchTab(t){
@@ -10040,8 +10062,8 @@ var RPT_VIEWS = [
   {id:'energy',     label:'Energy',           section:'BALANCE SHEETS'},
   {id:'sd',         label:'USDA (S&D)',       section:null},
   {id:'aafc',       label:'AAFC',             section:null},
-  {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS', hasCrops:true},
-  {id:'progress',   label:'Crop Progress',    section:null, hasCrops:true},
+  {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
+  {id:'progress',   label:'Crop Progress',    section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
   {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
   {id:'cattle',     label:'Cattle on Feed',   section:'LIVESTOCK'},
@@ -10419,10 +10441,11 @@ function renderRptWasde(){
     return;
   }
   var cAbbr = {'United States':'U.S.','European Union':'EU','South Africa':'S. Africa'};
+  function fmtN(v){ if(!v) return '—'; if(v>=1e6) return (v/1e3).toLocaleString(undefined,{maximumFractionDigits:0})+'K'; return v.toLocaleString(); }
   var views = [
-    {comm:'Corn', label:'CORN', countries:['United States','Brazil','Argentina'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
-    {comm:'Soybeans', label:'SOYBEANS', countries:['United States','Brazil','Argentina'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
-    {comm:'Wheat', label:'WHEAT', countries:['United States','Russia','European Union','Canada','Australia'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
+    {comm:'Corn', label:'CORN', countries:['United States','Brazil','Argentina'], items:[{k:'Production',l:'Prod'},{k:'Ending Stocks',l:'End Stk'},{k:'Exports',l:'Exports'},{k:'Domestic Consumption',l:'Dom Use'}]},
+    {comm:'Soybeans', label:'SOYBEANS', countries:['United States','Brazil','Argentina'], items:[{k:'Production',l:'Prod'},{k:'Ending Stocks',l:'End Stk'},{k:'Exports',l:'Exports'},{k:'Domestic Consumption',l:'Dom Use'}]},
+    {comm:'Wheat', label:'WHEAT', countries:['United States','Russia','European Union','Canada','Australia'], items:[{k:'Production',l:'Prod'},{k:'Ending Stocks',l:'End Stk'},{k:'Exports',l:'Exports'},{k:'Domestic Consumption',l:'Dom Use'}]},
   ];
   var h = '';
   views.forEach(function(v){
@@ -10435,14 +10458,11 @@ function renderRptWasde(){
     var cy = allYrs[allYrs.length - 1];
     var py = allYrs.length >= 2 ? allYrs[allYrs.length - 2] : null;
     h += '<div class="panel" style="margin-bottom:16px;">';
-    h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:13px;color:var(--text3);">' + cy + (py ? ' vs '+py : '') + '</div></div>';
-    h += '<div style="overflow-x:auto;"><table class="bal-table" style="table-layout:auto;font-size:13px;"><thead><tr><th style="text-align:left;padding:5px 6px;">Country</th>';
+    h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:12px;color:var(--text3);">' + cy + (py ? ' (YoY chg vs '+py+')' : '') + ' · 1000 MT</div></div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-family:inherit;font-size:12px;border:1px solid var(--border2);background:var(--bg);">';
+    h += '<thead><tr><th style="text-align:left;padding:5px 8px;background:var(--th-bg);border-bottom:2px solid var(--border2);font-size:12px;font-weight:800;color:var(--text2);"></th>';
     v.items.forEach(function(item){
-      h += py ? '<th colspan="3" style="text-align:center;border-left:1px solid var(--border2);">'+item+'</th>' : '<th style="border-left:1px solid var(--border2);">'+item+'</th>';
-    });
-    h += '</tr><tr><th></th>';
-    v.items.forEach(function(){
-      h += py ? '<th class="latest" style="border-left:1px solid var(--border2);">'+cy+'</th><th>'+py+'</th><th>Chg</th>' : '<th class="latest" style="border-left:1px solid var(--border2);">'+cy+'</th>';
+      h += '<th colspan="2" style="text-align:center;padding:5px 4px;background:var(--th-bg);border-bottom:2px solid var(--border2);border-left:1px solid var(--border2);font-size:12px;font-weight:800;color:var(--text2);letter-spacing:.06em;">'+item.l+'</th>';
     });
     h += '</tr></thead><tbody>';
     var ri = 0;
@@ -10451,22 +10471,19 @@ function renderRptWasde(){
       var cd = cdata[country]; if(!cd) return;
       var isW = country==='World';
       var label = isW ? 'WORLD' : (cAbbr[country] || country);
-      h += '<tr'+(isW?' class="row-total"':(ri%2?' class="row-alt"':''))+'><td style="text-align:left;'+(isW?'font-weight:900;color:var(--amber);':'')+'">'+label+'</td>';
+      var bg = isW ? 'background:var(--row-latest);' : (ri%2 ? 'background:var(--row-alt);' : 'background:var(--bg);');
+      h += '<tr><td style="text-align:left;padding:4px 8px;font-size:13px;font-weight:'+(isW?'900':'700')+';color:'+(isW?'var(--amber)':'var(--text)')+';border-bottom:1px solid var(--border);white-space:nowrap;'+bg+'">'+label+'</td>';
       v.items.forEach(function(item){
-        var cur = cd[cy]?(cd[cy][item]||0):0;
-        var prev = py&&cd[py]?(cd[py][item]||0):0;
-        if(py){
-          var chg = prev?((cur-prev)/prev*100):0;
-          h += '<td class="latest" style="border-left:1px solid var(--border2);">'+(cur?cur.toLocaleString():'—')+'</td>';
-          h += '<td>'+(prev?prev.toLocaleString():'—')+'</td>';
-          h += '<td class="'+(chg>0.5?'up':chg<-0.5?'dn':'')+'" style="font-size:13px;">'+(prev?((chg>=0?'+':'')+chg.toFixed(1)+'%'):'—')+'</td>';
-        } else {
-          h += '<td class="latest" style="border-left:1px solid var(--border2);">'+(cur?cur.toLocaleString():'—')+'</td>';
-        }
+        var cur = cd[cy]?(cd[cy][item.k]||0):0;
+        var prev = py&&cd[py]?(cd[py][item.k]||0):0;
+        var chg = prev?((cur-prev)/prev*100):0;
+        var chgCls = chg>0.5?'color:var(--green);':chg<-0.5?'color:var(--red);':'color:var(--text3);';
+        h += '<td style="text-align:right;padding:4px 6px;font-size:13px;font-weight:'+(isW?'800':'600')+';border-bottom:1px solid var(--border);border-left:1px solid var(--border2);white-space:nowrap;'+(isW?'color:var(--amber);':'color:var(--text2);')+bg+'">'+fmtN(cur)+'</td>';
+        h += '<td style="text-align:right;padding:4px 6px;font-size:11px;font-weight:700;border-bottom:1px solid var(--border);white-space:nowrap;'+chgCls+bg+'">'+(prev?((chg>=0?'+':'')+chg.toFixed(1)+'%'):'')+'</td>';
       });
       h += '</tr>'; if(!isW) ri++;
     });
-    h += '</tbody></table></div></div>';
+    h += '</tbody></table></div>';
   });
   if(!h) h = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data. PSD has: '+Object.keys(PSD).join(', ')+'</div>';
   el.innerHTML = h;
