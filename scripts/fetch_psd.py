@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Fetch USDA FAS PSD data via bulk CSV download from PSD Online.
+Computes World totals by summing all countries (not just tracked ones).
 Saves as data/psd_data.json matching terminal _PSD_RAW format.
 """
 import os, sys, json, urllib.request, csv, io, zipfile
@@ -19,27 +20,23 @@ ATTR_MAP = {
     "Feed Domestic Consumption": "fd",
 }
  
-# Comprehensive CSV commodity name → terminal name mapping
-# FAS CSV files use various naming conventions
+# Attributes summed for World totals (no yield - meaningless as a global average)
+SUM_ATTRS = {"ah", "bs", "dc", "es", "ex", "fd", "fi", "im", "pr", "te", "ti", "td", "ts"}
+ 
 COMM_MAP = {
-    # Grains
-    "Wheat": "Wheat",
-    "Corn": "Corn",
-    "Barley": None, "Sorghum": None, "Oats": None, "Rye": None,
-    "Millet": None, "Mixed Grain": None, "Rice, Milled": None,
-    # Oilseeds - try many variants
-    "Soybeans": "Soybeans",
-    "Soybean Oilseed": "Soybeans",
+    "Wheat": "Wheat", "Corn": "Corn",
+    "Soybeans": "Soybeans", "Soybean Oilseed": "Soybeans",
     "Oilseed, Soybean": "Soybeans",
-    "Soybean Meal": "Soybean Meal",
-    "Meal, Soybean": "Soybean Meal",
-    "Soybean Oil": "Soybean Oil",
-    "Oil, Soybean": "Soybean Oil",
-    "Rapeseed": "Rapeseed/Canola",
-    "Oilseed, Rapeseed": "Rapeseed/Canola",
+    "Soybean Meal": "Soybean Meal", "Meal, Soybean": "Soybean Meal",
+    "Soybean Oil": "Soybean Oil", "Oil, Soybean": "Soybean Oil",
+    "Rapeseed": "Rapeseed/Canola", "Oilseed, Rapeseed": "Rapeseed/Canola",
     "Canola": "Rapeseed/Canola",
+    "Cotton": "Cotton",
+    "Beef and Veal": "Beef and Veal", "Beef": "Beef and Veal",
     "Rapeseed Meal": None, "Rapeseed Oil": None,
     "Meal, Rapeseed": None, "Oil, Rapeseed": None,
+    "Barley": None, "Sorghum": None, "Oats": None, "Rye": None,
+    "Millet": None, "Mixed Grain": None, "Rice, Milled": None,
     "Sunflowerseed": None, "Peanut": None, "Palm Kernel": None,
     "Copra": None, "Cottonseed": None, "Palm Oil": None,
     "Oilseed, Sunflowerseed": None, "Oilseed, Peanut": None,
@@ -55,20 +52,12 @@ COMM_MAP = {
     "Cottonseed Meal": None, "Cottonseed Oil": None,
     "Fish Meal": None, "Coconut Oil": None,
     "Palm Kernel Meal": None, "Palm Kernel Oil": None,
-    "Peanut Meal": None, "Peanut Oil": None,
-    "Olive Oil": None,
-    # Cotton
-    "Cotton": "Cotton",
-    # Livestock
-    "Beef and Veal": "Beef and Veal",
-    "Beef": "Beef and Veal",
+    "Peanut Meal": None, "Peanut Oil": None, "Olive Oil": None,
     "Pork": None, "Broiler Meat": None, "Poultry, Meat, Broiler": None,
     "Turkey Meat": None, "Poultry, Meat, Turkey": None,
     "Lamb": None, "Sheep Meat": None,
-    # Dairy
     "Butter": None, "Cheese": None, "Milk, Nonfat Dry": None,
-    "Milk, Whole Dry": None, "Whey, Dry": None,
-    "Fluid Milk": None,
+    "Milk, Whole Dry": None, "Whey, Dry": None, "Fluid Milk": None,
 }
  
 COUNTRIES = {
@@ -76,7 +65,7 @@ COUNTRIES = {
     "Egypt", "European Union", "India", "Indonesia", "Japan",
     "Kazakhstan", "Mexico", "Pakistan", "Russia", "South Africa",
     "Thailand", "Turkey", "Ukraine", "United Kingdom",
-    "United States", "Vietnam", "World",
+    "United States", "Vietnam",
 }
  
 COUNTRY_MAP = {
@@ -99,9 +88,9 @@ def download_zip(filename):
         return resp.read()
  
  
-def parse_csv_zip(zipdata, result):
+def parse_csv_zip(zipdata, result, world_sums):
     count = 0
-    unseen_comms = set()
+    unseen = set()
     zf = zipfile.ZipFile(io.BytesIO(zipdata))
     for fname in zf.namelist():
         if not fname.lower().endswith('.csv'):
@@ -113,19 +102,15 @@ def parse_csv_zip(zipdata, result):
             reader = csv.DictReader(text)
             for row in reader:
                 comm = row.get("Commodity_Description", "")
- 
                 if comm not in COMM_MAP:
-                    unseen_comms.add(comm)
+                    unseen.add(comm)
                     continue
- 
                 comm_name = COMM_MAP[comm]
                 if not comm_name:
                     continue
  
                 country = row.get("Country_Name", "")
                 country = COUNTRY_MAP.get(country, country)
-                if country not in COUNTRIES:
-                    continue
  
                 attr = row.get("Attribute_Description", "")
                 short = ATTR_MAP.get(attr)
@@ -142,20 +127,29 @@ def parse_csv_zip(zipdata, result):
                 value = row.get("Value", "0")
                 if value:
                     value = value.replace(",", "").strip()
- 
-                result.setdefault(comm_name, {}).setdefault(country, {}).setdefault(year, {})
                 try:
                     v = float(value) if value else 0
-                    result[comm_name][country][year][short] = round(v, 2) if short == "yl" else int(round(v))
-                    fc += 1
                 except (ValueError, TypeError):
-                    pass
+                    continue
+ 
+                val = round(v, 2) if short == "yl" else int(round(v))
+ 
+                # Accumulate World sums from ALL countries
+                if short in SUM_ATTRS and country != "World":
+                    world_sums.setdefault(comm_name, {}).setdefault(year, {})
+                    world_sums[comm_name][year][short] = world_sums[comm_name][year].get(short, 0) + val
+ 
+                # Store individual country data for tracked countries only
+                if country in COUNTRIES:
+                    result.setdefault(comm_name, {}).setdefault(country, {}).setdefault(year, {})
+                    result[comm_name][country][year][short] = val
+                    fc += 1
+ 
         print(f"{fc} records")
         count += fc
  
-    if unseen_comms:
-        print(f"    Unmapped commodities: {sorted(unseen_comms)}")
- 
+    if unseen:
+        print(f"    Unmapped: {sorted(unseen)}")
     return count
  
  
@@ -172,12 +166,11 @@ def main():
         "psd_cotton_csv.zip",
         "psd_livestock_csv.zip",
         "psd_livestock_poultry_csv.zip",
-        "psd_sugar_csv.zip",
-        "psd_coffee_csv.zip",
         "psd_dairy_csv.zip",
     ]
  
     result = {}
+    world_sums = {}
     downloaded = []
  
     for filename in candidates:
@@ -185,7 +178,7 @@ def main():
             print(f"  {filename}...", end=" ", flush=True)
             data = download_zip(filename)
             print(f"OK ({len(data):,} bytes)")
-            count = parse_csv_zip(data, result)
+            count = parse_csv_zip(data, result, world_sums)
             if count > 0:
                 downloaded.append(filename)
         except urllib.error.HTTPError as e:
@@ -194,9 +187,18 @@ def main():
             print(f"error: {e}")
  
     if not result:
-        print("\nERROR: No data fetched from any source.", file=sys.stderr)
+        print("\nERROR: No data fetched.", file=sys.stderr)
         sys.exit(1)
  
+    # Add computed World totals (no yield for World)
+    print("\nComputing World totals...")
+    for comm, years in world_sums.items():
+        result.setdefault(comm, {})["World"] = {}
+        for year, attrs in years.items():
+            result[comm]["World"][year] = dict(attrs)
+        print(f"  {comm}: World totals for {len(years)} years")
+ 
+    # Save
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(result, f, separators=(",", ":"))
@@ -206,9 +208,12 @@ def main():
     print(f"\nDownloaded from: {', '.join(downloaded)}")
     print(f"Commodities ({len(comms)}): {', '.join(comms)}")
     for c in comms:
-        print(f"  {c}: {len(result[c])} countries")
+        countries = len(result[c])
+        has_world = "World" in result[c]
+        print(f"  {c}: {countries} entries {'(+World)' if has_world else ''}")
     print(f"Saved {OUT} ({size:,} bytes)")
  
  
 if __name__ == "__main__":
     main()
+ 
