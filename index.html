@@ -1156,9 +1156,10 @@ function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};
     if(d[k].sales){EXP_SALES[k]=d[k].sales;}
   }
   console.log('Export sales loaded:',Object.keys(d).join(', '));
-  // Force button rebuild on next render
+  // Force button rebuild and re-render
   var btns = document.getElementById('exp-comm-btns');
   if(btns) delete btns.dataset.built;
+  try { renderExports(); } catch(e){}
 }).catch(function(e){console.warn('Export sales fetch failed:',e.message);});})();
 
 const _COT_KEYS = ["date","oi","pm_net","pm_l","pm_s","mm_net","mm_l","mm_s"];
