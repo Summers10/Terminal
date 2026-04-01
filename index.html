@@ -1808,7 +1808,7 @@ if (sb) sb.style.display = 'none';
 // Highlight correct top nav
 var topBtns = document.querySelectorAll('#topnav .nav-tab');
 var topMap = {'sum':0,'fund':1,'analysis':2,'macro':3,'wx':4,'cal':5};
-var fundPages = ['energy','sd','exp','aafc','gsw'];
+var fundPages = ['energy','sd','exp','aafc','gsw','reports'];
 var analysisPages = ['cot','spreads','reg','cash'];
 var topIdx = topMap[t];
 if (topIdx === undefined) {
@@ -10436,7 +10436,7 @@ function renderRptWasde(){
     var py = allYrs.length >= 2 ? allYrs[allYrs.length - 2] : null;
     h += '<div class="panel" style="margin-bottom:16px;">';
     h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:13px;color:var(--text3);">' + cy + (py ? ' vs '+py : '') + '</div></div>';
-    h += '<div style="overflow-x:auto;"><table class="bal-table"><thead><tr><th style="text-align:left;">Country</th>';
+    h += '<div style="overflow-x:auto;"><table class="bal-table" style="table-layout:auto;font-size:13px;"><thead><tr><th style="text-align:left;padding:5px 6px;">Country</th>';
     v.items.forEach(function(item){
       h += py ? '<th colspan="3" style="text-align:center;border-left:1px solid var(--border2);">'+item+'</th>' : '<th style="border-left:1px solid var(--border2);">'+item+'</th>';
     });
@@ -10501,22 +10501,28 @@ function renderRptGswLink(){
 
 function renderRptEnergy(){
   var c = document.getElementById('rpt-energy-content');
-  var p = document.getElementById('energy-page');
-  if(p && c && !c.hasChildNodes()){ c.appendChild(p); }
+  var p = document.getElementById('energy-page-wrap');
+  if(p && c && !c.hasChildNodes()){
+    while(p.firstChild) c.appendChild(p.firstChild);
+  }
   if(!energyInited) initEnergy();
 }
 
 function renderRptSD(){
   var c = document.getElementById('rpt-sd-content');
-  var p = document.getElementById('sd-page');
-  if(p && c && !c.hasChildNodes()){ c.appendChild(p); }
+  var p = document.getElementById('sd-page-wrap');
+  if(p && c && !c.hasChildNodes()){
+    while(p.firstChild) c.appendChild(p.firstChild);
+  }
   renderSD();
 }
 
 function renderRptAAFC(){
   var c = document.getElementById('rpt-aafc-content');
-  var p = document.getElementById('aafc-page');
-  if(p && c && !c.hasChildNodes()){ c.appendChild(p); }
+  var p = document.getElementById('aafc-page-wrap');
+  if(p && c && !c.hasChildNodes()){
+    while(p.firstChild) c.appendChild(p.firstChild);
+  }
   if(!aafcInited) initAafc();
 }
 </script>
