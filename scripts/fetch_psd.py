@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
 Fetch USDA FAS PSD data via bulk CSV download from PSD Online.
-The API endpoints are currently broken (500/403), so this uses
-the publicly accessible CSV zip files instead.
- 
 Saves as data/psd_data.json matching terminal _PSD_RAW format.
 """
 import os, sys, json, urllib.request, csv, io, zipfile
@@ -22,20 +19,56 @@ ATTR_MAP = {
     "Feed Domestic Consumption": "fd",
 }
  
-# Terminal commodity names we want
-WANT_COMMS = {
-    "Wheat", "Corn", "Soybeans", "Soybean Meal", "Soybean Oil",
-    "Rapeseed", "Cotton", "Beef and Veal",
-}
- 
-# Map CSV commodity descriptions to terminal names
+# Comprehensive CSV commodity name → terminal name mapping
+# FAS CSV files use various naming conventions
 COMM_MAP = {
-    "Wheat": "Wheat", "Corn": "Corn",
-    "Soybeans": "Soybeans", "Soybean Oilseed": "Soybeans",
-    "Soybean Meal": "Soybean Meal", "Soybean Oil": "Soybean Oil",
-    "Rapeseed": "Rapeseed/Canola", "Rapeseed Meal": None,
-    "Rapeseed Oil": None, "Cotton": "Cotton",
+    # Grains
+    "Wheat": "Wheat",
+    "Corn": "Corn",
+    "Barley": None, "Sorghum": None, "Oats": None, "Rye": None,
+    "Millet": None, "Mixed Grain": None, "Rice, Milled": None,
+    # Oilseeds - try many variants
+    "Soybeans": "Soybeans",
+    "Soybean Oilseed": "Soybeans",
+    "Oilseed, Soybean": "Soybeans",
+    "Soybean Meal": "Soybean Meal",
+    "Meal, Soybean": "Soybean Meal",
+    "Soybean Oil": "Soybean Oil",
+    "Oil, Soybean": "Soybean Oil",
+    "Rapeseed": "Rapeseed/Canola",
+    "Oilseed, Rapeseed": "Rapeseed/Canola",
+    "Canola": "Rapeseed/Canola",
+    "Rapeseed Meal": None, "Rapeseed Oil": None,
+    "Meal, Rapeseed": None, "Oil, Rapeseed": None,
+    "Sunflowerseed": None, "Peanut": None, "Palm Kernel": None,
+    "Copra": None, "Cottonseed": None, "Palm Oil": None,
+    "Oilseed, Sunflowerseed": None, "Oilseed, Peanut": None,
+    "Oilseed, Cottonseed": None, "Oilseed, Copra": None,
+    "Oilseed, Palm Kernel": None,
+    "Meal, Sunflowerseed": None, "Meal, Peanut": None,
+    "Meal, Fish": None, "Meal, Cottonseed": None,
+    "Meal, Copra": None, "Meal, Palm Kernel": None,
+    "Oil, Sunflowerseed": None, "Oil, Peanut": None,
+    "Oil, Cottonseed": None, "Oil, Copra": None,
+    "Oil, Palm Kernel": None, "Oil, Olive": None, "Oil, Palm": None,
+    "Sunflowerseed Meal": None, "Sunflowerseed Oil": None,
+    "Cottonseed Meal": None, "Cottonseed Oil": None,
+    "Fish Meal": None, "Coconut Oil": None,
+    "Palm Kernel Meal": None, "Palm Kernel Oil": None,
+    "Peanut Meal": None, "Peanut Oil": None,
+    "Olive Oil": None,
+    # Cotton
+    "Cotton": "Cotton",
+    # Livestock
     "Beef and Veal": "Beef and Veal",
+    "Beef": "Beef and Veal",
+    "Pork": None, "Broiler Meat": None, "Poultry, Meat, Broiler": None,
+    "Turkey Meat": None, "Poultry, Meat, Turkey": None,
+    "Lamb": None, "Sheep Meat": None,
+    # Dairy
+    "Butter": None, "Cheese": None, "Milk, Nonfat Dry": None,
+    "Milk, Whole Dry": None, "Whey, Dry": None,
+    "Fluid Milk": None,
 }
  
 COUNTRIES = {
@@ -57,7 +90,6 @@ BASE = "https://apps.fas.usda.gov/psdonline/downloads"
  
  
 def download_zip(filename):
-    """Download a zip file from PSD Online downloads."""
     url = f"{BASE}/{filename}"
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -68,8 +100,8 @@ def download_zip(filename):
  
  
 def parse_csv_zip(zipdata, result):
-    """Parse a PSD CSV zip file and add records to result dict."""
     count = 0
+    unseen_comms = set()
     zf = zipfile.ZipFile(io.BytesIO(zipdata))
     for fname in zf.namelist():
         if not fname.lower().endswith('.csv'):
@@ -81,7 +113,12 @@ def parse_csv_zip(zipdata, result):
             reader = csv.DictReader(text)
             for row in reader:
                 comm = row.get("Commodity_Description", "")
-                comm_name = COMM_MAP.get(comm)
+ 
+                if comm not in COMM_MAP:
+                    unseen_comms.add(comm)
+                    continue
+ 
+                comm_name = COMM_MAP[comm]
                 if not comm_name:
                     continue
  
@@ -115,21 +152,26 @@ def parse_csv_zip(zipdata, result):
                     pass
         print(f"{fc} records")
         count += fc
+ 
+    if unseen_comms:
+        print(f"    Unmapped commodities: {sorted(unseen_comms)}")
+ 
     return count
  
  
 def main():
     print("Fetching FAS PSD data via bulk CSV download...")
  
-    # Try multiple possible filenames — the correct ones vary
     candidates = [
         "psd_alldata_csv.zip",
         "psd_grains_csv.zip",
         "psd_grains_pulses_csv.zip",
         "psd_grain_csv.zip",
         "psd_oilseeds_csv.zip",
+        "psd_oilseed_csv.zip",
         "psd_cotton_csv.zip",
         "psd_livestock_csv.zip",
+        "psd_livestock_poultry_csv.zip",
         "psd_sugar_csv.zip",
         "psd_coffee_csv.zip",
         "psd_dairy_csv.zip",
@@ -155,7 +197,6 @@ def main():
         print("\nERROR: No data fetched from any source.", file=sys.stderr)
         sys.exit(1)
  
-    # Save
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(result, f, separators=(",", ":"))
@@ -163,7 +204,7 @@ def main():
     size = os.path.getsize(OUT)
     comms = sorted(result.keys())
     print(f"\nDownloaded from: {', '.join(downloaded)}")
-    print(f"Commodities: {', '.join(comms)}")
+    print(f"Commodities ({len(comms)}): {', '.join(comms)}")
     for c in comms:
         print(f"  {c}: {len(result[c])} countries")
     print(f"Saved {OUT} ({size:,} bytes)")
@@ -171,3 +212,4 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
