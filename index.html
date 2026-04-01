@@ -390,7 +390,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <button class="cal-today" onclick="calToday()">Today</button>
       </div>
     </div>
-  <div class="info-panel" id="cal-info"><strong>AG & MACRO CALENDAR</strong> — Report dates for USDA (WASDE, export sales, crop progress), CFTC COT, Statistics Canada, EIA petroleum, FOMC, and other central bank decisions.</div>
+  <div class="info-panel" id="cal-info"><strong>AG & MACRO CALENDAR</strong> — Report dates for USDA (WASDE, export sales, crop progress), CFTC COT, AAFC, Statistics Canada, EIA petroleum, FOMC, and other central bank decisions.</div>
     <!-- Month nav moved to cal-toolbar -->
     <div id="cal-page" style="max-width:1600px;margin:0 auto;padding:0 20px 40px;">
       <div class="cal-inner">
@@ -2975,7 +2975,7 @@ events.push({date:getNthWeekday(yr,m,-1,3),label:'StatsCan Crop Report',cls:'ev-
 }
 for(let y=2025;y<=2027;y++){
 for(let m=0;m<12;m++){
-events.push({date:getNthWeekday(y,m,2,4),label:'StatsCan S&D',cls:'ev-statscan',note:'Canadian S&D'});
+events.push({date:getNthWeekday(y,m,2,4),label:'AAFC Supply/Demand',cls:'ev-aafc',note:'Canadian S&D'});
 }
 }
 const BOC_DATES = ['2025-01-29','2025-03-12','2025-04-16','2025-06-04',
