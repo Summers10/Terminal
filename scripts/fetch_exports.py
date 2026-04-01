@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+!/usr/bin/env python3
 """Fetch USDA FAS Weekly Export Sales historical data.
 Parses HTML tables from apps.fas.usda.gov/export-sales/
 Saves as data/export_sales.json matching terminal EXP_INSP/EXP_SALES format."""
 import os, sys, json, urllib.request, re
-from datetime import datetime, timedelta
+from datetime import datetime
 from html.parser import HTMLParser
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "export_sales.json")
@@ -18,7 +18,6 @@ MY_LABELS = {6: "Jun-May", 9: "Sep-Aug"}
  
  
 class TableParser(HTMLParser):
-    """Extract rows from HTML tables."""
     def __init__(self):
         super().__init__()
         self.in_table = False
@@ -50,7 +49,6 @@ class TableParser(HTMLParser):
  
  
 def parse_number(s):
-    """Parse number from FAS format: '1,234,567' or '(1,234)' for negatives."""
     s = s.strip().replace(",", "").replace("\xa0", "")
     if not s or s == "*" or s == "N/A":
         return None
@@ -66,7 +64,6 @@ def parse_number(s):
  
  
 def parse_date(s):
-    """Parse date from MM/DD/YYYY format."""
     s = s.strip()
     for fmt in ["%m/%d/%Y", "%m/%d/%y"]:
         try:
@@ -76,8 +73,16 @@ def parse_date(s):
     return None
  
  
+def my_sort_key(my_str):
+    """Convert '24/25' to sortable int 2024, '99/00' to 1999."""
+    try:
+        y1 = int(my_str.split("/")[0])
+        return y1 + 2000 if y1 < 80 else y1 + 1900
+    except (ValueError, IndexError):
+        return 0
+ 
+ 
 def get_marketing_year(dt, my_start_month):
-    """Return marketing year string like '24/25' given a date and MY start month."""
     if dt.month >= my_start_month:
         y1 = dt.year
     else:
@@ -87,7 +92,6 @@ def get_marketing_year(dt, my_start_month):
  
  
 def fetch_commodity(key, cfg):
-    """Fetch and parse one commodity's historical data."""
     url = cfg["url"]
     my_start = cfg["my_start"]
  
@@ -97,20 +101,22 @@ def fetch_commodity(key, cfg):
     })
  
     print(f"  Fetching {key} from {url}...", end=" ", flush=True)
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
         html = resp.read().decode("utf-8", errors="replace")
     print(f"{len(html):,} bytes")
  
     parser = TableParser()
     parser.feed(html)
  
-    # Parse rows: [week_ending, weekly_exports, accum_exports, net_sales, outstanding_sales, ...]
     data_rows = []
     for row in parser.rows:
         if len(row) < 5:
             continue
         dt = parse_date(row[0])
         if dt is None:
+            continue
+        # Only keep data from 2020 onwards
+        if dt.year < 2020:
             continue
         weekly_exports = parse_number(row[1])
         net_sales = parse_number(row[3])
@@ -128,15 +134,17 @@ def fetch_commodity(key, cfg):
         print(f"    WARNING: No data parsed for {key}")
         return None
  
-    # Group by marketing year, keep last 3 years
+    # Group by marketing year
     by_my = {}
     for r in data_rows:
         by_my.setdefault(r["my"], []).append(r)
  
-    all_mys = sorted(by_my.keys())
-    recent_mys = all_mys[-3:] if len(all_mys) >= 3 else all_mys
+    # Sort by actual year (not alphabetically!)
+    all_mys = sorted(by_my.keys(), key=my_sort_key)
+    # Keep last 2 marketing years (current + previous)
+    recent_mys = all_mys[-2:] if len(all_mys) >= 2 else all_mys
  
-    # Build weekly arrays (convert MT to 1000 MT, round to 1 decimal)
+    # Build weekly arrays (convert MT to 1000 MT)
     insp_years = {}
     sales_years = {}
  
@@ -145,16 +153,14 @@ def fetch_commodity(key, cfg):
         insp_years[my] = [round(r["weekly_exports"] / 1000, 1) if r["weekly_exports"] is not None else None for r in rows]
         sales_years[my] = [round(r["net_sales"] / 1000, 1) if r["net_sales"] is not None else None for r in rows]
  
-    year_labels = recent_mys[-2:]  # Current and previous MY
     my_label = MY_LABELS.get(my_start, f"Month{my_start}")
  
     result = {
-        "insp": {"MY": my_label, "years": year_labels, "w": {}},
-        "sales": {"years": year_labels, "w": {}},
+        "insp": {"MY": my_label, "years": recent_mys, "w": {}},
+        "sales": {"years": recent_mys, "w": {}},
     }
  
-    for yr in year_labels:
-        # Pad to 52 weeks
+    for yr in recent_mys:
         iw = insp_years.get(yr, [])
         sw = sales_years.get(yr, [])
         while len(iw) < 52: iw.append(None)
@@ -162,7 +168,7 @@ def fetch_commodity(key, cfg):
         result["insp"]["w"][yr] = iw[:52]
         result["sales"]["w"][yr] = sw[:52]
  
-    print(f"    {key}: {len(data_rows)} total rows, MYs: {', '.join(recent_mys)}")
+    print(f"    {key}: {len(data_rows)} rows, MYs: {', '.join(recent_mys)}")
     return result
  
  
