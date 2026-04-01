@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Fetch USDA FAS PSD data via the OpenData API.
-Correct endpoint: /api/psd/commodity/{code}/country/all/year/{year}
+Fetch USDA FAS PSD data — tries multiple API endpoints.
 Saves as data/psd_data.json matching terminal _PSD_RAW format.
 Required env var: USDA_API_KEY
+ 
+Tries in order:
+  1. PSDOnlineDataServices API (newer)
+  2. OpenData API (older, may be deprecated)
+  3. Bulk CSV download (no API key needed)
 """
-import os, sys, json, urllib.request, time
+import os, sys, json, urllib.request, urllib.parse, time, csv, io, zipfile
 from datetime import datetime
  
 API_KEY = os.environ.get("USDA_API_KEY", "")
-BASE = "https://apps.fas.usda.gov/OpenData/api/psd"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "psd_data.json")
  
 COMMODITIES = {
@@ -48,92 +51,226 @@ COUNTRY_MAP = {
     "European Union (EU-27)": "European Union",
     "European Union-27": "European Union",
     "EU-27": "European Union",
+    "EU27": "European Union",
+    "Korea, South": "South Korea",
 }
  
-YEARS = list(range(2015, datetime.now().year + 2))
+MIN_YEAR = 2015
+YEARS = list(range(MIN_YEAR, datetime.now().year + 2))
  
  
-def api_get(path):
-    url = f"{BASE}/{path}"
-    req = urllib.request.Request(url, headers={
-        "API_KEY": API_KEY,
-        "Accept": "application/json",
-        "User-Agent": "SUMCO-Terminal/1.0",
-    })
+def http_get(url, headers=None):
+    hdrs = {"Accept": "application/json", "User-Agent": "SUMCO-Terminal/1.0"}
+    if headers:
+        hdrs.update(headers)
+    req = urllib.request.Request(url, headers=hdrs)
     with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode())
+        return resp.read()
  
  
-def fetch_commodity(code, name):
-    print(f"  {name} ({code})...")
-    data = {}
-    errors = 0
+def process_records(records, result):
+    """Process API response records into result dict."""
+    count = 0
+    for r in records:
+        comm_code = r.get("commodityCode", r.get("Commodity_Code", ""))
+        comm_name = COMMODITIES.get(comm_code)
+        if not comm_name:
+            continue
  
-    for year in YEARS:
+        country = r.get("countryDescription", r.get("Country_Name", r.get("countryName", "")))
+        country = COUNTRY_MAP.get(country, country)
+        if country not in COUNTRIES:
+            continue
+ 
+        attr = r.get("attributeDescription", r.get("Attribute_Description", r.get("attributeName", "")))
+        short = ATTR_MAP.get(attr)
+        if not short:
+            continue
+ 
+        year = str(r.get("marketYear", r.get("Market_Year", r.get("year", ""))))
         try:
-            records = api_get(f"commodity/{code}/country/all/year/{year}")
-            if not records:
+            if int(year) < MIN_YEAR:
                 continue
+        except ValueError:
+            continue
  
-            for r in records:
-                country = r.get("countryDescription", r.get("country_Name", ""))
-                country = COUNTRY_MAP.get(country, country)
-                attr = r.get("attributeDescription", r.get("attribute_Description", ""))
-                value = r.get("value", r.get("Value", 0))
+        value = r.get("value", r.get("Value", 0))
  
-                if country not in COUNTRIES:
-                    continue
-                short = ATTR_MAP.get(attr)
-                if not short:
-                    continue
- 
-                yr = str(year)
-                data.setdefault(country, {}).setdefault(yr, {})
-                try:
-                    v = float(value) if value else 0
-                    data[country][yr][short] = round(v, 2) if short == "yl" else int(round(v))
-                except (ValueError, TypeError):
-                    pass
- 
-        except Exception as e:
-            errors += 1
-            if errors <= 2:
-                print(f"    Year {year}: {e}")
-            elif errors == 3:
-                print(f"    (suppressing further errors...)")
- 
-        time.sleep(0.3)
- 
-    print(f"    → {len(data)} countries, {errors} errors")
-    return data
+        result.setdefault(comm_name, {}).setdefault(country, {}).setdefault(year, {})
+        try:
+            v = float(value) if value else 0
+            result[comm_name][country][year][short] = round(v, 2) if short == "yl" else int(round(v))
+            count += 1
+        except (ValueError, TypeError):
+            pass
+    return count
  
  
-def main():
-    if not API_KEY:
-        print("ERROR: USDA_API_KEY not set", file=sys.stderr)
-        sys.exit(1)
- 
-    print(f"Fetching FAS PSD data ({len(YEARS)} years × {len(COMMODITIES)} commodities)...")
+def try_psd_dataservices():
+    """Try PSDOnlineDataServices API."""
+    print("\n[1] Trying PSDOnlineDataServices API...")
+    base = "https://apps.fas.usda.gov/PSDOnlineDataServices/api/CommodityData"
     result = {}
  
     for code, name in COMMODITIES.items():
+        print(f"  {name}...", end=" ", flush=True)
+        total = 0
+        errors = 0
+        for year in YEARS:
+            try:
+                url = f"{base}/GetCommodityDataByYear?commodityCode={code}&marketYear={year}"
+                data = json.loads(http_get(url, {"API_KEY": API_KEY}))
+                if data:
+                    total += process_records(data, result)
+                time.sleep(0.3)
+            except Exception as e:
+                errors += 1
+                if errors == 1:
+                    print(f"({e})", end=" ", flush=True)
+        print(f"{total} records, {errors} errors")
+        time.sleep(0.5)
+ 
+    return result
+ 
+ 
+def try_opendata_api():
+    """Try OpenData API."""
+    print("\n[2] Trying OpenData API...")
+    base = "https://apps.fas.usda.gov/OpenData/api/psd"
+    result = {}
+ 
+    for code, name in COMMODITIES.items():
+        print(f"  {name}...", end=" ", flush=True)
+        total = 0
+        errors = 0
+        for year in YEARS:
+            try:
+                url = f"{base}/commodity/{code}/country/all/year/{year}"
+                data = json.loads(http_get(url, {"API_KEY": API_KEY}))
+                if data:
+                    total += process_records(data, result)
+                time.sleep(0.3)
+            except Exception as e:
+                errors += 1
+                if errors == 1:
+                    print(f"({e})", end=" ", flush=True)
+        print(f"{total} records, {errors} errors")
+        time.sleep(0.5)
+ 
+    return result
+ 
+ 
+def try_bulk_csv():
+    """Try downloading bulk CSV from PSD Online."""
+    print("\n[3] Trying bulk CSV download...")
+    # PSD Online provides CSV downloads for commodity groups
+    csv_urls = [
+        "https://apps.fas.usda.gov/psdonline/downloads/psd_grains_csv.zip",
+        "https://apps.fas.usda.gov/psdonline/downloads/psd_oilseeds_csv.zip",
+        "https://apps.fas.usda.gov/psdonline/downloads/psd_cotton_csv.zip",
+        "https://apps.fas.usda.gov/psdonline/downloads/psd_meats_csv.zip",
+    ]
+ 
+    result = {}
+    # Map CSV commodity names to our names
+    csv_comm_map = {
+        "Wheat": "Wheat", "Corn": "Corn", "Soybeans": "Soybeans",
+        "Soybean Meal": "Soybean Meal", "Soybean Oil": "Soybean Oil",
+        "Rapeseed": "Rapeseed/Canola", "Cotton": "Cotton",
+        "Beef and Veal": "Beef and Veal",
+        "Soybean Oilseed": "Soybeans",
+    }
+ 
+    for url in csv_urls:
         try:
-            data = fetch_commodity(code, name)
-            if data:
-                result[name] = data
+            print(f"  Downloading {url.split('/')[-1]}...", end=" ", flush=True)
+            data = http_get(url)
+            zf = zipfile.ZipFile(io.BytesIO(data))
+            for fname in zf.namelist():
+                if not fname.endswith('.csv'):
+                    continue
+                with zf.open(fname) as f:
+                    reader = csv.DictReader(io.TextIOWrapper(f, encoding='utf-8-sig'))
+                    count = 0
+                    for row in reader:
+                        comm = row.get("Commodity_Description", "")
+                        comm_name = csv_comm_map.get(comm)
+                        if not comm_name:
+                            continue
+ 
+                        country = row.get("Country_Name", "")
+                        country = COUNTRY_MAP.get(country, country)
+                        if country not in COUNTRIES:
+                            continue
+ 
+                        attr = row.get("Attribute_Description", "")
+                        short = ATTR_MAP.get(attr)
+                        if not short:
+                            continue
+ 
+                        year = row.get("Market_Year", "")
+                        try:
+                            if int(year) < MIN_YEAR:
+                                continue
+                        except ValueError:
+                            continue
+ 
+                        value = row.get("Value", "0").replace(",", "")
+ 
+                        result.setdefault(comm_name, {}).setdefault(country, {}).setdefault(year, {})
+                        try:
+                            v = float(value) if value else 0
+                            result[comm_name][country][year][short] = round(v, 2) if short == "yl" else int(round(v))
+                            count += 1
+                        except (ValueError, TypeError):
+                            pass
+                    print(f"{count} records from {fname}")
         except Exception as e:
-            print(f"    FAILED: {e}")
-        time.sleep(1)
+            print(f"failed ({e})")
+ 
+    return result
+ 
+ 
+def main():
+    print(f"Fetching FAS PSD data...")
+    print(f"API key: {'set (' + API_KEY[:4] + '...)' if API_KEY else 'NOT SET'}")
+ 
+    result = {}
+ 
+    # Try approach 1: PSDOnlineDataServices
+    if API_KEY:
+        try:
+            result = try_psd_dataservices()
+        except Exception as e:
+            print(f"  Failed: {e}")
+ 
+    # Try approach 2: OpenData API
+    if not result and API_KEY:
+        try:
+            result = try_opendata_api()
+        except Exception as e:
+            print(f"  Failed: {e}")
+ 
+    # Try approach 3: Bulk CSV download (no API key needed)
+    if not result:
+        try:
+            result = try_bulk_csv()
+        except Exception as e:
+            print(f"  Failed: {e}")
  
     if not result:
-        print("ERROR: No data fetched. Check USDA_API_KEY.", file=sys.stderr)
+        print("\nERROR: All approaches failed. No data fetched.", file=sys.stderr)
         sys.exit(1)
  
+    # Save
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(result, f, separators=(",", ":"))
  
-    print(f"\nSaved {OUT} ({os.path.getsize(OUT):,} bytes) — {len(result)} commodities")
+    size = os.path.getsize(OUT)
+    comms = len(result)
+    countries = sum(len(v) for v in result.values())
+    print(f"\nSaved {OUT} ({size:,} bytes) — {comms} commodities, {countries} total country entries")
  
  
 if __name__ == "__main__":
