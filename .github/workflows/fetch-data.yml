@@ -1,0 +1,42 @@
+name: Fetch USDA Data
+ 
+on:
+  schedule:
+    - cron: '30 21 * * 1-5'
+  workflow_dispatch:
+ 
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+ 
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+ 
+      - name: Fetch NASS Reports data
+        env:
+          NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
+        run: python scripts/fetch_nass.py
+ 
+      - name: Fetch FAS PSD data
+        env:
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
+        run: python scripts/fetch_psd.py
+ 
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "Auto-update USDA data $(date -u +%Y-%m-%d)"
+            git push
+          fi
