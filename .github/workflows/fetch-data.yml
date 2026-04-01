@@ -36,6 +36,14 @@ jobs:
         run: python scripts/fetch_exports.py
         continue-on-error: true
  
+      - name: Run CGC GSW fetch
+        run: python scripts/fetch_cgc.py
+        continue-on-error: true
+ 
+      - name: Run StatsCan S&D fetch
+        run: python scripts/fetch_statscan.py
+        continue-on-error: true
+ 
       - name: Commit data
         run: |
           git config user.name "github-actions[bot]"
