@@ -8453,19 +8453,18 @@ function updateFredCharts() {
 
     if (!allPts.length) return;
 
-    // Find latest start date across all datasets so lines begin together
-    var commonStart = null;
+    // Find common date range so all lines start and end together
+    var commonStart = null, commonEnd = null;
     allPts.forEach(function(item) {
       if (!item.pts.length) return;
       var s0 = item.pts[0].x;
+      var e0 = item.pts[item.pts.length - 1].x;
       if (!commonStart || s0 > commonStart) commonStart = s0;
+      if (!commonEnd || e0 < commonEnd) commonEnd = e0;
     });
 
     allPts.forEach(function(item) {
-      // Trim points to start at common date (keep all data to the right)
-      var trimmed = commonStart
-        ? item.pts.filter(function(p){ return p.x >= commonStart; })
-        : item.pts;
+      var trimmed = item.pts.filter(function(p){ return p.x >= commonStart && p.x <= commonEnd; });
       var ds = { label: item.s.l, data: trimmed, borderColor: item.s.c, backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3 };
       if (grp.dual && item.s.yAxis) ds.yAxisID = item.s.yAxis;
       datasets.push(ds);
