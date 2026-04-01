@@ -10410,10 +10410,9 @@ function renderRptHogs(){
 function renderRptWasde(){
   var el = document.getElementById('rpt-wasde-content');
   if(!PSD){
-    el.innerHTML = '<div style="padding:40px 0;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING S&D DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for PSD data. Run the pipeline or check data/psd_data.json.</div></div>';
+    el.innerHTML = '<div style="padding:40px 0;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;">LOADING S&D DATA...</div></div>';
     return;
   }
-  // WASDE comparison view: specific commodities + countries
   var views = [
     {comm:'Corn', label:'CORN', countries:['United States','Brazil','Argentina'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
     {comm:'Soybeans', label:'SOYBEANS', countries:['United States','Brazil','Argentina'], items:['Production','Ending Stocks','Exports','Domestic Consumption']},
@@ -10423,47 +10422,46 @@ function renderRptWasde(){
   views.forEach(function(v){
     var cdata = PSD[v.comm];
     if(!cdata) return;
-    // Find latest 2 years from World data
-    var worldYrs = cdata['World'] ? Object.keys(cdata['World']).sort() : [];
-    if(worldYrs.length < 2) return;
-    var cy = worldYrs[worldYrs.length - 1];
-    var py = worldYrs[worldYrs.length - 2];
+    var ref = cdata['World'] || cdata['United States'] || cdata[v.countries[0]];
+    if(!ref) return;
+    var allYrs = Object.keys(ref).sort();
+    if(!allYrs.length) return;
+    var cy = allYrs[allYrs.length - 1];
+    var py = allYrs.length >= 2 ? allYrs[allYrs.length - 2] : null;
     h += '<div class="panel" style="margin-bottom:16px;">';
-    h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:13px;color:var(--text3);">' + py + ' vs ' + cy + '</div></div>';
-    h += '<div style="overflow-x:auto;"><table class="bal-table">';
-    h += '<thead><tr><th style="text-align:left;">Country</th>';
+    h += '<div class="panel-hdr"><div class="panel-title">' + v.label + '</div><div class="panel-sub" style="font-size:13px;color:var(--text3);">' + (py ? py+' vs ':'') + cy + '</div></div>';
+    h += '<div style="overflow-x:auto;"><table class="bal-table"><thead><tr><th style="text-align:left;">Country</th>';
     v.items.forEach(function(item){
-      h += '<th colspan="3" style="text-align:center;border-left:1px solid var(--border2);">' + item + '</th>';
+      h += py ? '<th colspan="3" style="text-align:center;border-left:1px solid var(--border2);">'+item+'</th>' : '<th style="border-left:1px solid var(--border2);">'+item+'</th>';
     });
     h += '</tr><tr><th></th>';
     v.items.forEach(function(){
-      h += '<th style="border-left:1px solid var(--border2);">' + py + '</th><th class="latest">' + cy + '</th><th>Chg</th>';
+      h += py ? '<th style="border-left:1px solid var(--border2);">'+py+'</th><th class="latest">'+cy+'</th><th>Chg</th>' : '<th class="latest" style="border-left:1px solid var(--border2);">'+cy+'</th>';
     });
     h += '</tr></thead><tbody>';
     var ri = 0;
-    // Add World first, then individual countries
-    var allCountries = ['World'].concat(v.countries);
-    allCountries.forEach(function(country){
-      var cd = cdata[country];
-      if(!cd) return;
-      var isWorld = country === 'World';
-      h += '<tr' + (isWorld ? ' class="row-total"' : (ri % 2 ? ' class="row-alt"' : '')) + '>';
-      h += '<td style="text-align:left;' + (isWorld ? 'font-weight:900;color:var(--amber);' : '') + '">' + (isWorld ? 'WORLD' : country) + '</td>';
+    var showCountries = cdata['World'] ? ['World'].concat(v.countries) : v.countries;
+    showCountries.forEach(function(country){
+      var cd = cdata[country]; if(!cd) return;
+      var isW = country==='World';
+      h += '<tr'+(isW?' class="row-total"':(ri%2?' class="row-alt"':''))+'><td style="text-align:left;'+(isW?'font-weight:900;color:var(--amber);':'')+'">'+( isW?'WORLD':country)+'</td>';
       v.items.forEach(function(item){
-        var curVal = cd[cy] ? (cd[cy][item] || 0) : 0;
-        var prevVal = cd[py] ? (cd[py][item] || 0) : 0;
-        var chg = prevVal ? ((curVal - prevVal) / prevVal * 100) : 0;
-        var chgStr = prevVal ? ((chg >= 0 ? '+' : '') + chg.toFixed(1) + '%') : '—';
-        var chgCls = chg > 0.5 ? 'up' : chg < -0.5 ? 'dn' : '';
-        h += '<td style="border-left:1px solid var(--border2);">' + (prevVal ? prevVal.toLocaleString() : '—') + '</td>';
-        h += '<td class="latest">' + (curVal ? curVal.toLocaleString() : '—') + '</td>';
-        h += '<td class="' + chgCls + '" style="font-size:13px;">' + chgStr + '</td>';
+        var cur = cd[cy]?(cd[cy][item]||0):0;
+        var prev = py&&cd[py]?(cd[py][item]||0):0;
+        if(py){
+          var chg = prev?((cur-prev)/prev*100):0;
+          h += '<td style="border-left:1px solid var(--border2);">'+(prev?prev.toLocaleString():'—')+'</td>';
+          h += '<td class="latest">'+(cur?cur.toLocaleString():'—')+'</td>';
+          h += '<td class="'+(chg>0.5?'up':chg<-0.5?'dn':'')+'" style="font-size:13px;">'+(prev?((chg>=0?'+':'')+chg.toFixed(1)+'%'):'—')+'</td>';
+        } else {
+          h += '<td class="latest" style="border-left:1px solid var(--border2);">'+(cur?cur.toLocaleString():'—')+'</td>';
+        }
       });
-      h += '</tr>';
-      if(!isWorld) ri++;
+      h += '</tr>'; if(!isW) ri++;
     });
     h += '</tbody></table></div></div>';
   });
+  if(!h) h = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data. PSD has: '+Object.keys(PSD).join(', ')+'</div>';
   el.innerHTML = h;
 }
 
