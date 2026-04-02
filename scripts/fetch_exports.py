@@ -188,6 +188,7 @@ def main():
         print("ERROR: No export data fetched.", file=sys.stderr)
         sys.exit(1)
  
+    results["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(results, f, separators=(",", ":"))
