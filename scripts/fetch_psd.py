@@ -201,6 +201,7 @@ def main():
     # Save
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
+        result["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
         json.dump(result, f, separators=(",", ":"))
  
     size = os.path.getsize(OUT)
@@ -216,4 +217,3 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
