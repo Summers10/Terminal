@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from datetime import datetime, timezone
 """Fetch FRED economic data server-side to avoid CORS issues.
 Saves as data/fred_data.json for the terminal to load."""
 import os, sys, json, urllib.request, time
