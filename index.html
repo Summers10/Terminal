@@ -83,8 +83,8 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <!-- BRAND HEADER + TOP NAV -->
 <div id="sticky-header" style="position:sticky;top:0;z-index:100;background:var(--bg);">
 <div id="brand-bar" style="padding:8px 20px 0;">
-  <div style="font-size:18px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);line-height:1;">SUMMERS-THOLL RESEARCH</div>
-  <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;margin-top:2px;">Commodity Trading Terminal</div>
+  <div style="font-size:20px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);line-height:1;">SUMMERS-THOLL</div>
+  <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.10em;margin-top:3px;">Commodity Research Terminal</div>
 </div>
 <div id="topnav">
   <button class="nav-tab active" onclick="switchTab('sum')">SUMMARY</button>
@@ -266,7 +266,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <button class="info-btn" id="exp-info-btn" onclick="toggleInfo('exp')" title="About this page">i</button>
     <div class="toolbar-sep"></div>
     <div style="display:flex;gap:6px;align-items:center;" id="exp-comm-btns"></div>
-    <span id="exp-asof" style="font-size:12px;color:var(--text3);letter-spacing:.06em;margin-left:8px;"></span>
+    <span id="exp-freshness" style="font-size:11px;letter-spacing:.05em;"></span> <span id="exp-asof" style="font-size:12px;color:var(--text3);letter-spacing:.06em;margin-left:8px;"></span>
   </div>
   <div class="info-panel" id="exp-info"><strong>EXPORT INSPECTIONS & SALES</strong> — Weekly US grain export data from USDA. Tracks actual shipments leaving US ports and weekly sales bookings. Compares current marketing year pace vs prior years to gauge demand strength.</div>
   <div id="exp-page" style="max-width:1440px;margin:0 auto;padding:0 20px 40px;">
@@ -530,7 +530,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       <button class="gsw-grain-btn active" onclick="setGswGrain('Canola')">Canola</button>
       <button class="gsw-grain-btn" onclick="setGswGrain('Wheat')">Wheat</button>
       <button class="gsw-grain-btn" onclick="setGswGrain('Barley')">Barley</button>
-      <span class="gsw-asof" id="gsw-asof"></span>
+      <span id="gsw-freshness" style="font-size:11px;letter-spacing:.05em;"></span> <span class="gsw-asof" id="gsw-asof"></span>
     </div>
     <div id="gsw-content"></div>
   </div>
@@ -688,6 +688,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   </div>
   <div class="info-panel" id="aafc-info"><strong>STATSCAN S&D</strong> — Canadian crop supply & demand from Statistics Canada (table 32-10-0013-01). Area, yield, production, trade, and ending stocks for Canadian crops. Updated automatically via pipeline.</div>
   <div id="aafc-page">
+    <div style="padding:4px 0 0;"><span id="statscan-freshness" style="font-size:11px;letter-spacing:.05em;"></span></div>
     <div class="aafc-toolbar" id="aafc-crop-btns"></div>
     <div id="aafc-content"></div>
   </div>
@@ -700,16 +701,17 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <div class="brand-sub">USDA NASS · Weekly Reports Dashboard</div></div>
     <div class="toolbar-sep"></div>
     <span id="rpt-asof" style="font-size:13px;color:var(--text3);letter-spacing:.06em;"></span>
+    <span id="pipeline-freshness" style="font-size:11px;letter-spacing:.05em;display:flex;gap:12px;flex-wrap:wrap;"></span>
   </div>
   <div id="reports-page" style="max-width:1500px;margin:0 auto;padding:0 20px 40px;">
     <div id="rpt-loading" style="padding:40px 0;text-align:center;color:var(--text3);font-size:14px;letter-spacing:.1em;">Loading NASS data...</div>
     <div id="rpt-content" style="display:none;display:none;gap:0;">
-      <!-- LEFT SIDEBAR -->
-      <div id="rpt-sidebar" style="width:220px;border-right:1px solid var(--border);padding:14px 0 40px;flex-shrink:0;">
+      <!-- LEFT SIDEBAR (fixed, matches group-nav style) -->
+      <div id="rpt-sidebar" style="position:fixed;top:78px;left:0;width:220px;height:calc(100vh - 78px);overflow-y:auto;border-right:1px solid var(--border);padding:8px 0 40px;background:var(--bg);z-index:89;">
         <div id="rpt-nav"></div>
       </div>
       <!-- RIGHT CONTENT -->
-      <div id="rpt-main" style="flex:1;min-width:0;padding:0 0 0 20px;">
+      <div id="rpt-main" style="flex:1;min-width:0;padding:0 0 0 20px;margin-left:220px;">
         <!-- Energy view -->
         <div class="rpt-view" id="rpt-v-energy" style="display:none;">
           <div id="rpt-energy-content"></div>
@@ -1141,6 +1143,37 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 </div>
 <script>
 
+// Data freshness display system
+var _pipelineDates = {};
+function showDataFreshness(elId, fetchedAt, label){
+  // Update individual element if it exists
+  var el = document.getElementById(elId);
+  if(el && fetchedAt){
+    var d = new Date(fetchedAt);
+    var now = new Date();
+    var ageDays = Math.floor((now - d) / 86400000);
+    var dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+    var color = ageDays > 7 ? 'var(--red)' : ageDays > 2 ? 'var(--text3)' : 'var(--green)';
+    var ageLabel = ageDays > 0 ? ageDays + 'd ago' : 'today';
+    el.innerHTML = '<span style="color:var(--text3)">' + label + ':</span> <span style="color:' + color + '">' + dateStr + ' (' + ageLabel + ')</span>';
+  }
+  // Also update global pipeline bar
+  if(fetchedAt) _pipelineDates[label] = fetchedAt;
+  var bar = document.getElementById('pipeline-freshness');
+  if(!bar) return;
+  var html = '';
+  for(var k in _pipelineDates){
+    var dt = new Date(_pipelineDates[k]);
+    var now2 = new Date();
+    var ad = Math.floor((now2 - dt) / 86400000);
+    var ds = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+    var c = ad > 7 ? 'var(--red)' : ad > 2 ? 'var(--text3)' : 'var(--green)';
+    var al = ad > 0 ? ad + 'd' : 'today';
+    html += '<span style="white-space:nowrap"><span style="color:var(--text3)">' + k + '</span> <span style="color:' + c + '">' + ds + ' (' + al + ')</span></span>';
+  }
+  bar.innerHTML = html;
+}
+
 function toggleInfo(pageId){
 const panel = document.getElementById(pageId+'-info');
 const btn = document.getElementById(pageId+'-info-btn');
@@ -1153,7 +1186,7 @@ const _REG_HIST_PRICES = {"Corn":{"2001-02":213.25,"2002-03":238.67,"2003-04":26
 var PSD = null;
 function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};for(var co in _PSD_RAW[c]){o[c][co]={};for(var y in _PSD_RAW[c][co]){o[c][co][y]={};for(var k in _PSD_RAW[c][co][y])o[c][co][y][_PSD_MAP[k]||k]=_PSD_RAW[c][co][y][k];}}}PSD=o;console.log('PSD built:',Object.keys(PSD).length,'commodities');}
 // Load PSD data from JSON (replaces embedded data)
-(function(){fetch('data/psd_data.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){_PSD_RAW=d;buildPSD();console.log('PSD loaded:',Object.keys(d));}).catch(function(e){console.warn('PSD fetch failed:',e.message);});})();
+(function(){fetch('data/psd_data.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){_PSD_RAW=d;buildPSD();console.log('PSD loaded:',Object.keys(d));showDataFreshness('psd-freshness',d._meta&&d._meta.fetched_at,'USDA PSD');}).catch(function(e){console.warn('PSD fetch failed:',e.message);});})();
 
 // Load export sales from pipeline JSON
 (function(){fetch('data/export_sales.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
@@ -1161,7 +1194,7 @@ function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};
     if(d[k].insp){EXP_INSP[k]=d[k].insp;}
     if(d[k].sales){EXP_SALES[k]=d[k].sales;}
   }
-  console.log('Export sales loaded:',Object.keys(d).join(', '));
+  console.log('Export sales loaded:',Object.keys(d).join(', '));showDataFreshness('exp-freshness',d._meta&&d._meta.fetched_at,'EXPORT SALES');
   // Force button rebuild and re-render
   var btns = document.getElementById('exp-comm-btns');
   if(btns) delete btns.dataset.built;
@@ -1171,13 +1204,13 @@ function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};
 // Load CGC GSW data from pipeline
 (function(){fetch('data/gsw_data.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
   _GSW_RAW=d; buildGSW();
-  console.log('GSW loaded from pipeline:',Object.keys(d).join(', '));
+  console.log('GSW loaded from pipeline:',Object.keys(d).join(', '));showDataFreshness('gsw-freshness',d._meta&&d._meta.fetched_at,'CGC GSW');
 }).catch(function(e){console.warn('GSW fetch failed:',e.message);});})();
 
 // Load AAFC data from StatsCan pipeline (historical actuals, fully automated)
 (function(){fetch('data/statscan_sd.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
   AAFC_DATA=d;
-  console.log('AAFC loaded from StatsCan:',Object.keys(d.crops||{}).join(', '));
+  console.log('AAFC loaded from StatsCan:',Object.keys(d.crops||{}).join(', '));showDataFreshness('statscan-freshness',d._meta&&d._meta.fetched_at,'STATSCAN');
 }).catch(function(e){
   // Fallback: try aafc_forecasts.json if available
   fetch('data/aafc_forecasts.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
