@@ -1,4 +1,4 @@
-ame: Fetch USDA Data
+name: Fetch USDA Data
 on:
   schedule:
     - cron: '30 21 * * 1-5'
