@@ -173,6 +173,7 @@ def main():
     formatted = format_for_terminal(data)
  
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    formatted["_meta"] = {"fetched_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")}
     with open(OUT, "w") as f:
         json.dump(formatted, f, separators=(",", ":"), default=str)
  
