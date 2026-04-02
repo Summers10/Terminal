@@ -214,6 +214,7 @@ def main():
     add_weekly_series(merged)
  
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    merged["_meta"] = {"fetched_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")}
     with open(OUT, "w") as f:
         json.dump(merged, f, separators=(",", ":"))
  
