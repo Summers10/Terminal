@@ -229,7 +229,6 @@ def fetch_cattle():
         "agg_level_desc": "NATIONAL",
         "year__GE": str(CURRENT_YEAR - 2),
         "domain_desc": "TOTAL",
-        "freq_desc": "MONTHLY",
     })
     entries = []
     for r in records:
