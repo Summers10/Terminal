@@ -19,14 +19,33 @@ COMMODITIES = {"Wheat": "Wheat", "Barley": "Barley", "Canola": "Canola",
                "Durum": "Durum", "Oats": "Oats", "Flaxseed": "Flaxseed",
                "All Wheat": "Wheat", "Canola (Rapeseed)": "Canola"}
  
-# Series mapping from CGC activity names to our internal keys
+# Series mapping — matches against worksheet OR metric column
 SERIES_MAP = {
     "Producer Deliveries": "producer_deliveries",
+    "Primary Deliveries": "producer_deliveries",
     "Domestic Use": "crush",
+    "Domestic Disappearance": "crush",
+    "Disappearance": "crush",
     "Exports": "exports",
     "Commercial Stocks": "commercial_stocks",
+    "Visible Supply": "commercial_stocks",
     "Primary Elevator Receipts": "primary_receipts",
     "Terminal Receipts": "terminal_receipts",
+}
+ 
+# Map worksheet+metric combos to series (for Feed Grains rows etc.)
+COMBO_MAP = {
+    ("feed grains", "deliveries"): "producer_deliveries",
+    ("feed grains", "domestic use"): "crush",
+    ("feed grains", "domestic disappearance"): "crush",
+    ("feed grains", "stocks"): "commercial_stocks",
+    ("feed grains", "visible supply"): "commercial_stocks",
+    ("primary elevator", "receipts"): "primary_receipts",
+    ("oilseeds", "deliveries"): "producer_deliveries",
+    ("oilseeds", "domestic use"): "crush",
+    ("oilseeds", "domestic disappearance"): "crush",
+    ("oilseeds", "stocks"): "commercial_stocks",
+    ("oilseeds", "visible supply"): "commercial_stocks",
 }
  
  
@@ -100,6 +119,12 @@ def parse_csv(text, crop_year):
             col_map['commodity'] = i
         elif 'activity' in hl or 'worksheet' in hl or 'category' in hl:
             col_map['activity'] = i
+        elif hl == 'metric':
+            col_map['metric'] = i
+        elif hl == 'period':
+            col_map['period'] = i
+        elif hl == 'region':
+            col_map['region'] = i
         elif 'value' in hl or 'quantity' in hl or '000' in hl or 'tonnes' in hl:
             col_map['value'] = i
  
@@ -117,6 +142,7 @@ def parse_csv(text, crop_year):
  
     # Parse data rows
     result = {}
+    agg = {}
     skipped = 0
     parsed = 0
     skip_reasons = {}
@@ -136,16 +162,40 @@ def parse_csv(text, crop_year):
             skip_reasons[f"comm:{commodity[:20]}"] = skip_reasons.get(f"comm:{commodity[:20]}", 0) + 1
             continue
  
+        # Filter: only cumulative "Crop Year" data, not "Current Week"
+        period = row[col_map['period']].strip().lower() if 'period' in col_map else ""
+        if period == 'current week':
+            continue
+ 
+        # Skip regional breakdowns - only keep "Total" or aggregate later
+        region = row[col_map['region']].strip() if 'region' in col_map else ""
+ 
         activity = row[col_map.get('activity', 1)].strip() if 'activity' in col_map else ""
+        metric = row[col_map.get('metric', -1)].strip() if 'metric' in col_map else ""
         act_clean = activity.lower().replace("_", " ").replace("-", " ").strip()
+        met_clean = metric.lower().replace("_", " ").replace("-", " ").strip()
+ 
+        # Try worksheet match first
         series_key = None
         for pattern, key in SERIES_MAP.items():
             if pattern.lower() in act_clean or act_clean in pattern.lower():
                 series_key = key
                 break
+        # Try metric match
+        if not series_key:
+            for pattern, key in SERIES_MAP.items():
+                if pattern.lower() in met_clean or met_clean in pattern.lower():
+                    series_key = key
+                    break
+        # Try combo match (worksheet + metric)
+        if not series_key:
+            for (ws, met), key in COMBO_MAP.items():
+                if ws in act_clean and met in met_clean:
+                    series_key = key
+                    break
         if not series_key:
             skipped += 1
-            skip_reasons[f"act:{activity[:30]}"] = skip_reasons.get(f"act:{activity[:30]}", 0) + 1
+            skip_reasons[f"act:{activity[:20]}|{metric[:20]}"] = skip_reasons.get(f"act:{activity[:20]}|{metric[:20]}", 0) + 1
             continue
  
         try:
@@ -172,12 +222,20 @@ def parse_csv(text, crop_year):
             y2 = int("20" + parts[1]) if len(parts[1]) == 2 else int(parts[1])
             cy_label = f"{y1}-{y2}"
  
-        result.setdefault(comm_key, {}).setdefault(series_key, {}).setdefault(cy_label, [])
-        result[comm_key][series_key][cy_label].append([week, date_str, value])
+        result.setdefault(comm_key, {}).setdefault(series_key, {}).setdefault(cy_label, {})
+        if week not in result[comm_key][series_key][cy_label]:
+            result[comm_key][series_key][cy_label][week] = [week, date_str, 0.0]
+        result[comm_key][series_key][cy_label][week][2] = round(result[comm_key][series_key][cy_label][week][2] + value, 1)
         parsed += 1
  
+    # Convert week dicts to sorted lists
+    for comm in result:
+        for series in result[comm]:
+            for cy in result[comm][series]:
+                result[comm][series][cy] = sorted(result[comm][series][cy].values(), key=lambda r: r[0])
+ 
     print(f"    Parsed: {parsed} rows, skipped: {skipped}")
-    if skip_reasons and parsed == 0:
+    if skip_reasons:
         top = sorted(skip_reasons.items(), key=lambda x: -x[1])[:10]
         print(f"    Top skip reasons: {top}")
     return result
@@ -249,4 +307,5 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
  
