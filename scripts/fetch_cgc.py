@@ -2,7 +2,7 @@
 """Fetch Canadian Grain Commission Grain Statistics Weekly CSV data.
 Downloads cumulative crop-year CSVs, parses into terminal _GSW_RAW format.
 Saves as data/gsw_data.json."""
-import os, sys, json, urllib.request, csv, io
+import os, sys, json, urllib.request, csv, io, time, ssl
 from datetime import datetime
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "gsw_data.json")
@@ -31,23 +31,29 @@ SERIES_MAP = {
  
  
 def download_csv(crop_year):
-    """Try multiple URL patterns for the crop year CSV."""
+    """Try multiple URL patterns for the crop year CSV with retries."""
     urls = [
         f"{BASE}/{crop_year}/gsw-shg-en.csv",
         f"{BASE}/{crop_year}/csv/gsw-shg-en.csv",
     ]
+    ctx = ssl.create_default_context()
     for url in urls:
-        try:
-            req = urllib.request.Request(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                "Accept": "text/csv,*/*",
-            })
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = resp.read()
-                print(f"  {crop_year}: {len(data):,} bytes from {url}")
-                return data.decode("utf-8-sig", errors="replace")
-        except Exception as e:
-            continue
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept": "text/csv,text/plain,*/*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                })
+                with urllib.request.urlopen(req, timeout=300, context=ctx) as resp:
+                    data = resp.read()
+                    print(f"  {crop_year}: {len(data):,} bytes from {url}")
+                    return data.decode("utf-8-sig", errors="replace")
+            except Exception as e:
+                print(f"  {crop_year}: attempt {attempt+1} failed for {url}: {type(e).__name__}: {e}")
+                if attempt < 2:
+                    time.sleep(5 * (attempt + 1))
+                continue
     print(f"  {crop_year}: FAILED all URLs")
     return None
  
@@ -228,4 +234,5 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
  
