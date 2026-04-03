@@ -4,11 +4,21 @@ Downloads cumulative crop-year CSVs, parses into terminal _GSW_RAW format.
 Saves as data/gsw_data.json.
  
 CSV columns: grain_week, crop_year, week_ending_date, worksheet, metric, period, grain, grade, region, Ktonnes
-Key worksheets: Feed Grains, Process, Terminal Exports, Terminal Receipts, Terminal Stocks, PPShipDist, Primary
+ 
+Summary totals are sums across worksheets:
+  producer_deliveries = Primary + Process + Producer Cars deliveries
+  exports             = Terminal + Primary + Producer Cars exports
+  crush (dom disapp)  = Process Milled + Primary Domestic + Terminal Domestic
+  commercial_stocks   = Primary + Process + Terminal stocks
+  terminal_receipts   = Sum of all ports
+ 
+Aggregation strategy:
+  Phase 1: Within each worksheet, MAX across regions (picks Total row)
+  Phase 2: SUM across worksheets per (commodity, series, year, week)
 """
 import os, sys, json, urllib.request, csv, io, ssl
 from datetime import datetime
-from collections import Counter
+from collections import Counter, defaultdict
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "gsw_data.json")
  
@@ -17,52 +27,66 @@ CROP_YEARS = ["2020-21", "2021-22", "2022-23", "2023-24", "2024-25", "2025-26"]
  
 BASE = "https://www.grainscanada.gc.ca/en/grain-research/statistics/grain-statistics-weekly"
  
-# Commodities we care about
-COMMODITIES = {"Wheat": "Wheat", "Barley": "Barley", "Canola": "Canola",
-               "Durum": "Durum", "Oats": "Oats", "Flaxseed": "Flaxseed",
-               "All Wheat": "Wheat", "Canola (Rapeseed)": "Canola",
-               "Amber Durum": "Durum", "Oat": "Oats"}
- 
-# Series mapping — matches against metric column value
-# Order matters: more specific patterns checked first in match_series()
-SERIES_MAP = {
-    "Milled/MFG Grain": "crush",
-    "Milled/MFG": "crush",
-    "Milled": "crush",
-    "MFG Grain": "crush",
-    "Domestic Disappearance": "crush",
-    "Domestic Use": "crush",
-    "Producer Deliveries": "producer_deliveries",
-    "Primary Deliveries": "producer_deliveries",
-    "Deliveries": "producer_deliveries",
-    "Terminal Exports": "exports",
-    "Exports": "exports",
-    "Terminal Stocks": "commercial_stocks",
-    "Visible Supply": "commercial_stocks",
-    "Commercial Stocks": "commercial_stocks",
-    "Stocks": "commercial_stocks",
-    "Primary Elevator Receipts": "primary_receipts",
-    "Primary Receipts": "primary_receipts",
-    "Receipts": "terminal_receipts",
-    "Terminal Receipts": "terminal_receipts",
+# Commodities
+COMMODITIES = {
+    "Wheat": "Wheat", "Barley": "Barley", "Canola": "Canola",
+    "Durum": "Durum", "Oats": "Oats", "Oat": "Oats",
+    "Flaxseed": "Flaxseed", "All Wheat": "Wheat",
+    "Canola (Rapeseed)": "Canola", "Amber Durum": "Durum",
 }
  
-# Map worksheet+metric combos to series (overrides SERIES_MAP when both columns present)
-COMBO_MAP = {
-    ("feed grains", "deliveries"): "producer_deliveries",
-    ("primary", "deliveries"): "producer_deliveries",
-    ("primary", "receipts"): "primary_receipts",
-    ("process", "milled"): "crush",
-    ("process", "mfg"): "crush",
-    ("process", "domestic"): "crush",
-    ("process", "producer deliveries"): None,  # skip — this is deliveries TO process, not crush
-    ("terminal exports", ""): "exports",
-    ("terminal receipts", ""): "terminal_receipts",
-    ("terminal stocks", ""): "commercial_stocks",
-    ("ppshipdist", "canadian domestic"): None,  # skip for now — partial domestic only
-}
+# Worksheet + metric -> series mapping
+# Each CSV row has a worksheet and metric. This map determines the series.
+# None = explicitly skip this combo
+SERIES_RULES = [
+    # Process worksheet
+    ("Process", "Milled",              "crush"),
+    ("Process", "MFG",                 "crush"),
+    ("Process", "Producer Deliveries", "producer_deliveries"),
+    ("Process", "Stocks",              "commercial_stocks"),
+    ("Process", "Other Deliveries",    None),
+    ("Process", "Shipments",           None),
  
-# Period rules: cumulative vs point-in-time
+    # Primary worksheet
+    ("Primary", "Deliveries",          "producer_deliveries"),
+    ("Primary", "Receipts",            "primary_receipts"),
+    ("Primary", "Stocks",              "commercial_stocks"),
+ 
+    # Terminal worksheets
+    ("Terminal Exports", "",            "exports"),
+    ("Terminal Receipts", "",           "terminal_receipts"),
+    ("Terminal Stocks", "",             "commercial_stocks"),
+    ("Terminal Disposition", "Canadian Domestic", "crush"),
+    ("Terminal Disposition", "Export",  None),   # already in Terminal Exports
+ 
+    # PPShipDist (disposition from Primary/Process elevators)
+    ("PPShipDist", "Canadian Domestic", "crush"),
+    ("PPShipDist", "Export Destination","exports"),
+    ("PPShipDist", "Process Elevators", None),  # already in Process deliveries
+    ("PPShipDist", "Pacific",           None),  # already in Terminal Receipts
+    ("PPShipDist", "Thunder",           None),
+    ("PPShipDist", "Churchill",         None),
+    ("PPShipDist", "Bay",              None),
+    ("PPShipDist", "St. Lawrence",      None),
+    ("PPShipDist", "Eastern Terminal",  None),
+    ("PPShipDist", "Western Container", None),
+    ("PPShipDist", "Eastern Container", None),
+ 
+    # Producer Cars
+    ("Producer Cars", "Deliveries",     "producer_deliveries"),
+    ("Producer Cars", "Shipments",      "producer_deliveries"),
+    ("Producer Cars", "Export",         "exports"),
+    ("Producer Cars", "Canadian Domestic", "crush"),
+ 
+    # Feed Grains (may have deliveries for feed grains — skip to avoid double-count with Primary)
+    ("Feed Grains", "Deliveries",       None),
+    ("Feed Grains", "Disappearance",    None),
+    ("Feed Grains", "Domestic",         None),
+    ("Feed Grains", "Stocks",           None),
+    ("Feed Grains", "Visible",          None),
+]
+ 
+# Period rules
 CUMULATIVE_SERIES = {"producer_deliveries", "exports", "crush", "primary_receipts", "terminal_receipts"}
 POINT_IN_TIME_SERIES = {"commercial_stocks"}
  
@@ -94,38 +118,27 @@ def download_csv(crop_year):
  
  
 def match_series(worksheet, metric):
-    """Match worksheet+metric to a series key. Returns series_key or None."""
-    ws = worksheet.lower().strip()
-    met = metric.lower().strip()
+    """Match worksheet+metric to a series key using rules table."""
+    ws = worksheet.strip()
+    met = metric.strip()
+    ws_l = ws.lower()
+    met_l = met.lower()
  
-    # 1. Try COMBO_MAP first (most specific)
-    for (ws_pat, met_pat), key in COMBO_MAP.items():
-        if ws_pat in ws and (not met_pat or met_pat in met):
-            return key  # Can be None to explicitly skip
+    for (rule_ws, rule_met, series_key) in SERIES_RULES:
+        rws = rule_ws.lower()
+        rmet = rule_met.lower()
  
-    # 2. Try metric match (column 4 in CSV)
-    for pattern, key in SERIES_MAP.items():
-        pl = pattern.lower()
-        if pl == met or pl in met:
-            return key
+        # Worksheet must match (substring)
+        if rws not in ws_l and ws_l not in rws:
+            continue
  
-    # 3. Try worksheet match (column 3 in CSV)
-    for pattern, key in SERIES_MAP.items():
-        pl = pattern.lower()
-        if pl == ws or pl in ws:
-            return key
+        # Metric must match (empty rule_met = match any metric)
+        if rmet and rmet not in met_l and met_l not in rmet:
+            continue
  
-    # 4. Reverse substring checks
-    for pattern, key in SERIES_MAP.items():
-        pl = pattern.lower()
-        if met in pl and len(met) > 3:
-            return key
-    for pattern, key in SERIES_MAP.items():
-        pl = pattern.lower()
-        if ws in pl and len(ws) > 3:
-            return key
+        return series_key  # Can be None (explicit skip)
  
-    return None
+    return "UNMATCHED"
  
  
 def parse_csv(text, crop_year):
@@ -179,7 +192,7 @@ def parse_csv(text, crop_year):
         elif ('value' in hl or 'quantity' in hl) and 'value' not in col_map:
             col_map['value'] = i
  
-    # Fallback for commodity column
+    # Fallback for commodity
     if 'commodity' not in col_map:
         for i, h in enumerate(header):
             hl = h.lower().strip()
@@ -188,21 +201,19 @@ def parse_csv(text, crop_year):
                 break
  
     if 'commodity' not in col_map or 'value' not in col_map:
-        print(f"    WARNING: Missing columns. commodity={'commodity' in col_map} value={'value' in col_map}")
-        for row in rows[header_idx+1:header_idx+4]:
-            print(f"    Sample: {row}")
+        print(f"    WARNING: Missing columns. Header: {header}")
         return {}
  
     print(f"    Column map: {col_map}")
     for row in rows[header_idx+1:header_idx+4]:
         print(f"    Sample: {row}")
  
-    # Diagnostic: collect all unique (worksheet, metric, period) combos for Canola
+    # Diagnostic counters
     canola_combos = Counter()
  
-    # Parse data rows — accumulate by (comm, series, year, week)
-    # Use MAX value per key to avoid double-counting from sub-items + Total rows
-    temp = {}
+    # Phase 1: Collect values per (worksheet, commodity, series, year, week, region)
+    # raw[worksheet][(comm, series, year, week)] -> {region: value}
+    raw = defaultdict(lambda: defaultdict(dict))
     skipped = 0
     parsed = 0
     skip_reasons = Counter()
@@ -230,7 +241,7 @@ def parse_csv(text, crop_year):
             skip_reasons[f"comm:{commodity[:20]}"] += 1
             continue
  
-        # Get worksheet, metric, period, region
+        # Get fields
         worksheet = row[col_map['worksheet']].strip() if 'worksheet' in col_map else ""
         metric = row[col_map['metric']].strip() if 'metric' in col_map else ""
         period = row[col_map['period']].strip().lower() if 'period' in col_map else ""
@@ -243,8 +254,11 @@ def parse_csv(text, crop_year):
         # Match series
         series_key = match_series(worksheet, metric)
         if series_key is None:
+            # Explicitly skipped
+            continue
+        if series_key == "UNMATCHED":
             skipped += 1
-            skip_reasons[f"ws:{worksheet[:15]}|{metric[:15]}"] += 1
+            skip_reasons[f"{worksheet[:15]}|{metric[:15]}"] += 1
             continue
  
         # Period filter
@@ -279,17 +293,40 @@ def parse_csv(text, crop_year):
         else:
             cy_label = crop_year
  
-        # Aggregate: for each (comm, series, year, week), keep MAX value
-        # This handles: Summary "Total" vs sub-item rows, multiple worksheets
-        agg_key = (comm_key, series_key, cy_label, week)
-        existing = temp.get(agg_key)
-        if existing is None or value > existing[1]:
-            temp[agg_key] = (date_str, round(value, 1))
+        data_key = (comm_key, series_key, cy_label, week)
+        ws_key = worksheet
+ 
+        # Store: within each worksheet, keep track of all regions
+        # Also store date_str for the final output
+        existing = raw[ws_key][data_key].get(region, (date_str, 0))
+        raw[ws_key][data_key][region] = (date_str, max(value, existing[1]))
         parsed += 1
+ 
+    # Phase 2: Aggregate
+    # For each worksheet: pick MAX value across regions (gets "Total" row if present)
+    # Then SUM across worksheets
+    final = {}  # (comm, series, year, week) -> (date_str, value)
+ 
+    for ws_key, data in raw.items():
+        for data_key, regions in data.items():
+            # Pick MAX value across regions for this worksheet
+            best_date = ""
+            best_val = 0
+            for reg, (date_str, val) in regions.items():
+                if val > best_val:
+                    best_val = val
+                    best_date = date_str
+ 
+            # Sum into final
+            if data_key in final:
+                old_date, old_val = final[data_key]
+                final[data_key] = (best_date or old_date, round(old_val + best_val, 1))
+            else:
+                final[data_key] = (best_date, round(best_val, 1))
  
     # Convert to result format
     result = {}
-    for (comm_key, series_key, cy_label, week), (date_str, value) in temp.items():
+    for (comm_key, series_key, cy_label, week), (date_str, value) in final.items():
         result.setdefault(comm_key, {}).setdefault(series_key, {}).setdefault(cy_label, [])
         result[comm_key][series_key][cy_label].append([week, date_str, value])
  
@@ -300,17 +337,26 @@ def parse_csv(text, crop_year):
                 result[comm][sname][cy].sort(key=lambda r: r[0])
  
     final_count = sum(len(rows) for comm in result for sname in result[comm] for rows in result[comm][sname].values())
-    print(f"    Raw parsed: {parsed}, aggregated: {final_count} points, skipped: {skipped}")
+    print(f"    Raw parsed: {parsed}, final: {final_count} data points, skipped: {skipped}")
  
-    # Print Canola diagnostics
+    # Canola diagnostics
     if canola_combos:
-        print(f"    Canola combos (ws|metric|period):")
-        for (ws, met, per), cnt in sorted(canola_combos.items(), key=lambda x: -x[1])[:20]:
-            print(f"      ws={ws:25s} met={met:25s} per={per:15s} rows={cnt}")
+        print(f"    Canola CSV combos (ws|metric|period):")
+        for (ws, met, per), cnt in sorted(canola_combos.items(), key=lambda x: -x[1])[:25]:
+            series = match_series(ws, met)
+            tag = f"-> {series}" if series and series != "UNMATCHED" else "(skip)" if series is None else "UNMATCHED"
+            print(f"      ws={ws:25s} met={met:25s} per={per:15s} rows={cnt:5d}  {tag}")
  
     if skip_reasons:
         top = sorted(skip_reasons.items(), key=lambda x: -x[1])[:10]
         print(f"    Top skip reasons: {top}")
+ 
+    # Spot check: Canola values for latest week
+    for series in ["producer_deliveries", "crush", "exports", "commercial_stocks", "terminal_receipts"]:
+        for cy_data in result.get("Canola", {}).get(series, {}).values():
+            if cy_data:
+                last = cy_data[-1]
+                print(f"    Canola {series}: week {last[0]} = {last[2]}")
  
     return result
  
