@@ -162,10 +162,8 @@ def parse_csv(text, crop_year):
             skip_reasons[f"comm:{commodity[:20]}"] = skip_reasons.get(f"comm:{commodity[:20]}", 0) + 1
             continue
  
-        # Filter: only cumulative "Crop Year" data, not "Current Week"
+        # Get period for filtering later
         period = row[col_map['period']].strip().lower() if 'period' in col_map else ""
-        if period == 'current week':
-            continue
  
         # Skip regional breakdowns - only keep "Total" or aggregate later
         region = row[col_map['region']].strip() if 'region' in col_map else ""
@@ -196,6 +194,13 @@ def parse_csv(text, crop_year):
         if not series_key:
             skipped += 1
             skip_reasons[f"act:{activity[:20]}|{metric[:20]}"] = skip_reasons.get(f"act:{activity[:20]}|{metric[:20]}", 0) + 1
+            continue
+ 
+        # Filter period: stocks are point-in-time (Current Week), everything else is cumulative (Crop Year)
+        is_stocks = series_key in ('commercial_stocks',)
+        if period == 'current week' and not is_stocks:
+            continue
+        if period != 'current week' and is_stocks:
             continue
  
         try:
@@ -307,5 +312,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
  
