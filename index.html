@@ -755,6 +755,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         </div>
         <!-- Grain Stocks view -->
         <div class="rpt-view" id="rpt-v-stocks" style="display:none;">
+          <div id="rpt-stocks-stamp"></div>
           <div class="panel">
             <div class="panel-hdr"><div class="panel-title">GRAIN STOCKS — QUARTERLY</div></div>
             <div style="overflow-x:auto;"><table class="bal-table" id="rpt-stocks-tbl"></table></div>
@@ -762,6 +763,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         </div>
         <!-- Acreage view -->
         <div class="rpt-view" id="rpt-v-acreage" style="display:none;">
+          <div id="rpt-acre-stamp"></div>
           <div class="panel">
             <div class="panel-hdr"><div class="panel-title">ACREAGE & PLANTINGS</div></div>
             <div style="overflow-x:auto;"><table class="bal-table" id="rpt-acre-tbl"></table></div>
@@ -769,6 +771,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         </div>
         <!-- Cattle view -->
         <div class="rpt-view" id="rpt-v-cattle" style="display:none;">
+          <div id="rpt-cattle-stamp"></div>
           <div class="panel">
             <div class="panel-hdr"><div class="panel-title">CATTLE ON FEED</div></div>
             <div style="overflow-x:auto;"><table class="bal-table" id="rpt-cattle-tbl"></table></div>
@@ -776,6 +779,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         </div>
         <!-- Hogs view -->
         <div class="rpt-view" id="rpt-v-hogs" style="display:none;">
+          <div id="rpt-hogs-stamp"></div>
           <div class="panel">
             <div class="panel-hdr"><div class="panel-title">HOGS & PIGS INVENTORY</div></div>
             <div style="overflow-x:auto;"><table class="bal-table" id="rpt-hogs-tbl"></table></div>
@@ -787,6 +791,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         </div>
         <!-- Exports view -->
         <div class="rpt-view" id="rpt-v-exports" style="display:none;">
+          <div id="rpt-exports-stamp"></div>
           <div id="rpt-exports-content" style="padding:10px 0;text-align:center;color:var(--text3);font-size:14px;letter-spacing:.08em;"></div>
         </div>
         <!-- GSW view -->
@@ -967,6 +972,20 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 
 // Data freshness display system
 var _pipelineDates = {};
+function freshStamp(source, fetchedAt, asOfDate){
+  var parts = [];
+  if(asOfDate) parts.push(asOfDate);
+  if(fetchedAt){
+    var d = new Date(fetchedAt);
+    var now = new Date();
+    var ageDays = Math.floor((now - d) / 86400000);
+    var ds = d.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+    var al = ageDays > 0 ? ' (' + ageDays + 'd ago)' : ' (today)';
+    var c = ageDays > 7 ? 'var(--red)' : ageDays > 1 ? 'var(--text3)' : 'var(--green)';
+    parts.push('<span style="color:'+c+'">fetched '+ds+al+'</span>');
+  }
+  return '<div style="font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.06em;padding:6px 0 2px;text-transform:uppercase;">'+source+': '+parts.join(' · ')+'</div>';
+}
 function showDataFreshness(elId, fetchedAt, label){
   // Update individual element if it exists
   var el = document.getElementById(elId);
@@ -979,21 +998,25 @@ function showDataFreshness(elId, fetchedAt, label){
     var ageLabel = ageDays > 0 ? ageDays + 'd ago' : 'today';
     el.innerHTML = '<span style="color:var(--text3)">' + label + ':</span> <span style="color:' + color + '">' + dateStr + ' (' + ageLabel + ')</span>';
   }
-  // Also update global pipeline bar
+  // Track all dates
   if(fetchedAt) _pipelineDates[label] = fetchedAt;
-  var bar = document.getElementById('pipeline-freshness');
-  if(!bar) return;
-  var html = '';
-  for(var k in _pipelineDates){
-    var dt = new Date(_pipelineDates[k]);
-    var now2 = new Date();
-    var ad = Math.floor((now2 - dt) / 86400000);
-    var ds = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
-    var c = ad > 7 ? 'var(--red)' : ad > 2 ? 'var(--text3)' : 'var(--green)';
-    var al = ad > 0 ? ad + 'd' : 'today';
-    html += '<span style="white-space:nowrap"><span style="color:var(--text3)">' + k + '</span> <span style="color:' + c + '">' + ds + ' (' + al + ')</span></span>';
-  }
-  bar.innerHTML = html;
+  // Update both bars (NASS toolbar + global header)
+  ['pipeline-freshness','global-freshness'].forEach(function(barId){
+    var bar = document.getElementById(barId);
+    if(!bar) return;
+    var html = '';
+    var sorted = Object.keys(_pipelineDates).sort();
+    sorted.forEach(function(k){
+      var dt = new Date(_pipelineDates[k]);
+      var now2 = new Date();
+      var ad = Math.floor((now2 - dt) / 86400000);
+      var ds = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase();
+      var c = ad > 7 ? 'var(--red)' : ad > 2 ? 'var(--text3)' : 'var(--green)';
+      var al = ad > 0 ? ad + 'd' : 'today';
+      html += '<span style="white-space:nowrap"><span style="color:var(--text4)">' + k + '</span> <span style="color:' + c + '">' + ds + ' (' + al + ')</span></span>';
+    });
+    bar.innerHTML = html;
+  });
 }
 
 function toggleInfo(pageId){
@@ -1170,6 +1193,7 @@ function _parseCOT() {
     var latest = allData[allData.length - 1].report_date_as_yyyy_mm_dd || '';
     if (el) el.textContent = 'COT live · ' + allData.length + ' rows · thru ' + latest;
     console.log('CFTC COT loaded: ' + allData.length + ' records');
+    showDataFreshness(null, latest + 'T00:00:00Z', 'CFTC COT');
 
     try { 
       cotInited = false;
@@ -5236,6 +5260,7 @@ let NGS = {records:[], band:{}};
 
     EIA = { records: records, band: band, latest_date: dates[dates.length-1] };
     console.log('EIA petroleum loaded: ' + records.length + ' weeks, thru ' + dates[dates.length-1]);
+    showDataFreshness(null, dates[dates.length-1] + 'T00:00:00Z', 'EIA PETRO');
 
   } catch(err) {
     console.error('EIA petroleum fetch failed:', err);
@@ -6200,7 +6225,8 @@ const prevYr = years.length >= 2 ? years[years.length - 2] : null;
 const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
 const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
 function dc(cur,prev){ if(cur===null||prev===null||cur===undefined||prev===undefined) return ''; return cur>prev?'aafc-up':cur<prev?'aafc-dn':''; }
-let html = `<div class="aafc-sd-wrap"><table class="aafc-all-tbl"><thead>
+let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
+html += `<div class="aafc-sd-wrap"><table class="aafc-all-tbl"><thead>
 <tr>
 <th style="text-align:left;">YEAR</th>
 <th>SEEDED<br><span style="font-weight:400;font-size:11px;">000 ha</span></th>
@@ -6269,7 +6295,8 @@ function deltaClass(cur, prev){
 if(cur===null||prev===null||cur===undefined||prev===undefined) return '';
 return cur>prev ? 'aafc-up' : cur<prev ? 'aafc-dn' : '';
 }
-let html = `<div class="aafc-price-label">${cd.price_label}</div>`;
+let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
+html += `<div class="aafc-price-label">${cd.price_label}</div>`;
 html += `<div class="aafc-sd-wrap"><table class="aafc-tbl"><thead>`;
 html += `<tr class="aafc-group">
 <th rowspan="2" style="text-align:left;border-right:1px solid var(--border2);">CROP YEAR</th>
@@ -8303,10 +8330,11 @@ async function refreshFred() {
       });
       if (ok > 0) {
         console.log('FRED loaded from pipeline JSON:', ok, 'series');
+        if(jsonData._meta && jsonData._meta.fetched_at) showDataFreshness(null, jsonData._meta.fetched_at, 'FRED');
         updateFredCharts();
         setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
         if (lb) lb.style.display = 'none';
-        if (st) { st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series'; st.style.color = 'var(--green)'; }
+        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, ok + '/' + allSeries.length + ' series');
         return;
       }
     }
@@ -10034,7 +10062,7 @@ function initReports(){
   if(!_nassData){
     fetch('data/nass_reports.json')
       .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){ _nassData = d; if(_nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); buildRptNav(); })
+      .then(function(d){ _nassData = d; if(_nassData.fetched){ document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); showDataFreshness(null, _nassData.fetched, 'NASS'); } buildRptNav(); })
       .catch(function(e){ console.warn('NASS data not available:', e.message); });
   }
 }
@@ -10315,6 +10343,8 @@ function renderRptStocks(){
   });
   if(!rows.length){ document.getElementById('rpt-stocks-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No grain stocks data</td></tr></tbody>'; return; }
   var ref = rows[0].latest;
+  var stampEl = document.getElementById('rpt-stocks-stamp');
+  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], ref.ref_period + ' ' + ref.year);
   var h = '';
   h += '<div class="panel" style="margin-bottom:18px;">';
   h += '<div class="panel-hdr"><div class="panel-title">USDA Quarterly Stocks</div>';
@@ -10361,6 +10391,8 @@ function renderRptAcreage(){
     rows.push({crop: crop.charAt(0) + crop.slice(1).toLowerCase(), cur: latest.mil_acres, prev: prevVal, year: latest.year, ref: latest.ref_period});
   });
   if(!rows.length){ document.getElementById('rpt-acre-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No acreage data</td></tr></tbody>'; return; }
+  var stampEl = document.getElementById('rpt-acre-stamp');
+  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], latestYear + ' Prospective Plantings');
   var h = '';
   h += '<div class="panel" style="margin-bottom:18px;">';
   h += '<div class="panel-hdr"><div class="panel-title">U.S. Planted Acreage</div>';
@@ -10392,6 +10424,9 @@ function renderRptAcreage(){
 function renderRptCattle(){
   var cattle = (_nassData && _nassData.cattle) || [];
   if(!cattle.length){ document.getElementById('rpt-cattle-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No cattle data available</td></tr></tbody>'; return; }
+  var latest = cattle[cattle.length-1];
+  var stampEl = document.getElementById('rpt-cattle-stamp');
+  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], latest.ref_period + ' ' + latest.year);
   var h = '<thead><tr><th style="text-align:left;">Period</th><th>Category</th><th style="color:var(--amber);">Thou. Head</th><th>Year</th></tr></thead><tbody>';
   var ri = 0;
   cattle.slice(-20).reverse().forEach(function(r){
@@ -10410,6 +10445,9 @@ function renderRptCattle(){
 function renderRptHogs(){
   var hogs = (_nassData && _nassData.hogs) || [];
   if(!hogs.length){ document.getElementById('rpt-hogs-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No hogs data available</td></tr></tbody>'; return; }
+  var latest = hogs[hogs.length-1];
+  var stampEl = document.getElementById('rpt-hogs-stamp');
+  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], latest.ref_period + ' ' + latest.year);
   var h = '<thead><tr><th style="text-align:left;">Period</th><th>Class</th><th style="color:var(--amber);">Thou. Head</th><th>Year</th></tr></thead><tbody>';
   var ri = 0;
   hogs.slice(-20).reverse().forEach(function(r){
@@ -10486,6 +10524,7 @@ function renderRptWasde(){
     return h;
   }
   var h = '';
+  h += freshStamp('USDA PSD', _pipelineDates['USDA PSD'], cy + ' WASDE');
   h += buildSection('U.S. Ending Stocks', 'Million Bushels', [
     {comm:'Corn',country:'United States',attr:'Ending Stocks',label:'Corn'},
     {comm:'Soybeans',country:'United States',attr:'Ending Stocks',label:'Soybeans'},
@@ -10526,6 +10565,8 @@ function renderRptWasde(){
 }
 
 function renderRptExportsLink(){
+  var stampEl = document.getElementById('rpt-exports-stamp');
+  if(stampEl) stampEl.innerHTML = freshStamp('USDA FAS', _pipelineDates['EXPORT SALES'], '');
   var container = document.getElementById('rpt-exports-content');
   var expWrap = document.getElementById('exp-page-wrap');
   if(expWrap && container && !container.hasChildNodes()){
