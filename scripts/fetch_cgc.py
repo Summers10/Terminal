@@ -80,19 +80,25 @@ def parse_csv(text, crop_year):
         header = [c.strip() for c in rows[0]]
         header_idx = 0
  
-    print(f"    Header ({len(header)} cols): {header[:8]}...")
+    print(f"    Header ({len(header)} cols): {header}")
  
     # Map column indices
     col_map = {}
     for i, h in enumerate(header):
         hl = h.lower()
-        if 'week' in hl and 'end' not in hl and 'number' not in hl:
+        if ('grain_week' == hl or hl == 'grain week') and 'week' not in col_map:
+            col_map['week'] = i
+        elif 'week' in hl and 'end' not in hl and 'number' not in hl and 'grain' not in hl and 'crop' not in hl:
             col_map['week'] = i
         elif 'week' in hl and ('end' in hl or 'date' in hl):
             col_map['date'] = i
-        elif 'commodity' in hl or 'grain' in hl or 'crop' in hl:
+        elif hl in ('commodity', 'grain', 'crop'):
             col_map['commodity'] = i
-        elif 'activity' in hl or 'type' in hl or 'category' in hl:
+        elif 'commodity' in hl and 'grain' not in hl:
+            col_map['commodity'] = i
+        elif hl == 'grain' or (('grain' in hl or 'crop' in hl) and 'week' not in hl and 'year' not in hl):
+            col_map['commodity'] = i
+        elif 'activity' in hl or 'worksheet' in hl or 'category' in hl:
             col_map['activity'] = i
         elif 'value' in hl or 'quantity' in hl or '000' in hl or 'tonnes' in hl:
             col_map['value'] = i
@@ -106,11 +112,14 @@ def parse_csv(text, crop_year):
         return {}
  
     print(f"    Column map: {col_map}")
+    for row in rows[header_idx+1:header_idx+4]:
+        print(f"    Sample: {row}")
  
     # Parse data rows
     result = {}
     skipped = 0
     parsed = 0
+    skip_reasons = {}
  
     for row in rows[header_idx + 1:]:
         if len(row) <= max(col_map.values()):
@@ -124,16 +133,19 @@ def parse_csv(text, crop_year):
                 break
         if not comm_key:
             skipped += 1
+            skip_reasons[f"comm:{commodity[:20]}"] = skip_reasons.get(f"comm:{commodity[:20]}", 0) + 1
             continue
  
         activity = row[col_map.get('activity', 1)].strip() if 'activity' in col_map else ""
+        act_clean = activity.lower().replace("_", " ").replace("-", " ").strip()
         series_key = None
         for pattern, key in SERIES_MAP.items():
-            if pattern.lower() in activity.lower():
+            if pattern.lower() in act_clean or act_clean in pattern.lower():
                 series_key = key
                 break
         if not series_key:
             skipped += 1
+            skip_reasons[f"act:{activity[:30]}"] = skip_reasons.get(f"act:{activity[:30]}", 0) + 1
             continue
  
         try:
@@ -165,6 +177,9 @@ def parse_csv(text, crop_year):
         parsed += 1
  
     print(f"    Parsed: {parsed} rows, skipped: {skipped}")
+    if skip_reasons and parsed == 0:
+        top = sorted(skip_reasons.items(), key=lambda x: -x[1])[:10]
+        print(f"    Top skip reasons: {top}")
     return result
  
  
@@ -234,5 +249,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
  
