@@ -83,8 +83,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <!-- BRAND HEADER + TOP NAV -->
 <div id="sticky-header" style="position:sticky;top:0;z-index:100;background:var(--bg);">
 <div id="brand-bar" style="padding:8px 20px 0;">
-  <div style="font-size:20px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);line-height:1;">SUMMERS-THOLL</div>
-  <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.10em;margin-top:3px;">Commodity Research Terminal</div>
+  <div style="font-size:20px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);line-height:1;">SUMMERS-THOLL RESEARCH</div>
 </div>
 <div id="topnav">
   <button class="nav-tab active" onclick="switchTab('sum')">SUMMARY</button>
@@ -1204,17 +1203,19 @@ function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};
 // Load CGC GSW data from pipeline
 (function(){fetch('data/gsw_data.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
   _GSW_RAW=d; buildGSW();
+  if(gswInited) renderGsw();
   console.log('GSW loaded from pipeline:',Object.keys(d).join(', '));showDataFreshness('gsw-freshness',d._meta&&d._meta.fetched_at,'CGC GSW');
 }).catch(function(e){console.warn('GSW fetch failed:',e.message);});})();
 
 // Load AAFC data from StatsCan pipeline (historical actuals, fully automated)
 (function(){fetch('data/statscan_sd.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
   AAFC_DATA=d;
+  if(aafcInited) initAafc();
   console.log('AAFC loaded from StatsCan:',Object.keys(d.crops||{}).join(', '));showDataFreshness('statscan-freshness',d._meta&&d._meta.fetched_at,'STATSCAN');
 }).catch(function(e){
   // Fallback: try aafc_forecasts.json if available
   fetch('data/aafc_forecasts.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
-    AAFC_DATA=d; console.log('AAFC loaded from forecasts JSON');
+    AAFC_DATA=d; if(aafcInited) initAafc(); console.log('AAFC loaded from forecasts JSON');
   }).catch(function(){console.warn('AAFC: no data available');});
 });})();
 
@@ -4958,8 +4959,6 @@ renderGsw();
 function initGsw(){
 gswInited = true;
 if(!Object.keys(GSW).length){
-  var gp = document.getElementById('gsw-page');
-  if(gp) gp.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING GSW DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/gsw_data.json</div></div>';
   return;
 }
 renderGsw();
@@ -6347,8 +6346,6 @@ let aafcCrop = 'ALL';
 function initAafc(){
 aafcInited = true;
 if(!AAFC_DATA || !AAFC_DATA.crops){
-  var ap = document.getElementById('aafc-page');
-  if(ap) ap.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING STATSCAN DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/statscan_sd.json</div></div>';
   return;
 }
 const btns = document.getElementById('aafc-crop-btns');
@@ -10192,13 +10189,13 @@ var RPT_VIEWS = [
   {id:'aafc',       label:'StatsCan (S&D)',   section:null},
   {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
   {id:'progress',   label:'Crop Progress',    section:null},
+  {id:'exports',    label:'Export Sales',     section:null},
+  {id:'gsw',        label:'Grain Stocks (CAN)', section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
   {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
   {id:'cattle',     label:'Cattle on Feed',   section:'LIVESTOCK'},
   {id:'hogs',       label:'Hogs & Pigs',      section:null},
-  {id:'wasde',      label:'WASDE (S&D)',      section:'MONTHLY'},
-  {id:'exports',    label:'Export Sales',     section:'OTHER REPORTS'},
-  {id:'gsw',        label:'Grain Stocks (CAN)', section:null}
+  {id:'wasde',      label:'WASDE (S&D)',      section:'MONTHLY'}
 ];
 
 function initReports(){
@@ -10208,7 +10205,7 @@ function initReports(){
   if(!_nassData){
     fetch('data/nass_reports.json')
       .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){ _nassData = d; if(_nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); buildRptNav(); })
+      .then(function(d){ _nassData = d; if(_nassData.fetched) document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); buildRptNav(); renderRptView(); })
       .catch(function(e){ console.warn('NASS data not available:', e.message); });
   }
 }
