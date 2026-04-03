@@ -97,9 +97,14 @@ def download_and_parse():
         text = io.TextIOWrapper(f, encoding='utf-8-sig')
         reader = csv.DictReader(text)
  
+        headers_printed = False
         for row in reader:
+            if not headers_printed:
+                print(f"  CSV columns: {list(row.keys())}")
+                print(f"  Sample row: {dict(list(row.items())[:8])}")
+                headers_printed = True
             # Get commodity
-            grain = row.get("Type of grain", row.get("Grains", "")).strip()
+            grain = row.get("Type of grain", row.get("Grains", row.get("Type of crop", ""))).strip()
             comm = None
             for pattern, key in COMMODITIES.items():
                 if pattern.lower() == grain.lower():
@@ -211,5 +216,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
  
