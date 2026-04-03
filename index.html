@@ -4948,7 +4948,7 @@ legEl.innerHTML=origins.map((o,oi)=>`<span style="display:flex;align-items:cente
 }
 var _GSW_RAW = {};
 var GSW = {};
-function buildGSW(){var o={};for(var c in _GSW_RAW){o[c]={};for(var sn in _GSW_RAW[c]){o[c][sn]={};for(var yr in _GSW_RAW[c][sn])o[c][sn][yr]=_GSW_RAW[c][sn][yr].map(function(r){return{week:r[0],date:r[1],value:r[2]};});}}GSW=o;}
+function buildGSW(){var o={};for(var c in _GSW_RAW){if(c==='_meta')continue;o[c]={};for(var sn in _GSW_RAW[c]){o[c][sn]={};for(var yr in _GSW_RAW[c][sn])o[c][sn][yr]=_GSW_RAW[c][sn][yr].map(function(r){return{week:r[0],date:r[1],value:r[2]};});}}GSW=o;}
 let gswInited = false;
 let gswGrain = 'Canola';
 function setGswGrain(g){
@@ -6366,8 +6366,11 @@ renderAafc();
 }
 function renderAafcAll(){
 const crops = Object.keys(AAFC_DATA.crops);
-const years = ['2024-2025','2025-2026f','2026-2027f'];
-const curYr = '2025-2026f';
+// Dynamically get years from the data
+const allYears = new Set();
+crops.forEach(c => { (AAFC_DATA.crops[c].rows||[]).forEach(r => allYears.add(r.year)); });
+const years = Array.from(allYears).sort().slice(-3);
+const curYr = years[years.length - 1] || '';
 const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
 const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
 function dc(cur,prev){ if(cur===null||prev===null||cur===undefined||prev===undefined) return ''; return cur>prev?'aafc-up':cur<prev?'aafc-dn':''; }
@@ -6390,7 +6393,7 @@ let html = `<div class="aafc-sd-wrap"><table class="aafc-all-tbl"><thead>
 crops.forEach(cropName => {
 const cd = AAFC_DATA.crops[cropName];
 const rows = cd.rows;
-const prev = rows.find(x => x.year === '2024-2025');
+const prev = rows.length >= 2 ? rows.find(x => x.year === years[years.length - 2]) || rows[rows.length - 2] : null;
 html += `<tr class="aafc-all-yr-hdr"><td colspan="12">${cropName}</td></tr>`;
 years.forEach(yr => {
 const isCur = yr === curYr;
@@ -6418,7 +6421,7 @@ html += `<tr style="${rowStyle}">
 });
 });
 html += `</tbody></table></div>`;
-html += `<div class="aafc-notes">${AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`;
+if(AAFC_DATA.notes && AAFC_DATA.notes.length) html += `<div class="aafc-notes">${AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`;
 document.getElementById('aafc-content').innerHTML = html;
 }
 function renderAafc(){
@@ -6430,7 +6433,7 @@ if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
 const cd = AAFC_DATA.crops[aafcCrop];
 if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
 const rows = cd.rows;
-const curYr = '2025-2026f';
+const curYr = rows.length ? rows[rows.length - 1].year : '';
 const isPulse = !rows[0].price || rows[0].food===null;
 const hasPrice = rows.some(r=>r.price);
 const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
@@ -6483,7 +6486,7 @@ ${hasPrice?`<td class="aafc-price" style="border-left:1px solid var(--border2);"
 </tr>`;
 });
 html += `</tbody></table></div>`;
-html += `<div class="aafc-notes">${AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`;
+if(AAFC_DATA.notes && AAFC_DATA.notes.length) html += `<div class="aafc-notes">${AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`;
 document.getElementById('aafc-content').innerHTML = html;
 }
 onCommChange();
