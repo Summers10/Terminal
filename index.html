@@ -83,8 +83,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <!-- BRAND HEADER + TOP NAV -->
 <div id="sticky-header" style="position:sticky;top:0;z-index:100;background:var(--bg);">
 <div id="brand-bar" style="padding:8px 20px 0;">
-  <div style="font-size:20px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);line-height:1;">SUMMERS-THOLL</div>
-  <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.10em;margin-top:3px;">Commodity Research Terminal</div>
+  <div style="font-size:20px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);line-height:1;">SUMMERS-THOLL RESEARCH</div>
 </div>
 <div id="topnav">
   <button class="nav-tab active" onclick="switchTab('sum')">SUMMARY</button>
@@ -4947,7 +4946,7 @@ legEl.innerHTML=origins.map((o,oi)=>`<span style="display:flex;align-items:cente
 }
 var _GSW_RAW = {};
 var GSW = {};
-function buildGSW(){var o={};for(var c in _GSW_RAW){o[c]={};for(var sn in _GSW_RAW[c]){o[c][sn]={};for(var yr in _GSW_RAW[c][sn])o[c][sn][yr]=_GSW_RAW[c][sn][yr].map(function(r){return{week:r[0],date:r[1],value:r[2]};});}}GSW=o;}
+function buildGSW(){var o={};for(var c in _GSW_RAW){if(c==='_meta')continue;o[c]={};for(var sn in _GSW_RAW[c]){o[c][sn]={};for(var yr in _GSW_RAW[c][sn])o[c][sn][yr]=_GSW_RAW[c][sn][yr].map(function(r){return{week:r[0],date:r[1],value:r[2]};});}}GSW=o;}
 let gswInited = false;
 let gswGrain = 'Canola';
 function setGswGrain(g){
@@ -6369,8 +6368,12 @@ renderAafc();
 }
 function renderAafcAll(){
 const crops = Object.keys(AAFC_DATA.crops);
-const years = ['2024-2025','2025-2026f','2026-2027f'];
-const curYr = '2025-2026f';
+// Dynamic years from data
+var allYears = {};
+crops.forEach(function(c){ AAFC_DATA.crops[c].rows.forEach(function(r){ allYears[r.year]=1; }); });
+const years = Object.keys(allYears).sort();
+const curYr = years.length ? years[years.length - 1] : '';
+const prevYr = years.length >= 2 ? years[years.length - 2] : null;
 const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
 const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
 function dc(cur,prev){ if(cur===null||prev===null||cur===undefined||prev===undefined) return ''; return cur>prev?'aafc-up':cur<prev?'aafc-dn':''; }
@@ -6393,13 +6396,13 @@ let html = `<div class="aafc-sd-wrap"><table class="aafc-all-tbl"><thead>
 crops.forEach(cropName => {
 const cd = AAFC_DATA.crops[cropName];
 const rows = cd.rows;
-const prev = rows.find(x => x.year === '2024-2025');
+const prev = prevYr ? rows.find(x => x.year === prevYr) : null;
 html += `<tr class="aafc-all-yr-hdr"><td colspan="12">${cropName}</td></tr>`;
 years.forEach(yr => {
 const isCur = yr === curYr;
 const r = rows.find(x => x.year === yr);
 if(!r) return;
-const isPrevRow = yr === '2024-2025';
+const isPrevRow = prevYr && yr === prevYr;
 const compare = isPrevRow ? null : prev;
 const denom = (r.dom||0) + (r.exports||0); const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
 const rowStyle = isCur ? 'background:var(--row-alt) !important;' : '';
@@ -6421,7 +6424,7 @@ html += `<tr style="${rowStyle}">
 });
 });
 html += `</tbody></table></div>`;
-html += `<div class="aafc-notes">${AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`;
+html += `<div class="aafc-notes">${AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('') : ''}</div>`;
 document.getElementById('aafc-content').innerHTML = html;
 }
 function renderAafc(){
@@ -6433,7 +6436,7 @@ if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
 const cd = AAFC_DATA.crops[aafcCrop];
 if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
 const rows = cd.rows;
-const curYr = '2025-2026f';
+const curYr = rows.length ? rows[rows.length - 1].year : '';
 const isPulse = !rows[0].price || rows[0].food===null;
 const hasPrice = rows.some(r=>r.price);
 const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
@@ -6486,7 +6489,7 @@ ${hasPrice?`<td class="aafc-price" style="border-left:1px solid var(--border2);"
 </tr>`;
 });
 html += `</tbody></table></div>`;
-html += `<div class="aafc-notes">${AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('')}</div>`;
+html += `<div class="aafc-notes">${AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('') : ''}</div>`;
 document.getElementById('aafc-content').innerHTML = html;
 }
 onCommChange();
@@ -10192,13 +10195,13 @@ var RPT_VIEWS = [
   {id:'aafc',       label:'StatsCan (S&D)',   section:null},
   {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
   {id:'progress',   label:'Crop Progress',    section:null},
+  {id:'exports',    label:'Export Sales',     section:null},
+  {id:'gsw',        label:'Grain Stocks (CAN)', section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
   {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
   {id:'cattle',     label:'Cattle on Feed',   section:'LIVESTOCK'},
   {id:'hogs',       label:'Hogs & Pigs',      section:null},
-  {id:'wasde',      label:'WASDE (S&D)',      section:'MONTHLY'},
-  {id:'exports',    label:'Export Sales',     section:'OTHER REPORTS'},
-  {id:'gsw',        label:'Grain Stocks (CAN)', section:null}
+  {id:'wasde',      label:'WASDE (S&D)',      section:'MONTHLY'}
 ];
 
 function initReports(){
@@ -10476,53 +10479,90 @@ function renderRptProgressCharts(){
 
 function renderRptStocks(){
   var stocks = _nassData.grain_stocks || {};
-  var h = '<thead><tr><th style="text-align:left;">Commodity</th><th>Report Date</th><th style="color:var(--amber);">Stocks (Mil Bu)</th><th>Year Ago</th><th>YoY Chg</th></tr></thead><tbody>';
-  var ri = 0;
-  ['CORN','SOYBEANS','WHEAT'].forEach(function(crop){
+  function fN(v,d){ if(v==null) return '—'; return v.toFixed(d!==undefined?d:3).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+  var crops = ['CORN','SOYBEANS','WHEAT'];
+  var rows = [];
+  crops.forEach(function(crop){
     var data = stocks[crop] || [];
     if(!data.length) return;
-    // Section header
-    h += '<tr class="row-section"><td colspan="5">' + crop + '</td></tr>';
-    var recent = data.slice(-4).reverse();
-    recent.forEach(function(r){
-      var prev = data.filter(function(d){ return d.ref_period === r.ref_period && d.year === r.year - 1; });
-      var pyVal = prev.length ? prev[0].mil_bu : null;
-      var yoy = pyVal ? ((r.mil_bu - pyVal) / pyVal * 100).toFixed(1) + '%' : '—';
-      var yoyCol = pyVal ? (r.mil_bu > pyVal ? 'class="up"' : r.mil_bu < pyVal ? 'class="dn"' : '') : '';
-      h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
-      h += '<td style="text-align:left;font-size:13px;color:var(--text2);">' + r.ref_period + '</td>';
-      h += '<td style="font-size:13px;">' + r.year + '</td>';
-      h += '<td class="latest">' + r.mil_bu.toLocaleString(undefined, {minimumFractionDigits: 1}) + '</td>';
-      h += '<td style="color:var(--text3);">' + (pyVal !== null ? pyVal.toLocaleString(undefined, {minimumFractionDigits: 1}) : '—') + '</td>';
-      h += '<td ' + yoyCol + '>' + yoy + '</td>';
-      h += '</tr>';
-      ri++;
-    });
+    var latest = data[data.length - 1];
+    var ya = data.filter(function(d){ return d.ref_period === latest.ref_period && d.year === latest.year - 1; });
+    var yaVal = ya.length ? ya[0].mil_bu : null;
+    rows.push({crop: crop.charAt(0) + crop.slice(1).toLowerCase(), latest: latest, yaVal: yaVal});
   });
-  h += '</tbody>';
+  if(!rows.length){ document.getElementById('rpt-stocks-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No grain stocks data</td></tr></tbody>'; return; }
+  var ref = rows[0].latest;
+  var h = '';
+  h += '<div class="panel" style="margin-bottom:18px;">';
+  h += '<div class="panel-hdr"><div class="panel-title">USDA Quarterly Stocks</div>';
+  h += '<div class="panel-sub" style="font-size:13px;color:var(--text3);">' + ref.ref_period + ' ' + ref.year + ' · Billion Bushels</div></div>';
+  h += '<table class="bal-table" style="table-layout:auto;">';
+  h += '<thead><tr><th style="width:140px;"></th>';
+  h += '<th class="latest" style="width:120px;">' + ref.ref_period + ' ' + ref.year + '</th>';
+  h += '<th style="width:120px;">' + ref.ref_period + ' ' + (ref.year - 1) + '</th>';
+  h += '<th style="width:100px;">Change</th>';
+  h += '</tr></thead><tbody>';
+  rows.forEach(function(r, i){
+    var cur = r.latest.mil_bu / 1000;
+    var prev = r.yaVal !== null ? r.yaVal / 1000 : null;
+    var chg = (cur != null && prev != null) ? cur - prev : null;
+    var chgStr = '—', chgCls = '';
+    if(chg != null){
+      chgStr = (chg >= 0 ? '+' : '') + fN(chg, 3);
+      chgCls = chg > 0.001 ? 'color:var(--green);' : chg < -0.001 ? 'color:var(--red);' : '';
+    }
+    h += '<tr' + (i % 2 ? ' class="row-alt"' : '') + '>';
+    h += '<td style="font-size:15px;font-weight:700;">' + r.crop + '</td>';
+    h += '<td class="latest">' + fN(cur, 3) + '</td>';
+    h += '<td>' + (prev != null ? fN(prev, 3) : '—') + '</td>';
+    h += '<td style="' + chgCls + 'font-weight:700;">' + chgStr + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
   document.getElementById('rpt-stocks-tbl').innerHTML = h;
 }
 
 function renderRptAcreage(){
   var acre = _nassData.acreage || {};
-  var h = '<thead><tr><th style="text-align:left;">Commodity</th><th>Year</th><th>Report</th><th style="color:var(--amber);">Mil Acres</th></tr></thead><tbody>';
-  var ri = 0;
-  ['CORN','SOYBEANS','WHEAT'].forEach(function(crop){
+  function fN(v,d){ if(v==null) return '—'; return v.toFixed(d!==undefined?d:1).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+  var crops = ['CORN','SOYBEANS','WHEAT','COTTON','BARLEY','OATS'];
+  var rows = [];
+  var latestYear = 0;
+  crops.forEach(function(crop){
     var data = acre[crop] || [];
     if(!data.length) return;
-    h += '<tr class="row-section"><td colspan="4">' + crop + '</td></tr>';
-    var recent = data.slice(-6).reverse();
-    recent.forEach(function(r){
-      h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
-      h += '<td style="text-align:left;font-size:13px;color:var(--text2);">' + r.ref_period + '</td>';
-      h += '<td style="font-size:13px;">' + r.year + '</td>';
-      h += '<td style="font-size:13px;color:var(--text3);">' + r.ref_period + '</td>';
-      h += '<td class="latest">' + r.mil_acres.toFixed(1) + '</td>';
-      h += '</tr>';
-      ri++;
-    });
+    var latest = data[data.length - 1];
+    if(latest.year > latestYear) latestYear = latest.year;
+    var prev = data.filter(function(d){ return d.year === latest.year - 1; });
+    var prevVal = prev.length ? prev[prev.length - 1].mil_acres : null;
+    rows.push({crop: crop.charAt(0) + crop.slice(1).toLowerCase(), cur: latest.mil_acres, prev: prevVal, year: latest.year, ref: latest.ref_period});
   });
-  h += '</tbody>';
+  if(!rows.length){ document.getElementById('rpt-acre-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No acreage data</td></tr></tbody>'; return; }
+  var h = '';
+  h += '<div class="panel" style="margin-bottom:18px;">';
+  h += '<div class="panel-hdr"><div class="panel-title">U.S. Planted Acreage</div>';
+  h += '<div class="panel-sub" style="font-size:13px;color:var(--text3);">Million Acres</div></div>';
+  h += '<table class="bal-table" style="table-layout:auto;">';
+  h += '<thead><tr><th style="width:140px;"></th>';
+  h += '<th class="latest" style="width:120px;">' + latestYear + '</th>';
+  h += '<th style="width:120px;">' + (latestYear - 1) + '</th>';
+  h += '<th style="width:100px;">Change</th>';
+  h += '</tr></thead><tbody>';
+  rows.forEach(function(r, i){
+    var chg = (r.cur != null && r.prev != null) ? r.cur - r.prev : null;
+    var chgStr = '—', chgCls = '';
+    if(chg != null){
+      chgStr = (chg >= 0 ? '+' : '') + fN(chg, 1);
+      chgCls = chg > 0.05 ? 'color:var(--green);' : chg < -0.05 ? 'color:var(--red);' : '';
+    }
+    h += '<tr' + (i % 2 ? ' class="row-alt"' : '') + '>';
+    h += '<td style="font-size:15px;font-weight:700;">' + r.crop + '</td>';
+    h += '<td class="latest">' + fN(r.cur, 1) + '</td>';
+    h += '<td>' + (r.prev != null ? fN(r.prev, 1) : '—') + '</td>';
+    h += '<td style="' + chgCls + 'font-weight:700;">' + chgStr + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
   document.getElementById('rpt-acre-tbl').innerHTML = h;
 }
 
@@ -10568,9 +10608,7 @@ function renderRptWasde(){
     el.innerHTML = '<div style="padding:40px 0;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;">LOADING S&D DATA...</div></div>';
     return;
   }
-  // Conversion: PSD is in 1000 MT. US stocks shown in million bushels.
   var BU_PER_MT = {Corn:39.368, Soybeans:36.744, Wheat:36.744};
-  function to1000MT(v){ return v; } // already in 1000 MT
   function toMMT(v){ return v ? v/1000 : null; }
   function toMilBu(v,comm){ return v && BU_PER_MT[comm] ? v * BU_PER_MT[comm] / 1000 : null; }
   function fN(v,dec){
@@ -10578,7 +10616,6 @@ function renderRptWasde(){
     if(dec===0) return Math.round(v).toLocaleString();
     return v.toFixed(dec!==undefined?dec:1).replace(/\B(?=(\d{3})+(?!\d))/g,',');
   }
-  // Find latest two crop years from PSD
   function getYears(comm, country){
     var cd = PSD[comm] && PSD[comm][country];
     if(!cd) return [null,null];
@@ -10589,12 +10626,9 @@ function renderRptWasde(){
     if(!yr || !PSD[comm] || !PSD[comm][country] || !PSD[comm][country][yr]) return null;
     return PSD[comm][country][yr][attr] || null;
   }
-  // Get years from US corn as reference
   var refYrs = getYears('Corn','United States');
   var cy = refYrs[0], py = refYrs[1];
   if(!cy){ el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data available</div>'; return; }
-
-  // Build a summary table section
   function buildSection(title, unit, rows, convertFn, dec){
     var h = '<div class="panel" style="margin-bottom:18px;">';
     h += '<div class="panel-hdr"><div class="panel-title">'+title+'</div>';
@@ -10614,8 +10648,7 @@ function renderRptWasde(){
       var chgStr = '—';
       var chgCls = '';
       if(chg!=null){
-        var sign = chg > 0.05 ? '+' : chg < -0.05 ? '' : '';
-        chgStr = sign + fN(chg, dec);
+        chgStr = (chg >= 0 ? '+' : '') + fN(chg, dec);
         chgCls = chg > 0.05 ? 'color:var(--green);' : chg < -0.05 ? 'color:var(--red);' : '';
       }
       var alt = i%2 ? ' class="row-alt"' : '';
@@ -10629,58 +10662,42 @@ function renderRptWasde(){
     h += '</tbody></table></div>';
     return h;
   }
-
   var h = '';
-
-  // U.S. Ending Stocks (Million Bushels)
   h += buildSection('U.S. Ending Stocks', 'Million Bushels', [
-    {comm:'Corn',     country:'United States', attr:'Ending Stocks', label:'Corn'},
-    {comm:'Soybeans', country:'United States', attr:'Ending Stocks', label:'Soybeans'},
-    {comm:'Wheat',    country:'United States', attr:'Ending Stocks', label:'Wheat'},
+    {comm:'Corn',country:'United States',attr:'Ending Stocks',label:'Corn'},
+    {comm:'Soybeans',country:'United States',attr:'Ending Stocks',label:'Soybeans'},
+    {comm:'Wheat',country:'United States',attr:'Ending Stocks',label:'Wheat'},
   ], toMilBu, 0);
-
-  // World Ending Stocks (MMT)
   h += buildSection('World Ending Stocks', 'Million Metric Tons', [
-    {comm:'Corn',     country:'World', attr:'Ending Stocks', label:'Corn'},
-    {comm:'Soybeans', country:'World', attr:'Ending Stocks', label:'Soybeans'},
-    {comm:'Wheat',    country:'World', attr:'Ending Stocks', label:'Wheat'},
+    {comm:'Corn',country:'World',attr:'Ending Stocks',label:'Corn'},
+    {comm:'Soybeans',country:'World',attr:'Ending Stocks',label:'Soybeans'},
+    {comm:'Wheat',country:'World',attr:'Ending Stocks',label:'Wheat'},
   ], toMMT, 1);
-
-  // U.S. Production (Million Bushels)
   h += buildSection('U.S. Production', 'Million Bushels', [
-    {comm:'Corn',     country:'United States', attr:'Production', label:'Corn'},
-    {comm:'Soybeans', country:'United States', attr:'Production', label:'Soybeans'},
-    {comm:'Wheat',    country:'United States', attr:'Production', label:'Wheat'},
+    {comm:'Corn',country:'United States',attr:'Production',label:'Corn'},
+    {comm:'Soybeans',country:'United States',attr:'Production',label:'Soybeans'},
+    {comm:'Wheat',country:'United States',attr:'Production',label:'Wheat'},
   ], toMilBu, 0);
-
-  // Brazil Production (MMT)
   h += buildSection('Brazil Production', 'Million Metric Tons', [
-    {comm:'Corn',     country:'Brazil', attr:'Production', label:'Corn'},
-    {comm:'Soybeans', country:'Brazil', attr:'Production', label:'Soybeans'},
+    {comm:'Corn',country:'Brazil',attr:'Production',label:'Corn'},
+    {comm:'Soybeans',country:'Brazil',attr:'Production',label:'Soybeans'},
   ], toMMT, 1);
-
-  // Argentina Production (MMT)
   h += buildSection('Argentina Production', 'Million Metric Tons', [
-    {comm:'Corn',     country:'Argentina', attr:'Production', label:'Corn'},
-    {comm:'Soybeans', country:'Argentina', attr:'Production', label:'Soybeans'},
+    {comm:'Corn',country:'Argentina',attr:'Production',label:'Corn'},
+    {comm:'Soybeans',country:'Argentina',attr:'Production',label:'Soybeans'},
   ], toMMT, 1);
-
-  // World Production (MMT)
   h += buildSection('World Production', 'Million Metric Tons', [
-    {comm:'Corn',     country:'World', attr:'Production', label:'Corn'},
-    {comm:'Soybeans', country:'World', attr:'Production', label:'Soybeans'},
-    {comm:'Wheat',    country:'World', attr:'Production', label:'Wheat'},
+    {comm:'Corn',country:'World',attr:'Production',label:'Corn'},
+    {comm:'Soybeans',country:'World',attr:'Production',label:'Soybeans'},
+    {comm:'Wheat',country:'World',attr:'Production',label:'Wheat'},
   ], toMMT, 1);
-
-  // Key Exporters — Wheat
-  h += buildSection('Wheat — Key Exporters', 'Million Metric Tons · Production', [
-    {comm:'Wheat', country:'Russia',          attr:'Production', label:'Russia'},
-    {comm:'Wheat', country:'European Union',  attr:'Production', label:'EU'},
-    {comm:'Wheat', country:'Canada',          attr:'Production', label:'Canada'},
-    {comm:'Wheat', country:'Australia',        attr:'Production', label:'Australia'},
-    {comm:'Wheat', country:'Ukraine',          attr:'Production', label:'Ukraine'},
+  h += buildSection('Wheat — Key Exporters', 'MMT · Production', [
+    {comm:'Wheat',country:'Russia',attr:'Production',label:'Russia'},
+    {comm:'Wheat',country:'European Union',attr:'Production',label:'EU'},
+    {comm:'Wheat',country:'Canada',attr:'Production',label:'Canada'},
+    {comm:'Wheat',country:'Australia',attr:'Production',label:'Australia'},
+    {comm:'Wheat',country:'Ukraine',attr:'Production',label:'Ukraine'},
   ], toMMT, 1);
-
   if(!h) h = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data. PSD has: '+Object.keys(PSD).join(', ')+'</div>';
   el.innerHTML = h;
 }
