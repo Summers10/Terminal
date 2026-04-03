@@ -3,7 +3,7 @@
 Downloads CSV zip, parses Canadian grain S&D, saves as data/statscan_sd.json.
 This provides the historical actuals that feed the AAFC tab.
 AAFC forecasts must be manually updated in data/aafc_forecasts.json."""
-import os, sys, json, urllib.request, csv, io, zipfile
+import os, sys, json, urllib.request, csv, io, zipfile, time, ssl
 from datetime import datetime
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "statscan_sd.json")
@@ -50,13 +50,34 @@ SD_MAP = {
  
 def download_and_parse():
     print(f"Downloading StatsCan table 32-10-0013-01...")
-    req = urllib.request.Request(URL, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "*/*",
-    })
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        zipdata = resp.read()
-    print(f"  Downloaded: {len(zipdata):,} bytes")
+    ctx = ssl.create_default_context()
+    urls = [
+        URL,
+        "https://www150.statcan.gc.ca/n1/tbl/csv/32100013-eng.zip",
+    ]
+    zipdata = None
+    for url in urls:
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept": "*/*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                })
+                with urllib.request.urlopen(req, timeout=300, context=ctx) as resp:
+                    zipdata = resp.read()
+                print(f"  Downloaded: {len(zipdata):,} bytes (attempt {attempt+1})")
+                break
+            except Exception as e:
+                print(f"  Attempt {attempt+1} failed for {url}: {type(e).__name__}: {e}")
+                if attempt < 2:
+                    time.sleep(5 * (attempt + 1))
+        if zipdata:
+            break
+ 
+    if not zipdata:
+        print("ERROR: All download attempts failed", file=sys.stderr)
+        return {}
  
     zf = zipfile.ZipFile(io.BytesIO(zipdata))
     csv_name = None
@@ -190,4 +211,5 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
  
