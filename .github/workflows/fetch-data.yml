@@ -9,7 +9,7 @@ permissions:
  
 jobs:
   fetch-data:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
  
@@ -52,4 +52,5 @@ jobs:
           git diff --staged --quiet || git commit -m "Auto-update data $(date -u +%Y-%m-%d)"
           git pull --rebase
           git push
+ 
  
