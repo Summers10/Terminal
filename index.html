@@ -8627,29 +8627,52 @@ async function refreshFred() {
     if (resp.ok) {
       var jsonData = await resp.json();
       var ok = 0;
+      // Load standard macro dashboard series
       allSeries.forEach(function(s) {
         if (jsonData[s.id] && jsonData[s.id].length) { fredData[s.id] = jsonData[s.id]; ok++; updateFredMetric(s); }
       });
-      if (ok > 0) {
-        console.log('FRED loaded from pipeline JSON:', ok, 'series');
+      // CRITICAL: also load FX pairs and foreign 10Y yields for the currency dashboard
+      // These are not in FRED_SERIES (macro dashboard) but ARE in the pipeline JSON
+      var fxAndRateIds = FX_PAIRS.map(function(p){ return p.id; })
+        .concat(FX_PAIRS.filter(function(p){ return p.rateId; }).map(function(p){ return p.rateId; }));
+      var fxLoaded = 0;
+      fxAndRateIds.forEach(function(sid){
+        if (jsonData[sid] && jsonData[sid].length) {
+          fredData[sid] = jsonData[sid];
+          fxLoaded++;
+          console.log('FX/Rate loaded:', sid, jsonData[sid].length, 'obs, latest:', jsonData[sid][0].d, '=', jsonData[sid][0].v);
+        } else {
+          console.warn('FX/Rate NOT in pipeline JSON:', sid);
+        }
+      });
+      console.log('FX/Rate series loaded:', fxLoaded + '/' + fxAndRateIds.length);
+      if (ok > 0 || fxLoaded > 0) {
+        console.log('FRED loaded from pipeline JSON:', ok, 'macro series,', fxLoaded, 'FX/rate series');
         if(jsonData._meta && jsonData._meta.fetched_at) showDataFreshness(null, jsonData._meta.fetched_at, 'FRED');
         updateFredCharts();
         setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
         if (lb) lb.style.display = 'none';
-        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, ok + '/' + allSeries.length + ' series');
+        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, (ok + fxLoaded) + ' series');
         return;
       }
     }
   } catch(e) { console.log('FRED pipeline JSON not available, trying live API...'); }
-  // Fallback: live API
+  // Fallback: live API (fetches macro series + FX/rate series)
   if (!fredApiKey) { if(lb) lb.style.display='none'; return; }
   var ok = 0, fail = 0;
-  for (var i = 0; i < allSeries.length; i++) {
-    var s = allSeries[i];
-    if (lp) lp.style.width = ((i + 1) / allSeries.length * 100) + '%';
+  // Build combined series list: macro + FX + foreign yields
+  var fxExtraSeries = [];
+  FX_PAIRS.forEach(function(p){
+    fxExtraSeries.push({id: p.id, lim: 252, extra: ''});
+    if(p.rateId) fxExtraSeries.push({id: p.rateId, lim: 60, extra: ''});
+  });
+  var combinedSeries = allSeries.concat(fxExtraSeries);
+  for (var i = 0; i < combinedSeries.length; i++) {
+    var s = combinedSeries[i];
+    if (lp) lp.style.width = ((i + 1) / combinedSeries.length * 100) + '%';
     try {
       var data = await fredFetch(s.id, s.lim, s.extra);
-      if (data && data.length > 0) { fredData[s.id] = data; ok++; updateFredMetric(s); } else { fail++; }
+      if (data && data.length > 0) { fredData[s.id] = data; ok++; if(s.id in allSeries.reduce(function(o,x){o[x.id]=1;return o;},{})) updateFredMetric(s); } else { fail++; }
     } catch(e) { fail++; }
   }
   updateFredCharts();
