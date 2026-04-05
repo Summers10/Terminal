@@ -1,7 +1,11 @@
-name: Fetch USDA Data
+name: Fetch Commodity Data
+ 
 on:
   schedule:
-    - cron: '30 21 * * 1-5'
+    # Every 30 minutes at :00 and :30  UTC = same minutes as Central Time
+    # (CDT = UTC-5, so :00/:30 UTC → :55/:25 CT prev hour — but data
+    #  freshness matters more than exact CT alignment)
+    - cron: '0,30 * * * *'
   workflow_dispatch:
  
 permissions:
@@ -10,6 +14,7 @@ permissions:
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
+ 
     steps:
       - uses: actions/checkout@v4
  
@@ -44,12 +49,13 @@ jobs:
         run: python scripts/fetch_statscan.py
         continue-on-error: true
  
-      - name: Commit data
+      - name: Commit and push data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          git diff --staged --quiet || git commit -m "Auto-update data $(date -u +%Y-%m-%d)"
-          git pull --rebase
-          git push
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Auto-update data $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase origin main
+          git push origin main
  
