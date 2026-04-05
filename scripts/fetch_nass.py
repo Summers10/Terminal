@@ -17,7 +17,7 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 CROPS = ["CORN", "SOYBEANS", "WHEAT"]
 CURRENT_YEAR = datetime.now().year
 # Fetch current year + 1 prior year for comparisons
-YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR]
+YEARS = [CURRENT_YEAR - 2, CURRENT_YEAR - 1, CURRENT_YEAR]
 # For 5yr avg, we need 5 prior years for stocks/acreage
 HIST_YEARS = list(range(CURRENT_YEAR - 5, CURRENT_YEAR + 1))
  
@@ -57,7 +57,7 @@ def fetch_conditions():
                 "source_desc": "SURVEY",
                 "statisticcat_desc": "CONDITION",
                 "agg_level_desc": "NATIONAL",
-                "year__GE": str(CURRENT_YEAR - 1),
+                "year__GE": str(CURRENT_YEAR - 2),
                 "freq_desc": "WEEKLY",
             })
             # Group by year + week_ending, then by unit_desc (PCT VERY POOR, PCT POOR, etc.)
@@ -107,7 +107,7 @@ def fetch_progress():
                 "source_desc": "SURVEY",
                 "statisticcat_desc": "PROGRESS",
                 "agg_level_desc": "NATIONAL",
-                "year__GE": str(CURRENT_YEAR - 1),
+                "year__GE": str(CURRENT_YEAR - 2),
                 "freq_desc": "WEEKLY",
             })
             stages = {}
@@ -315,4 +315,5 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
  
