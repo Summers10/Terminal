@@ -688,13 +688,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   <div class="info-panel" id="aafc-info"><strong>STATSCAN S&D</strong> — Canadian crop supply & demand from Statistics Canada (table 32-10-0013-01). Area, yield, production, trade, and ending stocks for Canadian crops. Updated automatically via pipeline.</div>
   <div id="aafc-page">
     <div style="padding:4px 0 0;"><span id="statscan-freshness" style="font-size:11px;letter-spacing:.05em;"></span></div>
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;flex-wrap:wrap;">
-      <div class="bu-toggle" style="flex-shrink:0;">
-        <button class="bu-btn active" id="aafc-view-annual" onclick="setAafcView('annual')">ANNUAL</button>
-        <button class="bu-btn" id="aafc-view-quarterly" onclick="setAafcView('quarterly')">QUARTERLY</button>
-      </div>
-      <div class="aafc-toolbar" id="aafc-crop-btns" style="padding:0;background:none;border:none;"></div>
-    </div>
+    <div class="aafc-toolbar" id="aafc-crop-btns"></div>
     <div id="aafc-content"></div>
   </div>
 </div>
@@ -6221,251 +6215,258 @@ el.innerHTML = html;
 var AAFC_DATA = null;
 let aafcInited = false;
 let aafcCrop = 'ALL';
-let aafcView = 'annual';
-function setAafcView(v){
-  aafcView = v;
-  var a = document.getElementById('aafc-view-annual');
-  var q = document.getElementById('aafc-view-quarterly');
-  if(a){ a.classList.toggle('active', v==='annual'); }
-  if(q){ q.classList.toggle('active', v==='quarterly'); }
-  if(v === 'quarterly' && aafcCrop === 'ALL' && AAFC_DATA){
-    var crops = Object.keys(AAFC_DATA.crops);
-    if(crops.length){ aafcCrop = crops[0]; }
-    document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
-      var label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
-      b.classList.toggle('active', label === aafcCrop);
-    });
-  }
-  renderAafc();
-}
+
 function initAafc(){
-aafcInited = true;
-if(!AAFC_DATA || !AAFC_DATA.crops){
-  var ap = document.getElementById('aafc-page');
-  if(ap) ap.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING STATSCAN DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/statscan_sd.json</div></div>';
-  return;
-}
-const btns = document.getElementById('aafc-crop-btns');
-const crops = Object.keys(AAFC_DATA.crops);
-const allBtn = `<button class="aafc-crop-btn aafc-all-btn${aafcCrop==='ALL'?' active':''}" onclick="setAafcCrop('ALL')">ALL CROPS</button>`;
-btns.innerHTML = allBtn + crops.map(c =>
-`<button class="aafc-crop-btn${c===aafcCrop?' active':''}" onclick="setAafcCrop('${c}')">${c}</button>`
-).join('') + `<span class="aafc-report-date">STATSCAN · ${AAFC_DATA.report_date.toUpperCase()}</span>`;
-renderAafc();
-}
-function setAafcCrop(c){
-aafcCrop = c;
-document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
-const label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
-b.classList.toggle('active', label===c);
-});
-if(aafcView === 'quarterly' && c === 'ALL'){ aafcView='annual'; var a=document.getElementById('aafc-view-annual'); var q=document.getElementById('aafc-view-quarterly'); if(a)a.classList.add('active'); if(q)q.classList.remove('active'); }
-renderAafc();
-}
-function renderAafcQuarterly(){
-  if(!AAFC_DATA) return;
-  var cd = AAFC_DATA.crops[aafcCrop];
-  if(!cd){ document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);">Select a specific crop to view quarterly comparison.</div>'; return; }
-  var quarterly = cd.quarterly || [];
-  if(!quarterly.length){
-    document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);"><strong style="color:var(--amber);">No quarterly data.</strong> Deploy updated fetch_statscan.py and trigger the workflow.</div>';
+  aafcInited = true;
+  if(!AAFC_DATA || !AAFC_DATA.crops){
+    var ap = document.getElementById('aafc-page');
+    if(ap) ap.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING STATSCAN DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/statscan_sd.json</div></div>';
     return;
   }
-  var currQ  = quarterly[0];
-  var prevQ  = quarterly.length > 1 ? quarterly[1] : null;
-  var samePY = quarterly.filter(function(q){ return q.quarter === currQ.quarter && q.crop_year !== currQ.crop_year; }).slice(0,2);
-  var currCY  = AAFC_DATA.current_crop_year || currQ.crop_year;
-  var currQCode = AAFC_DATA.current_quarter || currQ.quarter;
-  var currQL    = AAFC_DATA.current_quarter_label || currQ.quarter_label;
-  var fmt = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toLocaleString(); };
-  var fmtY = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toFixed(2); };
-  function delta(a,b){ if(a===null||b===null||a===undefined||b===undefined) return {str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5) return {str:'—',cls:''}; var s=(d>=0?'+':'')+Math.round(d).toLocaleString(); return {str:s, cls:d>0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'}; }
-  var isFullYear = (currQ.quarter === 'Q4');
-  var h = '';
-  h += freshStamp('STATSCAN', _pipelineDates['STATSCAN'], currCY+' '+currQCode);
-  h += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">';
-  h += '<strong style="color:var(--amber);letter-spacing:.08em;">QUARTERLY COMPARISON — '+aafcCrop.toUpperCase()+'</strong><br>';
-  h += 'Crop year: <strong>Aug 1 – Jul 31</strong> &nbsp;|&nbsp; Current: <strong>'+currCY+' '+currQCode+' ('+currQL+')</strong> ';
-  if(isFullYear) h += '— <em>Q4 = full-year actual</em>'; else h += '— <em>cumulative YTD, not a full-year estimate</em>';
-  h += '<br>Columns compare the same quarter across seasons. All volumes in 000 tonnes unless noted.';
-  h += '</div>';
-  var items = [
-    {key:'prod',    label:'Production',          fmt:fmt},
-    {key:'supply',  label:'Total Supply',        fmt:fmt},
-    {key:'exports', label:'Exports',             fmt:fmt},
-    {key:'dom',     label:'Dom. Use',            fmt:fmt},
-    {key:'stocks',  label:'Ending Stocks',       fmt:fmt},
-    {key:'area_s',  label:'Seeded Area (000 ha)',fmt:fmt},
-    {key:'area_h',  label:'Harv. Area (000 ha)', fmt:fmt},
-    {key:'yield',   label:'Yield (t/ha)',         fmt:fmtY},
-  ];
-  function colHead(q){ return q.crop_year+' '+q.quarter+'<br><span style="font-size:10px;font-weight:600;color:var(--text3);">'+q.quarter_label+'</span>'; }
-  h += '<div style="overflow-x:auto;"><table class="bal-table" style="table-layout:auto;min-width:600px;">';
-  h += '<thead><tr>';
-  h += '<th style="text-align:left;width:180px;font-size:13px;">ITEM</th>';
-  h += '<th class="latest">'+colHead(currQ)+'</th>';
-  if(prevQ){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">QoQ Δ</th>'; h += '<th>'+colHead(prevQ)+'</th>'; }
-  samePY.forEach(function(q){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">YoY Δ</th>'; h += '<th>'+colHead(q)+'</th>'; });
-  h += '</tr></thead><tbody>';
-  items.forEach(function(item, ri){
-    var cv=currQ[item.key], pv=prevQ?prevQ[item.key]:null;
-    var qod=delta(cv,pv);
-    var alt=ri%2?' class="row-alt"':'';
-    h += '<tr'+alt+'>';
-    h += '<td style="text-align:left;font-weight:700;">'+item.label+'</td>';
-    h += '<td class="latest">'+item.fmt(cv)+'</td>';
-    if(prevQ){ h += '<td style="font-size:13px;'+qod.cls+'">'+qod.str+'</td><td>'+item.fmt(pv)+'</td>'; }
-    samePY.forEach(function(q){ var yv=q[item.key]; var yod=delta(cv,yv); h += '<td style="font-size:13px;'+yod.cls+'">'+yod.str+'</td><td>'+item.fmt(yv)+'</td>'; });
-    h += '</tr>';
+  const btns = document.getElementById('aafc-crop-btns');
+  const crops = Object.keys(AAFC_DATA.crops);
+  const allBtn = `<button class="aafc-crop-btn aafc-all-btn${aafcCrop==='ALL'?' active':''}" onclick="setAafcCrop('ALL')">ALL CROPS</button>`;
+  btns.innerHTML = allBtn + crops.map(c =>
+    `<button class="aafc-crop-btn${c===aafcCrop?' active':''}" onclick="setAafcCrop('${c}')">${c}</button>`
+  ).join('') + `<span class="aafc-report-date">STATSCAN \u00b7 ${AAFC_DATA.report_date.toUpperCase()}</span>`;
+  renderAafc();
+}
+
+function setAafcCrop(c){
+  aafcCrop = c;
+  document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
+    const label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
+    b.classList.toggle('active', label===c);
   });
-  function su(r){ if(!r) return null; var d=(r.dom||0)+(r.exports||0); return d>0?((r.stocks/d)*100):null; }
-  var sc=su(currQ),sp=su(prevQ); var spy=samePY.map(su);
-  var fsu=function(v){return v===null?'—':v.toFixed(0)+'%';};
-  function sud(a,b){if(a===null||b===null)return{str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5)return{str:'—',cls:''}; return{str:(d>=0?'+':'')+d.toFixed(0)+'pp',cls:d<0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'};}
-  var alt2=items.length%2?' class="row-alt"':'';
-  h += '<tr'+alt2+'><td style="text-align:left;font-weight:700;font-style:italic;">S/U Ratio</td><td class="latest">'+fsu(sc)+'</td>';
-  if(prevQ){ var qd2=sud(sc,sp); h += '<td style="font-size:13px;'+qd2.cls+'">'+qd2.str+'</td><td>'+fsu(sp)+'</td>'; }
-  spy.forEach(function(s){ var yd=sud(sc,s); h += '<td style="font-size:13px;'+yd.cls+'">'+yd.str+'</td><td>'+fsu(s)+'</td>'; });
-  h += '</tr>';
-  h += '</tbody></table></div>';
-  h += '<div style="font-size:12px;color:var(--text3);margin-top:12px;font-style:italic;line-height:1.6;">Quarterly figures are <strong>cumulative YTD</strong> from Aug 1. Q4 = full crop-year actual. StatsCan does not publish mid-year full-year estimates. Switch to <strong>ANNUAL</strong> view for historical S&D balance sheets.</div>';
+  renderAafc();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _fmtN(v){ return (v===null||v===undefined) ? '\u2014' : Number(v).toLocaleString(); }
+function _fmtY(v){ return (v===null||v===undefined) ? '\u2014' : Number(v).toFixed(2); }
+function _su(r){
+  if(!r) return null;
+  var d = (r.dom||0) + (r.exports||0);
+  return d > 0 ? (r.stocks / d) * 100 : null;
+}
+// Short crop-year: "2024-2025" → "24-25"
+function _shortCY(cy){
+  var p = cy ? cy.split('-') : [];
+  return p.length >= 2 ? p[0].slice(-2)+'-'+p[1].slice(-2) : (cy||'');
+}
+// deltaClass: green if cur > prev, red if cur < prev
+function _dcls(cur, prev){
+  if(cur==null||prev==null||cur===undefined||prev===undefined) return '';
+  return cur > prev ? 'aafc-up' : cur < prev ? 'aafc-dn' : '';
+}
+
+// ── Callout box ───────────────────────────────────────────────────────────────
+function _statscanCallout(currCY, currQ, currQL){
+  var isQ4 = currQ === 'Q4';
+  return '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">'
+    + '<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 \u2013 JUL 31</strong><br>'
+    + 'Rows are quarterly cumulative snapshots (Q1=Aug\u2013Oct, Q2=Nov\u2013Jan, Q3=Feb\u2013Apr, Q4=May\u2013Jul). '
+    + 'Q4 = full-year actual. '
+    + (isQ4 ? '' : 'Current period <strong>'+currCY+' '+currQ+'</strong> is YTD \u2014 <em>not a full-year estimate</em>. ')
+    + 'YoY coloring compares each quarter to the <strong>same quarter the prior season</strong>. '
+    + 'All volumes in 000 tonnes.'
+    + '</div>';
+}
+
+// ── ALL CROPS view ────────────────────────────────────────────────────────────
+function renderAafcAll(){
+  var fmt = _fmtN, fmtY = _fmtY;
+  var curCY = AAFC_DATA.current_crop_year || '';
+  var curQ  = AAFC_DATA.current_quarter  || '';
+  var curQL = AAFC_DATA.current_quarter_label || '';
+  var h = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curCY+' '+curQ);
+  h += _statscanCallout(curCY, curQ, curQL);
+
+  Object.keys(AAFC_DATA.crops).sort().forEach(function(cropName){
+    var cd = AAFC_DATA.crops[cropName];
+    var quarterly = cd.quarterly || [];
+    if(!quarterly.length) return;
+
+    // For ALL view: show last 4 quarters as rows + compact columns
+    var rows = quarterly.slice(0, 6);  // newest first, up to 6 quarters
+
+    // Build same-quarter-prior-year lookup for YoY colouring
+    var qLookup = {};
+    quarterly.forEach(function(r){ qLookup[r.crop_year+'|'+r.quarter] = r; });
+    function prevYearSameQ(r){
+      var p = (r.crop_year||'').split('-');
+      if(p.length < 2) return null;
+      var y1 = parseInt(p[0]);
+      return qLookup[(y1-1)+'-'+y1+'|'+r.quarter] || null;
+    }
+
+    var showFood = rows.some(function(r){ return r.food!=null; });
+
+    h += '<div style="margin-bottom:22px;">';
+    h += '<div style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);padding:8px 14px;background:var(--section-bg);border-top:2px solid var(--amber);border-bottom:1px solid var(--border2);cursor:pointer;" onclick="setAafcCrop(\''+cropName+'\')">'+cropName.toUpperCase()+' <span style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.04em;">\u25b8 detail</span></div>';
+    h += '<table class="aafc-all-tbl"><thead><tr>';
+    h += '<th style="text-align:left;min-width:100px;">PERIOD</th>';
+    h += '<th>PROD.</th><th>SUPPLY</th><th>EXPORTS</th>';
+    if(showFood) h += '<th>FOOD/IND</th>';
+    h += '<th>DOM. USE</th><th>STOCKS</th><th>S/U %</th><th>YIELD t/ha</th>';
+    h += '</tr></thead><tbody>';
+
+    rows.forEach(function(r, i){
+      var py = prevYearSameQ(r);
+      var isCur = (r.crop_year === curCY && r.quarter === curQ);
+      var isQ4  = (r.quarter === 'Q4');
+      var qBadge = isCur
+        ? (isQ4 ? ' <span style="font-size:10px;font-weight:900;color:var(--amber);letter-spacing:.04em;">FULL</span>'
+                : ' <span style="font-size:10px;font-weight:900;color:var(--amber);letter-spacing:.04em;">YTD</span>')
+        : (isQ4 ? ' <span style="font-size:9px;font-weight:700;color:var(--text3);">full</span>' : '');
+      var periodLbl = _shortCY(r.crop_year)+' '+r.quarter+'<br><span style="font-size:10px;font-weight:600;color:var(--text3);">'+r.quarter_label+'</span>'+qBadge;
+      var su = _su(r);
+      var suStr = su!=null ? su.toFixed(0)+'%' : '\u2014';
+      var alt = i%2?' style="background:var(--row-alt);"':'';
+      var rowStyle = isCur?' style="background:var(--row-latest);"':alt;
+      var labelStyle = isCur ? 'color:var(--amber);font-weight:800;' : '';
+      // YoY delta classes (vs same quarter prior year) — no suppression, same-Q comparison is valid
+      var dc = py ? _dcls : function(){ return ''; };
+      h += '<tr'+rowStyle+'>';
+      h += '<td style="text-align:left;'+labelStyle+'">'+periodLbl+'</td>';
+      h += '<td class="'+(py?_dcls(r.prod,py.prod):'')+'">'+fmt(r.prod)+'</td>';
+      h += '<td>'+fmt(r.supply)+'</td>';
+      h += '<td class="'+(py?_dcls(r.exports,py.exports):'')+'">'+fmt(r.exports)+'</td>';
+      if(showFood) h += '<td>'+fmt(r.food)+'</td>';
+      h += '<td>'+fmt(r.dom)+'</td>';
+      h += '<td class="'+(py?_dcls(r.stocks,py.stocks):'')+'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
+      h += '<td style="font-weight:700;">'+suStr+'</td>';
+      h += '<td>'+fmtY(r.yield)+'</td>';
+      h += '</tr>';
+    });
+
+    h += '</tbody></table></div>';
+  });
+
   document.getElementById('aafc-content').innerHTML = h;
 }
-function renderAafcAll(){
-const crops = Object.keys(AAFC_DATA.crops);
-var allYears = {};
-crops.forEach(function(c){ AAFC_DATA.crops[c].rows.forEach(function(r){ allYears[r.year]=1; }); });
-const years = Object.keys(allYears).sort();
-const curYr = years.length ? years[years.length - 1] : '';
-const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
-const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
-function dc(a,b){ if(a==null||b==null) return ''; return a>b?'aafc-up':a<b?'aafc-dn':''; }
-let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
-html += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--text2);">'
-  + '<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>'
-  + 'The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. '
-  + 'YoY change coloring is suppressed on the YTD row to avoid misleading comparisons. All volumes in 000 tonnes unless noted.'
-  + '</div>';
-// Render each crop as its own balance sheet (same format as individual view)
-crops.forEach(cropName => {
-const cd = AAFC_DATA.crops[cropName];
-const rows = cd.rows;
-if(!rows.length) return;
-const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
-html += '<div style="margin-bottom:22px;">';
-html += '<div style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);padding:8px 14px;background:var(--section-bg);border-top:2px solid var(--amber);border-bottom:1px solid var(--border2);cursor:pointer;" onclick="setAafcCrop(\''+cropName+'\')">'+cropName.toUpperCase()+' <span style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.04em;">▸ detail</span></div>';
-html += '<table class="aafc-all-tbl"><thead><tr>';
-html += '<th style="text-align:left;width:110px;">YEAR</th>';
-html += '<th>PROD.</th><th>SUPPLY</th><th>EXPORTS</th>';
-if(showFood) html += '<th>FOOD</th>';
-html += '<th>DOM. USE</th><th>STOCKS</th><th>S/U %</th>';
-html += '<th>YIELD<br><span style="font-weight:400;font-size:10px;">t/ha</span></th>';
-html += '</tr></thead><tbody>';
-rows.forEach((r, i) => {
-  const prev = i > 0 ? rows[i-1] : null;
-  const isCur = r.year === curYr;
-  const denom = (r.dom||0) + (r.exports||0);
-  const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
-  const yrLbl = isCur ? r.year+' <span style="font-size:10px;font-weight:900;color:var(--amber);letter-spacing:.04em;">YTD</span>' : r.year;
-  const cls = isCur ? ' style="background:var(--row-alt);"' : (i%2?' style="background:var(--row-alt);"':'');
-  // Suppress YoY coloring on the current (YTD) row — partial-year data is not comparable
-  const dcFn = isCur ? (()=>'') : dc;
-  html += '<tr'+(isCur?' style="background:var(--row-latest);"':cls)+'>';
-  html += '<td style="'+(isCur?'color:var(--amber);font-weight:800;':'')+'">'+yrLbl+'</td>';
-  html += '<td class="'+dcFn(r.prod,prev?prev.prod:null)+'">'+fmt(r.prod)+'</td>';
-  html += '<td>'+fmt(r.supply)+'</td>';
-  html += '<td class="'+dcFn(r.exports,prev?prev.exports:null)+'">'+fmt(r.exports)+'</td>';
-  if(showFood) html += '<td>'+fmt(r.food)+'</td>';
-  html += '<td>'+fmt(r.dom)+'</td>';
-  html += '<td class="'+dcFn(r.stocks,prev?prev.stocks:null)+'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
-  html += '<td style="font-weight:700;">'+su+'</td>';
-  html += '<td>'+fmtY(r.yield)+'</td>';
-  html += '</tr>';
-});
-html += '</tbody></table></div>';
-});
-html += '<div class="aafc-notes">'+(AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>'<div>• '+n+'</div>').join('') : '')+'</div>';
-document.getElementById('aafc-content').innerHTML = html;
-}
+
+// ── Single-crop view (quarterly data in annual table format) ──────────────────
 function renderAafc(){
-if(AAFC_DATA && AAFC_DATA.report_date){
-const el = document.getElementById('aafc-report-date-label');
-if(el) el.textContent = AAFC_DATA.report_date;
-}
-if(aafcView === 'quarterly'){ renderAafcQuarterly(); return; }
-if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
-const cd = AAFC_DATA.crops[aafcCrop];
-if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
-const rows = cd.rows;
-const curYr = rows.length ? rows[rows.length - 1].year : '';
-const isPulse = !rows[0].price || rows[0].food===null;
-const hasPrice = rows.some(r=>r.price);
-const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
-const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
-const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
-function deltaClass(cur, prev){
-if(cur===null||prev===null||cur===undefined||prev===undefined) return '';
-return cur>prev ? 'aafc-up' : cur<prev ? 'aafc-dn' : '';
-}
-// Check if area/yield data exists (may be null for current partial year)
-const hasAreaData = rows.some(r=>r.area_s!=null||r.area_h!=null);
-const showArea = hasAreaData;
-// Count area group span: seeded + harv + yield = 3, or 0 if suppressed
-const areaSpan = showArea ? 3 : 0;
-let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
-html += `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">`
-  + `<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>`
-  + `The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. `
-  + `YoY change coloring is suppressed on the YTD row to avoid misleading comparisons.`
-  + `</div>`;
-html += `<div class="aafc-price-label">${cd.price_label}</div>`;
-html += `<div class="aafc-sd-wrap"><table class="aafc-tbl"><thead>`;
-html += `<tr class="aafc-group">
-<th rowspan="2" style="text-align:left;border-right:1px solid var(--border2);">CROP YEAR</th>
+  if(AAFC_DATA && AAFC_DATA.report_date){
+    const el = document.getElementById('aafc-report-date-label');
+    if(el) el.textContent = AAFC_DATA.report_date;
+  }
+  if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
+
+  const cd = AAFC_DATA.crops[aafcCrop];
+  if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
+
+  const quarterly = cd.quarterly || [];
+  if(!quarterly.length){
+    document.getElementById('aafc-content').innerHTML =
+      '<div style="padding:20px;color:var(--text3);"><strong style="color:var(--amber);">No quarterly data.</strong> '
+      + 'Deploy updated fetch_statscan.py and trigger the workflow.</div>';
+    return;
+  }
+
+  const curCY = AAFC_DATA.current_crop_year || (quarterly[0]||{}).crop_year || '';
+  const curQ  = AAFC_DATA.current_quarter   || (quarterly[0]||{}).quarter   || '';
+  const curQL = AAFC_DATA.current_quarter_label || (quarterly[0]||{}).quarter_label || '';
+  const fmt  = _fmtN;
+  const fmtY = _fmtY;
+
+  // Use last 3 full crop years + current partial year → show newest first
+  // quarterly[] is already newest-first; show up to ~12 rows (3 full years of Q1-Q4 + current qtrs)
+  const rows = quarterly;   // all available quarters, newest first
+
+  const showFood  = rows.some(function(r){ return r.food!=null; });
+  const showArea  = rows.some(function(r){ return r.area_s!=null || r.area_h!=null; });
+  const hasPrice  = false;   // StatsCan has no price data
+
+  // Build same-quarter prior-year lookup for YoY coloring
+  var qLookup = {};
+  rows.forEach(function(r){ qLookup[r.crop_year+'|'+r.quarter] = r; });
+  function samePY(r){
+    var p = (r.crop_year||'').split('-');
+    if(p.length < 2) return null;
+    var y1 = parseInt(p[0]);
+    return qLookup[(y1-1)+'-'+y1+'|'+r.quarter] || null;
+  }
+
+  var h = '';
+  h += freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curCY+' '+curQ);
+  h += _statscanCallout(curCY, curQ, curQL);
+
+  h += `<div class="aafc-sd-wrap"><table class="aafc-tbl"><thead>`;
+  h += `<tr class="aafc-group">
+<th rowspan="2" style="text-align:left;border-right:1px solid var(--border2);min-width:120px;">PERIOD</th>
 ${showArea?`<th colspan="3" class="span-area" style="border-left:1px solid var(--border2);">AREA (000 ha)</th>`:''}
 <th colspan="3" class="span-supply" style="border-left:1px solid var(--border2);">SUPPLY (000 t)</th>
 <th colspan="${showFood?4:3}" class="span-demand" style="border-left:1px solid var(--border2);">DEMAND (000 t)</th>
 <th colspan="2" style="border-left:1px solid var(--border2);">BALANCE</th>
-${hasPrice?'<th style="border-left:1px solid var(--border2);">PRICE</th>':''}
 </tr>`;
-html += `<tr class="aafc-cols">
+  h += `<tr class="aafc-cols">
 ${showArea?`<th style="border-left:1px solid var(--border2);">SEEDED</th><th>HARV.</th><th class="span-area">YIELD t/ha</th>`:''}
 <th style="border-left:1px solid var(--border2);">PROD.</th><th>IMPORTS</th><th class="span-supply">TOTAL</th>
 <th style="border-left:1px solid var(--border2);">EXPORTS</th>
 ${showFood?'<th>FOOD/IND</th>':''}
 <th>FEED/WSTE</th><th class="span-demand">DOM. USE</th>
-<th style="border-left:1px solid var(--border2);">STOCKS</th>
-<th>S/U %</th>
-${hasPrice?`<th style="border-left:1px solid var(--border2);">$/t</th>`:''}
+<th style="border-left:1px solid var(--border2);">STOCKS</th><th>S/U %</th>
 </tr></thead><tbody>`;
-rows.forEach((r, i) => {
-const prev = i > 0 ? rows[i-1] : null;
-const isCur = r.year === curYr;
-const rowCls = isCur ? 'aafc-cur' : '';
-const denom = (r.dom||0) + (r.exports||0); const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
-// Suppress YoY delta coloring on current (YTD) row — partial year is not comparable to prior full year
-const dc2 = isCur ? (()=>'') : deltaClass;
-const yrCell = isCur
-  ? `${r.year} <span style="font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--amber);">YTD</span>`
-  : r.year;
-html += `<tr class="${rowCls}">
-<td>${yrCell}</td>
-${showArea?`<td style="border-left:1px solid var(--border2);">${fmt(r.area_s)}</td><td>${fmt(r.area_h)}</td><td class="${prev?dc2(r.yield,prev.yield):''}">${fmtY(r.yield)}</td>`:''}
-<td style="border-left:1px solid var(--border2);">${fmt(r.prod)}</td>
-<td>${fmt(r.imports)}</td>
-<td class="${prev?dc2(r.supply,prev.supply):''}">${fmt(r.supply)}</td>
-<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.exports,prev.exports):''}">${fmt(r.exports)}</td>
-${showFood?`<td>${fmt(r.food)}</td>`:''}
-<td>${fmt(r.feed)}</td>
-<td class="${prev?dc2(r.dom,prev.dom):''}">${fmt(r.dom)}</td>
-<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.stocks,prev.stocks):''}">${fmt(r.stocks)}</td>
-<td>${su}</td>
-${hasPrice?`<td class="aafc-price" style="border-left:1px solid var(--border2);">$${fmt(r.price)}</td>`:''}
-</tr>`;
-});
-html += `</tbody></table></div>`;
-html += `<div class="aafc-notes">${AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('') : ''}</div>`;
-document.getElementById('aafc-content').innerHTML = html;
+
+  // Section header when crop year changes
+  var lastCY = null;
+
+  rows.forEach(function(r, i){
+    var py = samePY(r);
+    var isCur = (r.crop_year === curCY && r.quarter === curQ);
+    var isQ4  = (r.quarter === 'Q4');
+    var denom = (r.dom||0) + (r.exports||0);
+    var su    = denom > 0 ? (r.stocks/denom*100).toFixed(0)+'%' : '\u2014';
+
+    // Section divider when crop year changes (newest→oldest)
+    if(r.crop_year !== lastCY){
+      lastCY = r.crop_year;
+      var isFullYearAvail = rows.some(function(x){ return x.crop_year===r.crop_year && x.quarter==='Q4'; });
+      var cyLabel = r.crop_year + (isFullYearAvail ? '' : ' <span style="font-size:10px;font-weight:700;color:var(--text3);">(partial)</span>');
+      var colspan = 1 + (showArea?3:0) + 3 + (showFood?4:3) + 2;
+      h += `<tr><td colspan="${colspan}" class="row-section">${cyLabel}</td></tr>`;
+    }
+
+    // Period cell label
+    var badge = '';
+    if(isCur){
+      badge = isQ4
+        ? ' <span style="font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--amber);">FULL YEAR</span>'
+        : ' <span style="font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--amber);">YTD</span>';
+    } else if(isQ4){
+      badge = ' <span style="font-size:9px;font-weight:700;color:var(--text3);">full yr</span>';
+    }
+    var periodCell = `${r.quarter} <span style="font-size:11px;font-weight:600;color:var(--text3);">${r.quarter_label}</span>${badge}`;
+
+    // YoY delta class vs same quarter prior year (valid comparison — same period, different season)
+    var dc = function(a, b){ return py ? _dcls(a, b) : ''; };
+    var pyA = py || {};
+
+    var rowCls = isCur ? 'aafc-cur' : (i%2===0?'':'row-alt');
+
+    h += `<tr class="${rowCls}">`;
+    h += `<td style="padding-left:14px;">${periodCell}</td>`;
+    if(showArea){
+      h += `<td style="border-left:1px solid var(--border2);">${fmt(r.area_s)}</td>`;
+      h += `<td>${fmt(r.area_h)}</td>`;
+      h += `<td class="${dc(r.yield,pyA.yield)}">${fmtY(r.yield)}</td>`;
+    }
+    h += `<td style="border-left:1px solid var(--border2);" class="${dc(r.prod,pyA.prod)}">${fmt(r.prod)}</td>`;
+    h += `<td>${fmt(r.imports)}</td>`;
+    h += `<td class="${dc(r.supply,pyA.supply)}">${fmt(r.supply)}</td>`;
+    h += `<td style="border-left:1px solid var(--border2);" class="${dc(r.exports,pyA.exports)}">${fmt(r.exports)}</td>`;
+    if(showFood) h += `<td class="${dc(r.food,pyA.food)}">${fmt(r.food)}</td>`;
+    h += `<td class="${dc(r.feed,pyA.feed)}">${fmt(r.feed)}</td>`;
+    h += `<td class="${dc(r.dom,pyA.dom)}">${fmt(r.dom)}</td>`;
+    h += `<td style="border-left:1px solid var(--border2);" class="${dc(r.stocks,pyA.stocks)}" style="font-weight:800;">${fmt(r.stocks)}</td>`;
+    h += `<td style="font-weight:700;">${su}</td>`;
+    h += `</tr>`;
+  });
+
+  h += `</tbody></table></div>`;
+  document.getElementById('aafc-content').innerHTML = h;
 }
 onCommChange();
 setTimeout(()=>{
