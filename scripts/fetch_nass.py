@@ -41,108 +41,94 @@ def fetch_conditions():
     """Crop conditions: % in each category by week, national level."""
     print("Fetching crop conditions...")
     out = {}
-    for crop in CROPS:
-        # For wheat, get both winter and spring
-        if crop == "WHEAT":
-            variants = [
-                ("WINTER WHEAT", {"commodity_desc": "WHEAT", "prodn_practice_desc": "WINTER"}),
-                ("SPRING WHEAT", {"commodity_desc": "WHEAT", "prodn_practice_desc": "SPRING, EXCL DURUM"}),
-            ]
-        else:
-            variants = [(crop, {"commodity_desc": crop})]
+    cat_map = {"PCT VERY POOR":"vp","PCT POOR":"p","PCT FAIR":"f","PCT GOOD":"g","PCT EXCELLENT":"e"}
  
-        for label, qp in variants:
-            records = api_get({
-                **qp,
-                "source_desc": "SURVEY",
-                "statisticcat_desc": "CONDITION",
-                "agg_level_desc": "NATIONAL",
-                "year__GE": str(CURRENT_YEAR - 2),
-                "freq_desc": "WEEKLY",
-            })
-            # Group by year + week_ending, then by unit_desc (PCT VERY POOR, PCT POOR, etc.)
-            weeks = {}
-            for r in records:
-                we = r.get("week_ending", "")
-                yr = r.get("year", 0)
-                unit = r.get("unit_desc", "")
-                val = r.get("Value", "")
-                if not we or val in ("", "(D)", "(NA)"):
-                    continue
-                key = f"{yr}_{we}"
-                if key not in weeks:
-                    weeks[key] = {"week_ending": we, "year": int(yr)}
-                cat_map = {
-                    "PCT VERY POOR": "vp", "PCT POOR": "p",
-                    "PCT FAIR": "f", "PCT GOOD": "g", "PCT EXCELLENT": "e"
-                }
-                if unit in cat_map:
-                    try:
-                        weeks[key][cat_map[unit]] = int(float(val))
-                    except ValueError:
-                        pass
+    for crop in ["CORN","SOYBEANS"]:
+        records = api_get({"commodity_desc":crop,"source_desc":"SURVEY",
+            "statisticcat_desc":"CONDITION","agg_level_desc":"NATIONAL",
+            "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+        weeks = {}
+        for r in records:
+            we,yr,unit,val = r.get("week_ending",""),r.get("year",0),r.get("unit_desc",""),r.get("Value","")
+            if not we or val in ("","(D)","(NA)"): continue
+            key = f"{yr}_{we}"
+            if key not in weeks: weeks[key] = {"week_ending":we,"year":int(yr)}
+            if unit in cat_map:
+                try: weeks[key][cat_map[unit]] = int(float(val))
+                except ValueError: pass
+        out[crop] = sorted(weeks.values(), key=lambda x: x["week_ending"])
+        print(f"  {crop}: {len(out[crop])} weeks")
  
-            # Sort by week_ending and split by year
-            sorted_weeks = sorted(weeks.values(), key=lambda x: x["week_ending"])
-            out[label] = sorted_weeks
+    # Wheat: fetch all, split by short_desc (avoids brittle prodn_practice_desc filter)
+    wheat_recs = api_get({"commodity_desc":"WHEAT","source_desc":"SURVEY",
+        "statisticcat_desc":"CONDITION","agg_level_desc":"NATIONAL",
+        "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+    print(f"  WHEAT raw records: {len(wheat_recs)}")
+    by_type = {"WINTER WHEAT":{},"SPRING WHEAT":{}}
+    for r in wheat_recs:
+        we,yr,unit,val = r.get("week_ending",""),r.get("year",0),r.get("unit_desc",""),r.get("Value","")
+        short = r.get("short_desc","").upper()
+        if not we or val in ("","(D)","(NA)"): continue
+        if "WINTER" in short: label = "WINTER WHEAT"
+        elif "SPRING" in short and "DURUM" not in short: label = "SPRING WHEAT"
+        else: continue
+        key = f"{yr}_{we}"
+        if key not in by_type[label]: by_type[label][key] = {"week_ending":we,"year":int(yr)}
+        if unit in cat_map:
+            try: by_type[label][key][cat_map[unit]] = int(float(val))
+            except ValueError: pass
+    for label,weeks in by_type.items():
+        out[label] = sorted(weeks.values(), key=lambda x: x["week_ending"])
+        print(f"  {label}: {len(out[label])} weeks")
     return out
- 
  
 def fetch_progress():
     """Crop progress: % planted, emerged, harvested by week."""
     print("Fetching crop progress...")
     out = {}
-    for crop in CROPS:
-        if crop == "WHEAT":
-            variants = [
-                ("WINTER WHEAT", {"commodity_desc": "WHEAT", "prodn_practice_desc": "WINTER"}),
-                ("SPRING WHEAT", {"commodity_desc": "WHEAT", "prodn_practice_desc": "SPRING, EXCL DURUM"}),
-            ]
-        else:
-            variants = [(crop, {"commodity_desc": crop})]
+    STAGES = ["PLANTED","EMERGED","SILKING","DOUGH","DENTED","MATURE","HARVESTED","HEADED","TURNING","COLORING","DROPPING LEAVES","SETTING PODS","BLOOMING","JOINTED"]
  
-        for label, qp in variants:
-            records = api_get({
-                **qp,
-                "source_desc": "SURVEY",
-                "statisticcat_desc": "PROGRESS",
-                "agg_level_desc": "NATIONAL",
-                "year__GE": str(CURRENT_YEAR - 2),
-                "freq_desc": "WEEKLY",
-            })
-            stages = {}
-            for r in records:
-                we = r.get("week_ending", "")
-                yr = r.get("year", 0)
-                desc = r.get("short_desc", "")
-                val = r.get("Value", "")
-                if not we or val in ("", "(D)", "(NA)"):
-                    continue
-                # Extract stage from short_desc (e.g., "CORN - PROGRESS, MEASURED IN PCT PLANTED")
-                stage = "OTHER"
-                for s in ["PLANTED", "EMERGED", "SILKING", "DOUGH", "DENTED", "MATURE", "HARVESTED",
-                           "HEADED", "TURNING", "COLORING", "DROPPING LEAVES", "SETTING PODS",
-                           "BLOOMING", "JOINTED"]:
-                    if s in desc.upper():
-                        stage = s
-                        break
-                key = f"{label}|{stage}"
-                if key not in stages:
-                    stages[key] = []
-                try:
-                    stages[key].append({
-                        "week_ending": we, "year": int(yr), "value": int(float(val))
-                    })
-                except ValueError:
-                    pass
+    def parse_stages(records, label):
+        stages = {}
+        for r in records:
+            we,yr = r.get("week_ending",""),r.get("year",0)
+            desc,val = r.get("short_desc","").upper(),r.get("Value","")
+            if not we or val in ("","(D)","(NA)"): continue
+            stage = "OTHER"
+            for s in STAGES:
+                if s in desc: stage = s; break
+            key = f"{label}|{stage}"
+            if key not in stages: stages[key] = []
+            try: stages[key].append({"week_ending":we,"year":int(yr),"value":int(float(val))})
+            except ValueError: pass
+        cp = {}
+        for k,v in stages.items():
+            _,s = k.split("|")
+            cp[s] = sorted(v, key=lambda x: x["week_ending"])
+        return cp
  
-            crop_progress = {}
-            for k, v in stages.items():
-                _, stage = k.split("|")
-                crop_progress[stage] = sorted(v, key=lambda x: x["week_ending"])
-            out[label] = crop_progress
+    for crop in ["CORN","SOYBEANS"]:
+        records = api_get({"commodity_desc":crop,"source_desc":"SURVEY",
+            "statisticcat_desc":"PROGRESS","agg_level_desc":"NATIONAL",
+            "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+        out[crop] = parse_stages(records, crop)
+ 
+    # Wheat: fetch all, split by short_desc
+    wheat_recs = api_get({"commodity_desc":"WHEAT","source_desc":"SURVEY",
+        "statisticcat_desc":"PROGRESS","agg_level_desc":"NATIONAL",
+        "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+    print(f"  WHEAT progress raw records: {len(wheat_recs)}")
+    for wlabel,wtype in [("WINTER WHEAT","WINTER"),("SPRING WHEAT","SPRING")]:
+        filtered = []
+        for r in wheat_recs:
+            short = r.get("short_desc","").upper()
+            if wtype not in short: continue
+            if wtype == "SPRING" and "DURUM" in short: continue
+            filtered.append(r)
+        out[wlabel] = parse_stages(filtered, wlabel)
+        stages_found = [k for k in out[wlabel] if k != "OTHER"]
+        print(f"  {wlabel}: {len(filtered)} records, stages: {stages_found}")
     return out
- 
  
 def fetch_grain_stocks():
     """Quarterly grain stocks, national level."""
