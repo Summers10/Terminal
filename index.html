@@ -6285,14 +6285,19 @@ function _buildDisplayRows(quarterly, curCY, curQ){
   var qLookup = {};
   quarterly.forEach(function(r){ qLookup[r.crop_year+'|'+r.quarter] = r; });
 
-  var prevCY1 = _prevCY(curCY, 1) || '';
-
-  var pqCode = _PREV_Q[curQ] || null;
+  // Use the most recent quarter that actually HAS data, not the calendar current_quarter.
+  // StatsCan may not have published the current calendar quarter yet.
+  var latest = quarterly[0];
+  if(!latest) return [];
+  var effCY  = latest.crop_year;
+  var effQ   = latest.quarter;
+  var prev1  = _prevCY(effCY, 1) || '';
+  var pqCode = _PREV_Q[effQ] || null;
 
   var slots = [
-    { key: curCY   + '|' + curQ,               tag: 'cur'   },   // current quarter
-    { key: prevCY1 + '|' + curQ,               tag: 'py1'   },   // same Q last year
-    { key: pqCode ? curCY+'|'+pqCode : '____', tag: 'prevq' },   // prior Q this season
+    { key: effCY  + '|' + effQ,              tag: 'cur'   },  // latest actual data
+    { key: prev1  + '|' + effQ,              tag: 'py1'   },  // same Q last year
+    { key: pqCode ? effCY+'|'+pqCode:'____', tag: 'prevq' },  // prior Q same season
   ];
 
   return slots.map(function(s){
