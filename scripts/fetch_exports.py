@@ -1,89 +1,34 @@
 #!/usr/bin/env python3
-"""Fetch USDA FAS Weekly Export Sales historical data.
-Parses HTML tables from apps.fas.usda.gov/export-sales/
-Saves as data/export_sales.json matching terminal EXP_INSP/EXP_SALES format."""
-import os, sys, json, urllib.request, re
-from datetime import datetime
-from html.parser import HTMLParser
+"""
+fetch_exports.py — USDA FAS Weekly Export Sales updater.
+Parses weeksumm.htm for latest weekly data (exports + net sales).
+Appends new weeks to existing export_sales.json (incremental update).
+Runs in GitHub Actions daily at 4:30pm CT (Mon-Fri).
+ 
+NOTE: This is an append-only updater. The existing export_sales.json
+contains historical data from prior runs. This script adds new weeks
+as they become available. If export_sales.json is missing, it creates
+a minimal skeleton and starts accumulating from scratch.
+"""
+import os, sys, json, re, urllib.request
+from datetime import datetime, timezone
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "export_sales.json")
  
+WEEKSUM_URL = "https://apps.fas.usda.gov/export-sales/weeksumm.htm"
+ 
+# Commodity patterns to extract from weeksumm.htm
+# Format: regex pattern → (key, my_start_month, MY label)
 COMMODITIES = {
-    "wheat":    {"url": "https://apps.fas.usda.gov/export-sales/h107.htm", "my_start": 6},  # Jun-May
-    "corn":     {"url": "https://apps.fas.usda.gov/export-sales/h401.htm", "my_start": 9},  # Sep-Aug
-    "soybeans": {"url": "https://apps.fas.usda.gov/export-sales/h801.htm", "my_start": 9},  # Sep-Aug
+    "wheat":    {"pattern": r"ALL WHEAT\s+", "my_start": 6, "my_label": "Jun-May"},
+    "corn":     {"pattern": r"CORN\s+",      "my_start": 9, "my_label": "Sep-Aug"},
+    "soybeans": {"pattern": r"SOYBEANS\s+",  "my_start": 9, "my_label": "Sep-Aug"},
 }
  
-MY_LABELS = {6: "Jun-May", 9: "Sep-Aug"}
  
- 
-class TableParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.in_table = False
-        self.in_row = False
-        self.in_cell = False
-        self.rows = []
-        self.current_row = []
-        self.current_cell = ""
- 
-    def handle_starttag(self, tag, attrs):
-        if tag == "table": self.in_table = True
-        elif tag == "tr" and self.in_table: self.in_row = True; self.current_row = []
-        elif tag == "td" and self.in_row: self.in_cell = True; self.current_cell = ""
- 
-    def handle_endtag(self, tag):
-        if tag == "td" and self.in_cell:
-            self.in_cell = False
-            self.current_row.append(self.current_cell.strip())
-        elif tag == "tr" and self.in_row:
-            self.in_row = False
-            if self.current_row:
-                self.rows.append(self.current_row)
-        elif tag == "table":
-            self.in_table = False
- 
-    def handle_data(self, data):
-        if self.in_cell:
-            self.current_cell += data
- 
- 
-def parse_number(s):
-    s = s.strip().replace(",", "").replace("\xa0", "")
-    if not s or s == "*" or s == "N/A":
-        return None
-    neg = False
-    if s.startswith("(") and s.endswith(")"):
-        neg = True
-        s = s[1:-1]
-    try:
-        v = float(s)
-        return -v if neg else v
-    except ValueError:
-        return None
- 
- 
-def parse_date(s):
-    s = s.strip()
-    for fmt in ["%m/%d/%Y", "%m/%d/%y"]:
-        try:
-            return datetime.strptime(s, fmt)
-        except ValueError:
-            continue
-    return None
- 
- 
-def my_sort_key(my_str):
-    """Convert '24/25' to sortable int 2024, '99/00' to 1999."""
-    try:
-        y1 = int(my_str.split("/")[0])
-        return y1 + 2000 if y1 < 80 else y1 + 1900
-    except (ValueError, IndexError):
-        return 0
- 
- 
-def get_marketing_year(dt, my_start_month):
-    if dt.month >= my_start_month:
+def get_marketing_year(dt, my_start):
+    """Return MY string like '25/26' from a date and MY start month."""
+    if dt.month >= my_start:
         y1 = dt.year
     else:
         y1 = dt.year - 1
@@ -91,111 +36,215 @@ def get_marketing_year(dt, my_start_month):
     return f"{y1 % 100:02d}/{y2 % 100:02d}"
  
  
-def fetch_commodity(key, cfg):
-    url = cfg["url"]
-    my_start = cfg["my_start"]
+def week_of_my(dt, my_start):
+    """Return week number (1-52) within the marketing year."""
+    if dt.month >= my_start:
+        my_start_date = datetime(dt.year, my_start, 1)
+    else:
+        my_start_date = datetime(dt.year - 1, my_start, 1)
+    delta = (dt - my_start_date).days
+    return max(1, min(52, delta // 7 + 1))
  
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "text/html,*/*",
+ 
+def fetch_weeksumm():
+    """Fetch and parse weeksumm.htm, return dict of latest data per commodity."""
+    print(f"  Fetching {WEEKSUM_URL}...")
+    req = urllib.request.Request(WEEKSUM_URL, headers={
+        "User-Agent": "Mozilla/5.0 (USDA-Export-Sales-Fetcher)"
     })
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
  
-    print(f"  Fetching {key} from {url}...", end=" ", flush=True)
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        html = resp.read().decode("utf-8", errors="replace")
-    print(f"{len(html):,} bytes")
+    # Extract text between <pre> tags or just use the whole thing
+    pre_match = re.search(r"<pre[^>]*>(.*?)</pre>", raw, re.DOTALL | re.IGNORECASE)
+    text = pre_match.group(1) if pre_match else raw
  
-    parser = TableParser()
-    parser.feed(html)
+    # Clean HTML entities
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&")
  
-    data_rows = []
-    for row in parser.rows:
-        if len(row) < 5:
-            continue
-        dt = parse_date(row[0])
-        if dt is None:
-            continue
-        # Only keep data from 2020 onwards
-        if dt.year < 2020:
-            continue
-        weekly_exports = parse_number(row[1])
-        net_sales = parse_number(row[3])
-        if weekly_exports is None and net_sales is None:
-            continue
-        my = get_marketing_year(dt, my_start)
-        data_rows.append({
-            "date": dt,
-            "my": my,
-            "weekly_exports": weekly_exports,
-            "net_sales": net_sales,
-        })
- 
-    if not data_rows:
-        print(f"    WARNING: No data parsed for {key}")
-        return None
- 
-    # Group by marketing year
-    by_my = {}
-    for r in data_rows:
-        by_my.setdefault(r["my"], []).append(r)
- 
-    # Sort by actual year (not alphabetically!)
-    all_mys = sorted(by_my.keys(), key=my_sort_key)
-    # Keep last 2 marketing years (current + previous)
-    recent_mys = all_mys[-2:] if len(all_mys) >= 2 else all_mys
- 
-    # Build weekly arrays (FAS data is already in 1,000 MT)
-    insp_years = {}
-    sales_years = {}
- 
-    for my in recent_mys:
-        rows = sorted(by_my[my], key=lambda r: r["date"])
-        insp_years[my] = [round(r["weekly_exports"], 1) if r["weekly_exports"] is not None else None for r in rows]
-        sales_years[my] = [round(r["net_sales"], 1) if r["net_sales"] is not None else None for r in rows]
- 
-    my_label = MY_LABELS.get(my_start, f"Month{my_start}")
- 
-    result = {
-        "insp": {"MY": my_label, "years": recent_mys, "w": {}},
-        "sales": {"years": recent_mys, "w": {}},
-    }
- 
-    for yr in recent_mys:
-        iw = insp_years.get(yr, [])
-        sw = sales_years.get(yr, [])
-        while len(iw) < 52: iw.append(None)
-        while len(sw) < 52: sw.append(None)
-        result["insp"]["w"][yr] = iw[:52]
-        result["sales"]["w"][yr] = sw[:52]
- 
-    print(f"    {key}: {len(data_rows)} rows, MYs: {', '.join(recent_mys)}")
-    return result
- 
- 
-def main():
-    print("Fetching USDA FAS Export Sales data...")
     results = {}
  
     for key, cfg in COMMODITIES.items():
-        try:
-            data = fetch_commodity(key, cfg)
-            if data:
-                results[key] = data
-        except Exception as e:
-            print(f"    ERROR {key}: {e}")
+        pat = cfg["pattern"]
+        # Find all lines matching this commodity
+        # Format: "ALL WHEAT      : 01/29       399.6  ...  403.8    5301.6"
+        #         "               : 02/05       498.0  ...  580.0    5209.6"
+        # We want: week_ending, new_sales, exports, outstanding_sales
  
-    if not results:
-        print("ERROR: No export data fetched.", file=sys.stderr)
+        # Find the commodity section
+        matches = re.finditer(
+            pat + r":\s+(\d{2}/\d{2})\s+([\d,.*]+(?:\s+[\d,.*]+){4})",
+            text
+        )
+        # Also find continuation lines (start with spaces + colon)
+        # The commodity name line has the name, continuation has spaces
+        section_start = re.search(pat, text)
+        if not section_start:
+            print(f"    {key}: pattern not found in weeksumm")
+            continue
+ 
+        # Get all data lines for this commodity
+        # Pattern: optional commodity name, colon, date, then 5 numbers
+        pos = section_start.start()
+        lines = []
+ 
+        # Look for lines with ": MM/DD" pattern after the commodity name
+        remaining = text[pos:]
+        for line_match in re.finditer(
+            r":\s+(\d{2}/\d{2})\s+([\d,.*\s]+?)(?=\n|$)", remaining
+        ):
+            date_str = line_match.group(1)
+            nums_str = line_match.group(2).strip()
+            # Parse numbers (space-separated, may have commas)
+            nums = []
+            for n in nums_str.split():
+                n = n.replace(",", "").strip()
+                if n == "*" or not n:
+                    nums.append(0.0)
+                else:
+                    try:
+                        nums.append(float(n))
+                    except ValueError:
+                        nums.append(0.0)
+ 
+            if len(nums) >= 5:
+                lines.append({
+                    "date_str": date_str,
+                    "new_sales": nums[0],    # NEW SALES
+                    "from_foreign": nums[1],  # PURCHASES FROM FOREIGN
+                    "buybacks": nums[2],      # BUY-BACKS & CANCELLATIONS
+                    "exports": nums[3],       # EXPORTS
+                    "outstanding": nums[4],   # OUTSTANDING SALES
+                })
+ 
+            # Stop after 2 data lines (current + previous week)
+            if len(lines) >= 2:
+                break
+ 
+        if not lines:
+            print(f"    {key}: no data lines found")
+            continue
+ 
+        # Use the LATEST line (last in the pair)
+        latest = lines[-1]
+ 
+        # Resolve full date (assume current year context)
+        now = datetime.now(timezone.utc)
+        mm, dd = latest["date_str"].split("/")
+        # Try current year first, then previous
+        try_year = now.year
+        dt = datetime(try_year, int(mm), int(dd))
+        # If date is in the future by more than 30 days, use previous year
+        if (dt - now.replace(tzinfo=None)).days > 30:
+            dt = datetime(try_year - 1, int(mm), int(dd))
+ 
+        my = get_marketing_year(dt, cfg["my_start"])
+        wk = week_of_my(dt, cfg["my_start"])
+ 
+        results[key] = {
+            "date": dt,
+            "my": my,
+            "week": wk,
+            "exports": latest["exports"],
+            "net_sales": latest["new_sales"] - latest["from_foreign"] - latest["buybacks"],
+            "outstanding": latest["outstanding"],
+            "my_label": cfg["my_label"],
+        }
+        print(f"    {key}: MY {my}, Week {wk}, Exports={latest['exports']:.1f}, "
+              f"NetSales={results[key]['net_sales']:.1f}, Outstanding={latest['outstanding']:.1f}")
+ 
+    return results
+ 
+ 
+def load_existing():
+    """Load existing export_sales.json or create skeleton."""
+    if os.path.exists(OUT):
+        with open(OUT) as f:
+            return json.load(f)
+ 
+    print("  No existing export_sales.json — creating skeleton")
+    return {}
+ 
+ 
+def ensure_commodity(data, key, my_label):
+    """Ensure commodity structure exists in data."""
+    if key not in data:
+        data[key] = {
+            "insp": {"MY": my_label, "years": [], "w": {}},
+            "sales": {"years": [], "w": {}},
+        }
+    return data[key]
+ 
+ 
+def append_week(data, key, parsed):
+    """Append a new week's data to the commodity arrays."""
+    comm = ensure_commodity(data, key, parsed["my_label"])
+    my = parsed["my"]
+    wk = parsed["week"]
+    idx = wk - 1  # 0-indexed
+ 
+    # Ensure MY exists in years list
+    for section in ["insp", "sales"]:
+        sec = comm[section]
+        if my not in sec.get("years", []):
+            sec.setdefault("years", []).append(my)
+            sec["years"].sort(key=lambda s: int(s.split("/")[0]) + (2000 if int(s.split("/")[0]) < 80 else 1900))
+        if my not in sec.get("w", {}):
+            sec["w"][my] = [None] * 52
+ 
+    # Set values (only if not already set for this week)
+    insp_arr = comm["insp"]["w"][my]
+    sales_arr = comm["sales"]["w"][my]
+ 
+    if idx < 52:
+        if insp_arr[idx] is None:
+            insp_arr[idx] = round(parsed["exports"], 1)
+            sales_arr[idx] = round(parsed["net_sales"], 1)
+            print(f"    {key}: Added week {wk} ({my})")
+            return True
+        else:
+            print(f"    {key}: Week {wk} ({my}) already exists, skipping")
+            return False
+ 
+    return False
+ 
+ 
+def main():
+    print("=" * 60)
+    print("FETCH_EXPORTS — USDA FAS Weekly Export Sales (incremental)")
+    print("=" * 60)
+ 
+    # Load existing data
+    data = load_existing()
+ 
+    # Fetch latest from weeksumm.htm
+    try:
+        parsed = fetch_weeksumm()
+    except Exception as e:
+        print(f"ERROR fetching weeksumm: {e}", file=sys.stderr)
         sys.exit(1)
  
-    results["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
+    if not parsed:
+        print("ERROR: No commodity data parsed.", file=sys.stderr)
+        sys.exit(1)
+ 
+    # Append new weeks
+    updated = False
+    for key, p in parsed.items():
+        if append_week(data, key, p):
+            updated = True
+ 
+    # Update meta
+    data["_meta"] = {"fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+ 
+    # Save
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
-        json.dump(results, f, separators=(",", ":"))
+        json.dump(data, f, separators=(",", ":"))
  
-    size = os.path.getsize(OUT)
-    print(f"\nCommodities: {', '.join(results.keys())}")
-    print(f"Saved {OUT} ({size:,} bytes)")
+    sz = os.path.getsize(OUT)
+    print(f"\n{'Updated' if updated else 'No new data.'}")
+    print(f"Saved {OUT} ({sz:,} bytes)")
  
  
 if __name__ == "__main__":
