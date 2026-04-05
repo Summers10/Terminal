@@ -726,14 +726,14 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <!-- Conditions view -->
         <div class="rpt-view" id="rpt-v-conditions">
           <div id="rpt-cond-score" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
-            <div class="panel" style="margin-bottom:0;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;align-items:stretch;">
+            <div class="panel" style="margin-bottom:0;display:flex;flex-direction:column;">
               <div class="panel-hdr"><div class="panel-title" id="rpt-cond-title">CROP CONDITIONS</div></div>
-              <div style="overflow-x:auto;"><table class="bal-table" id="rpt-cond-tbl"></table></div>
+              <div style="overflow:hidden;flex:1;"><table class="bal-table" id="rpt-cond-tbl" style="table-layout:auto;width:100%;"></table></div>
             </div>
-            <div class="panel" style="margin-bottom:0;">
+            <div class="panel" style="margin-bottom:0;display:flex;flex-direction:column;">
               <div class="panel-hdr"><div class="panel-title">GOOD / EXCELLENT %</div></div>
-              <div style="padding:14px 16px;"><canvas id="rpt-ge-chart" class="chart-canvas" style="height:300px;"></canvas></div>
+              <div style="padding:14px 16px;flex:1;min-height:400px;"><canvas id="rpt-ge-chart" style="display:block;width:100%;height:100%;"></canvas></div>
             </div>
           </div>
         </div>
@@ -6398,7 +6398,7 @@ function _renderCropTable(cd, curCY, curQ){
   h += '<th style="text-align:left;min-width:120px;width:140px;">PERIOD</th>';
   h += '<th>PROD.</th><th>SUPPLY</th><th>EXPORTS</th>';
   if(showFood) h += '<th>FOOD/IND</th>';
-  h += '<th>FEED/WSTE</th><th>DOM. USE</th><th>STOCKS</th><th>S/U %</th><th>YIELD t/ha</th>';
+  h += '<th>FEED/WSTE</th><th>DOM. USE</th><th>STOCKS</th><th>S/U %</th>';
   h += '</tr></thead><tbody>';
 
   slots.forEach(function(s, i){
@@ -6426,7 +6426,7 @@ function _renderCropTable(cd, curCY, curQ){
     h += '<td class="'+dc(r.dom,      py.dom)      +'">'+fmt(r.dom)+'</td>';
     h += '<td class="'+dc(r.stocks,   py.stocks)   +'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
     h += '<td style="font-weight:700;">'+suStr+'</td>';
-    h += '<td>'+fmtY(r.yield)+'</td>';
+    h += '';
     h += '</tr>';
   });
 
@@ -10546,26 +10546,35 @@ function renderRptGEChart(){
   var cond = _nassData.crop_conditions || {};
   var rows = cond[_rptCrop] || [];
   var cy = rptLatestYear(rows);
-  var cyData = rows.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); });
-  var pyData = rows.filter(function(r){ return r.year === cy - 1; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); });
   function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
-  var cyPts = cyData.map(function(r){ return {x: weekNum(r.week_ending), y: rptGetGE(r)}; });
-  var pyPts = pyData.map(function(r){ return {x: weekNum(r.week_ending), y: rptGetGE(r)}; });
+  function yearPts(yr){ return rows.filter(function(r){ return r.year===yr; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); }).map(function(r){ return {x:weekNum(r.week_ending),y:rptGetGE(r)}; }); }
   var ctx = document.getElementById('rpt-ge-chart');
   if(_rptGEChart){ _rptGEChart.destroy(); }
   var isDark = document.body.classList.contains('dark');
+  // Current year = solid amber; prior years = progressively lighter
+  var priorColors = isDark
+    ? ['rgba(245,166,35,0.55)','rgba(245,166,35,0.32)','rgba(245,166,35,0.18)']
+    : ['rgba(212,133,10,0.55)','rgba(212,133,10,0.32)','rgba(212,133,10,0.18)'];
+  var datasets = [
+    { label: String(cy), data: yearPts(cy), borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2.5, fill: false, tension: 0.3 }
+  ];
+  [1,2,3].forEach(function(offset){
+    var yr = cy - offset;
+    var pts = yearPts(yr);
+    if(!pts.length) return;
+    datasets.push({ label: String(yr), data: pts, borderColor: priorColors[offset-1], borderWidth: offset===1?1.8:1.2, borderDash: [5,3], pointRadius: 0, fill: false, tension: 0.3 });
+  });
+  var gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+  var tc = isDark ? '#6a7a8a' : '#5a6878';
   _rptGEChart = new Chart(ctx, {
     type: 'line',
-    data: { datasets: [
-      { label: String(cy), data: cyPts, borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
-      { label: String(cy-1), data: pyPts, borderColor: isDark ? 'rgba(245,166,35,0.35)' : 'rgba(212,133,10,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
-    ] },
+    data: { datasets: datasets },
     options: { responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-        y: { title: { display: true, text: '% Good/Excellent', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
+        x: { type: 'linear', title: { display: true, text: 'Week #', color: tc }, ticks: { color: tc, stepSize: 4 }, grid: { color: gc } },
+        y: { title: { display: true, text: '% Good/Excellent', color: tc }, ticks: { color: tc }, grid: { color: gc } }
       },
-      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
+      plugins: { legend: { labels: { color: tc, font: { family: "'Courier New',monospace", weight: '700', size: 11 }, boxWidth: 24, padding: 10 } } }
     }
   });
 }
