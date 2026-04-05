@@ -19,7 +19,7 @@ except ImportError:
     os.system(f"{sys.executable} -m pip install yfinance --break-system-packages -q")
     import yfinance as yf
  
-DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SPREADS_FILE = DATA_DIR / "spreads_data.json"
  
 # ---------------------------------------------------------------------------
