@@ -494,7 +494,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
             </div>
             <span id="cot-chart-asof" style="margin-left:auto;font-size:11px;color:var(--text3);letter-spacing:.08em;"></span>
           </div>
-          <canvas id="cot-chart-canvas" style="width:100%;height:860px;display:block;background:var(--bg);"></canvas>
+          <canvas id="cot-chart-canvas" style="width:100%;height:680px;display:block;background:var(--bg);"></canvas>
       <canvas id="cot-oi-canvas" style="width:100%;height:220px;display:block;margin-top:4px;background:var(--bg);"></canvas>
         </div><!-- charts area -->
       </div><!-- flex container -->
@@ -844,6 +844,9 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   <div id="macro-dashboard" style="padding:16px 20px;max-width:1440px;margin:0 auto;">
     <div id="fredLoadBar" style="display:none;height:3px;background:var(--bg3);border-radius:2px;margin-bottom:10px;overflow:hidden"><div id="fredLoadProg" style="height:100%;background:var(--amber);width:0;transition:width .3s"></div></div>
     <div class="grd" id="fredDashGrid"></div>
+  </div>
+  <div id="macro-currency" style="display:none;padding:16px 20px;max-width:1440px;margin:0 auto;">
+    <div id="fx-dashboard"></div>
   </div>
   <div id="macro-guide" style="display:none;padding:16px 20px;max-width:1440px;margin:0 auto;">
 <div id="tab-guide" >
@@ -1734,6 +1737,7 @@ var _GROUP_ITEMS = {
   ],
   macro: [
     {id:'dashboard', label:'Dashboard', section:'MACRO'},
+    {id:'currency', label:'Currencies'},
     {id:'guide', label:'Field Guide'}
   ],
   cal: [
@@ -8266,10 +8270,12 @@ let fredCharts = {};
 
 function setMacroView(v) {
   document.getElementById('macro-dashboard').style.display = v === 'dashboard' ? '' : 'none';
+  document.getElementById('macro-currency').style.display = v === 'currency' ? '' : 'none';
   document.getElementById('macro-guide').style.display = v === 'guide' ? '' : 'none';
+  if(v === 'currency' && !fxInited) initFxDashboard();
   var macroSubDiv = document.getElementById('subtab-macro');
   if (macroSubDiv) {
-    var labelMap = {dashboard:'DASHBOARD',guide:'FIELD GUIDE'};
+    var labelMap = {dashboard:'DASHBOARD',currency:'CURRENCIES',guide:'FIELD GUIDE'};
     var target = labelMap[v] || v.toUpperCase();
     macroSubDiv.querySelectorAll('.subtab').forEach(function(b){
       b.classList.toggle('active', b.textContent.trim().toUpperCase() === target);
@@ -8330,6 +8336,147 @@ async function fredFetch(sid, limit, extra) {
   return null;
 }
 
+var fxInited = false;
+const FX_PAIRS = [
+  {id:'DEXCAUS', label:'USD/CAD', inv:false, desc:'Canadian Dollar', flag:'🇨🇦', rateId:'IRLTLT01CAM156N'},
+  {id:'DEXUSEU', label:'EUR/USD', inv:true, desc:'Euro', flag:'🇪🇺', rateId:'IRLTLT01EZM156N'},
+  {id:'DEXUSUK', label:'GBP/USD', inv:true, desc:'British Pound', flag:'🇬🇧', rateId:'IRLTLT01GBM156N'},
+  {id:'DEXJPUS', label:'USD/JPY', inv:false, desc:'Japanese Yen', flag:'🇯🇵', rateId:'IRLTLT01JPM156N'},
+  {id:'DEXUSAL', label:'AUD/USD', inv:true, desc:'Australian Dollar', flag:'🇦🇺', rateId:'IRLTLT01AUM156N'},
+  {id:'DEXBZUS', label:'USD/BRL', inv:false, desc:'Brazilian Real', flag:'🇧🇷', rateId:'IRLTLT01BRM156N'},
+];
+function initFxDashboard(){
+  fxInited = true;
+  var el = document.getElementById('fx-dashboard');
+  if(!el) return;
+  var FRED_D = fredData || {};
+  // Check if we have FX data
+  var hasFx = FX_PAIRS.some(function(p){ return FRED_D[p.id] && FRED_D[p.id].length > 0; });
+  if(!hasFx){
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:14px;">FX data loading — FRED pipeline needs to run with new series (DEXCAUS, DEXUSEU, etc.)<br>Deploy updated fetch_fred.py and trigger workflow.</div>';
+    return;
+  }
+  var us10 = FRED_D['DGS10'] || [];
+  var usRate = us10.length ? parseFloat(us10[us10.length-1][1]) : null;
+  var h = '';
+  h += '<div style="font-size:16px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:0 0 10px;border-bottom:3px solid var(--amber);margin-bottom:16px;">CURRENCY DASHBOARD</div>';
+  // Scoreboard
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">';
+  FX_PAIRS.forEach(function(p){
+    var data = FRED_D[p.id] || [];
+    if(!data.length){ h += '<div></div>'; return; }
+    var latest = parseFloat(data[data.length-1][1]);
+    var prev = data.length > 1 ? parseFloat(data[data.length-2][1]) : latest;
+    var chg = latest - prev;
+    var pctChg = prev ? (chg / prev * 100) : 0;
+    var chgCls = chg > 0.0001 ? 'color:var(--green)' : chg < -0.0001 ? 'color:var(--red)' : 'color:var(--text3)';
+    // Rate differential
+    var foreignRate = null;
+    var rateData = p.rateId ? (FRED_D[p.rateId] || []) : [];
+    if(rateData.length) foreignRate = parseFloat(rateData[rateData.length-1][1]);
+    var rateDiff = (usRate !== null && foreignRate !== null) ? (usRate - foreignRate) : null;
+    h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px 14px;">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+    h += '<span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);">'+p.label+'</span>';
+    h += '<span style="font-size:12px;color:var(--text3);">'+p.desc+'</span></div>';
+    h += '<div style="font-size:22px;font-weight:800;color:var(--text);line-height:1;">'+latest.toFixed(p.id==='DEXJPUS'?2:4)+'</div>';
+    h += '<div style="font-size:13px;font-weight:700;margin-top:4px;'+chgCls+'">'+(chg>=0?'+':'')+chg.toFixed(4)+' ('+pctChg.toFixed(2)+'%)</div>';
+    if(rateDiff !== null){
+      var rdCls = rateDiff > 0 ? 'color:var(--green)' : 'color:var(--red)';
+      h += '<div style="font-size:11px;color:var(--text3);margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">Rate Spread: <span style="font-weight:800;'+rdCls+'">'+(rateDiff*100).toFixed(0)+' bps</span></div>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+  // Charts - 2 column grid
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';
+  FX_PAIRS.forEach(function(p, idx){
+    var cid = 'fx-chart-'+idx;
+    h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0;overflow:hidden;">';
+    h += '<div style="padding:8px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;">';
+    h += '<span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);">'+p.label+'</span>';
+    h += '<span style="font-size:12px;color:var(--text3);">'+p.desc+' · 1Y Daily</span></div>';
+    h += '<div style="padding:10px 14px;"><canvas id="'+cid+'" style="width:100%;height:200px;display:block;background:var(--bg);"></canvas></div></div>';
+  });
+  h += '</div>';
+  // Rate differentials table
+  h += '<div style="margin-top:20px;">';
+  h += '<div style="font-size:14px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);padding:10px 0 8px;border-bottom:2px solid var(--amber);margin-bottom:0;">RATE DIFFERENTIALS — US 10Y vs FOREIGN 10Y</div>';
+  h += '<table class="bal-table" style="table-layout:auto;"><thead><tr>';
+  h += '<th style="width:120px;">Pair</th><th>US 10Y</th><th>Foreign 10Y</th><th>Spread</th><th>Signal</th>';
+  h += '</tr></thead><tbody>';
+  FX_PAIRS.forEach(function(p,i){
+    var foreignRate = null;
+    var rateData = p.rateId ? (FRED_D[p.rateId] || []) : [];
+    if(rateData.length) foreignRate = parseFloat(rateData[rateData.length-1][1]);
+    var spread = (usRate!==null && foreignRate!==null) ? usRate - foreignRate : null;
+    var signal = '—';
+    var sigCls = '';
+    if(spread !== null){
+      var spreadBps = spread * 100;
+    if(spreadBps > 100){ signal = 'USD bullish'; sigCls = 'color:var(--green)'; }
+      else if(spreadBps > 0){ signal = 'Mild USD+'; sigCls = 'color:var(--text)'; }
+      else if(spreadBps > -100){ signal = 'Mild USD−'; sigCls = 'color:var(--text)'; }
+      else { signal = 'USD bearish'; sigCls = 'color:var(--red)'; }
+    }
+    var alt = i%2 ? ' class="row-alt"' : '';
+    h += '<tr'+alt+'>';
+    h += '<td style="font-weight:800;">'+p.label+'</td>';
+    h += '<td>'+(usRate!==null ? usRate.toFixed(2)+'%' : '—')+'</td>';
+    h += '<td>'+(foreignRate!==null ? foreignRate.toFixed(2)+'%' : '—')+'</td>';
+    h += '<td style="font-weight:800;'+(spread!==null?(spreadBps>0?'color:var(--green)':'color:var(--red)'):'')+'\">'+(spread!==null ? (spreadBps>=0?'+':'')+spreadBps.toFixed(0)+' bps' : '—')+'</td>';
+    h += '<td style="font-weight:700;'+sigCls+'">'+signal+'</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+  // Draw charts
+  setTimeout(function(){
+    var isDark = document.body.classList.contains('dark');
+    var tc = isDark ? '#7a8a9a' : '#5a6878';
+    var gc = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)';
+    FX_PAIRS.forEach(function(p, idx){
+      var canvas = document.getElementById('fx-chart-'+idx);
+      if(!canvas) return;
+      var data = FRED_D[p.id] || [];
+      if(!data.length) return;
+      var dpr = window.devicePixelRatio || 1;
+      var W = canvas.clientWidth, H = canvas.clientHeight;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      var PAD = {t:10, r:52, b:22, l:6};
+      var vals = data.map(function(d){ return parseFloat(d[1]); }).filter(function(v){ return !isNaN(v); });
+      if(!vals.length) return;
+      var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+      var range = mx - mn || 1;
+      mn -= range * 0.05; mx += range * 0.05;
+      var pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
+      var xP = function(i){ return PAD.l + (i / (vals.length - 1)) * pw; };
+      var yP = function(v){ return PAD.t + (1 - (v - mn) / (mx - mn)) * ph; };
+      // Grid
+      ctx.strokeStyle = gc; ctx.lineWidth = 0.5;
+      for(var g=0;g<4;g++){
+        var gy = PAD.t + (g/3)*ph;
+        ctx.beginPath(); ctx.moveTo(PAD.l,gy); ctx.lineTo(W-PAD.r,gy); ctx.stroke();
+        ctx.font = '600 10px Courier New'; ctx.fillStyle = tc; ctx.textAlign = 'right';
+        ctx.fillText((mx - (g/3)*(mx-mn)).toFixed(p.id==='DEXJPUS'?1:3), W-PAD.r+48, gy+4);
+      }
+      // Line
+      ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for(var i=0;i<vals.length;i++){
+        if(i===0) ctx.moveTo(xP(i), yP(vals[i]));
+        else ctx.lineTo(xP(i), yP(vals[i]));
+      }
+      ctx.stroke();
+      // Endpoint
+      var last = vals[vals.length-1];
+      ctx.beginPath(); ctx.arc(xP(vals.length-1), yP(last), 3, 0, Math.PI*2);
+      ctx.fillStyle = '#f5a623'; ctx.fill();
+    });
+  }, 100);
+}
 function initMacro() {
   macroInited = true;
   buildFredDashboard();
