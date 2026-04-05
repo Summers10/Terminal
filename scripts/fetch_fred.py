@@ -18,6 +18,13 @@ SERIES = [
     ("CPALTT01USM657N", 60),
     ("M2SL", 60), ("WALCL", 104),
     ("INDPRO", 60),
+    # FX rates
+    ("DEXCAUS", 252), ("DEXUSEU", 252), ("DEXJPUS", 252),
+    ("DEXUSAL", 252), ("DEXUSUK", 252), ("DEXBZUS", 252),
+    # Foreign 10Y yields for rate differentials
+    ("IRLTLT01CAM156N", 60), ("IRLTLT01EZM156N", 60),
+    ("IRLTLT01JPM156N", 60), ("IRLTLT01GBM156N", 60),
+    ("IRLTLT01AUM156N", 60), ("IRLTLT01BRM156N", 60),
 ]
  
 # PCE needs units=pc1 for YoY% change
