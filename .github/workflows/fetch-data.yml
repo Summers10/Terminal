@@ -18,9 +18,6 @@ jobs:
         with:
           python-version: '3.11'
  
-      - name: Install dependencies
-        run: pip install yfinance
- 
       - name: Run NASS fetch
         env:
           NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
@@ -45,10 +42,6 @@ jobs:
  
       - name: Run StatsCan S&D fetch
         run: python scripts/fetch_statscan.py
-        continue-on-error: true
- 
-      - name: Run Yahoo prices fetch
-        run: python scripts/fetch_prices.py
         continue-on-error: true
  
       - name: Commit data
