@@ -1469,9 +1469,15 @@ function renderSummaryPage(){
     'canola_bean_usd': 'OILSEEDS & PRODUCTS',
     'soyoil_heat': 'ENERGY'
   };
-  let shtml = '<thead><tr><th style="text-align:left;">Spread</th><th>Latest</th><th>1w Chg</th><th>Pctile</th><th>Z-Score</th><th style="min-width:120px;">5yr Range</th></tr></thead><tbody>';
+  const SP_CORR_MAP = {
+    'bean_corn_ratio':'BEANS_CORN','kc_cbot_spread':'KC_WHEAT','wheat_corn_spread':'CORN_WHEAT',
+    'kc_corn_spread':'KC_CORN','canola_bean_usd':'CANOLA_BEANS','oil_share':'OIL_MEAL',
+    'soyoil_heat':'OIL_HEAT','crack_321':'BEANS_WTI'
+  };
+  const spCorrs = SPREAD_DATA.correlations || {};
+  let shtml = '<thead><tr><th style="text-align:left;">Spread</th><th>Latest</th><th>1w Chg</th><th>Pctile</th><th>Z-Score</th><th>30d Corr</th><th style="min-width:120px;">5yr Range</th></tr></thead><tbody>';
   for(const key of spOrder){
-    if(SP_SECTIONS[key]) shtml += '<tr class="row-section"><td colspan="6">' + SP_SECTIONS[key] + '</td></tr>';
+    if(SP_SECTIONS[key]) shtml += '<tr class="row-section"><td colspan="7">' + SP_SECTIONS[key] + '</td></tr>';
     const sp = spData[key];
     if(!sp) continue;
     const pct = sp.pctile;
@@ -1493,6 +1499,10 @@ function renderSummaryPage(){
     shtml += '<td class="' + pctCol + spPctFlag + '" style="font-weight:800;">' + pct.toFixed(0) + '%</td>';
     const spZFlag = Math.abs(z) >= 2 ? (z > 0 ? ' sum-flag-green' : ' sum-flag-red') : '';
     shtml += '<td class="' + zCol + spZFlag + '" style="font-weight:700;">' + (z >= 0 ? '+' : '') + z.toFixed(2) + '</td>';
+    var corrKey = SP_CORR_MAP[key];
+    var corrVal = corrKey && spCorrs[corrKey] ? spCorrs[corrKey].px_30d : null;
+    var corrCls = corrVal === null ? '' : Math.abs(corrVal) > 0.7 ? 'up' : Math.abs(corrVal) < 0.3 ? 'dn' : '';
+    shtml += '<td class="' + corrCls + '" style="font-size:13px;font-weight:700;">' + (corrVal !== null ? (corrVal >= 0 ? '+' : '') + corrVal.toFixed(3) : '—') + '</td>';
     shtml += '<td><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;position:relative;"><div style="width:' + barW + '%;height:100%;background:' + barColor + ';border-radius:3px;"></div></div><span style="font-size:11px;color:var(--text3);min-width:28px;text-align:right;">' + pct.toFixed(0) + '</span></div></td>';
     shtml += '</tr>';
   }
@@ -5110,11 +5120,18 @@ ctx.beginPath(); ctx.arc(xP(lp.week), yP(lp.value), 3.5, 0, Math.PI*2);
 ctx.fillStyle = '#f5a623'; ctx.fill();
 if(skey === 'exports' || skey === 'crush' || skey === 'producer_deliveries'){
 const prevPtsFull = (seriesData[prevYear]||[]).filter(p=>p.week<=52);
-const prevAtCurWk = prevPtsFull.find(p=>p.week===lp.week);
 const prevAtWk52  = prevPtsFull.find(p=>p.week===52) || prevPtsFull[prevPtsFull.length-1];
-if(prevAtCurWk && prevAtWk52 && prevAtCurWk.value > 0){
-const ratio = prevAtWk52.value / prevAtCurWk.value;
-const projected52 = lp.value * ratio;
+// Trailing 10-week average pace projection
+const trail10 = lastCur.slice(-10);
+if(trail10.length >= 2 && prevAtWk52){
+const weeklyDeltas = [];
+for(let ti=1;ti<trail10.length;ti++){
+  const wkGap = trail10[ti].week - trail10[ti-1].week;
+  if(wkGap > 0) weeklyDeltas.push((trail10[ti].value - trail10[ti-1].value) / wkGap);
+}
+const avgPace = weeklyDeltas.length > 0 ? weeklyDeltas.reduce((a,b)=>a+b,0)/weeklyDeltas.length : 0;
+const weeksLeft = 52 - lp.week;
+const projected52 = lp.value + avgPace * weeksLeft;
 ctx.strokeStyle = '#f5a623';
 ctx.lineWidth = 1.5;
 ctx.globalAlpha = 0.45;
@@ -5131,6 +5148,9 @@ ctx.font = `700 12px ${CHART_FONT}`;
 ctx.fillStyle = '#f5a623';
 ctx.textAlign = 'right';
 ctx.fillText(fmtKt(projected52), xP(prevAtWk52.week)-6, yP(projected52)-6);
+ctx.font = `600 9px ${CHART_FONT}`;
+ctx.fillStyle = DARK() ? 'rgba(245,166,35,0.6)' : 'rgba(180,130,60,0.7)';
+ctx.fillText('10wk avg pace', xP(prevAtWk52.week)-6, yP(projected52)+8);
 ctx.globalAlpha = 1;
 }
 }
@@ -10028,7 +10048,7 @@ var RPT_VIEWS = [
   {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
   {id:'progress',   label:'Crop Progress',    section:null},
   {id:'exports',    label:'Export Sales',     section:null},
-  {id:'gsw',        label:'Grain Stocks (CAN)', section:null},
+  {id:'gsw',        label:'Grain Stats Weekly', section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
   {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
   {id:'cattle',     label:'Cattle on Feed',   section:'LIVESTOCK'},
