@@ -6261,17 +6261,7 @@ function _dcls(cur, prev){
 }
 
 // ── Callout box ───────────────────────────────────────────────────────────────
-function _statscanCallout(currCY, currQ, currQL){
-  var isQ4 = currQ === 'Q4';
-  return '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">'
-    + '<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 \u2013 JUL 31</strong><br>'
-    + 'Rows are quarterly cumulative snapshots (Q1=Aug\u2013Oct, Q2=Nov\u2013Jan, Q3=Feb\u2013Apr, Q4=May\u2013Jul). '
-    + 'Q4 = full-year actual. '
-    + (isQ4 ? '' : 'Current period <strong>'+currCY+' '+currQ+'</strong> is YTD \u2014 <em>not a full-year estimate</em>. ')
-    + 'YoY coloring compares each quarter to the <strong>same quarter the prior season</strong>. '
-    + 'All volumes in 000 tonnes.'
-    + '</div>';
-}
+
 
 // ── ALL CROPS view ────────────────────────────────────────────────────────────
 // ── Shared quarter-label helpers ─────────────────────────────────────────────
@@ -6287,22 +6277,22 @@ function _prevCY(cy, n){
   return y1 + '-' + (y1+1);
 }
 
-// Build the 4 target rows for one crop:
-//   [0] current Q
-//   [1] same Q -1yr
-//   [2] same Q -2yr
-//   [3] prior Q (current crop year)
+// Build the 3 target rows for one crop:
+//   [0] current Q            (e.g. 25-26 Q2) — YTD current season
+//   [1] same Q prior year    (e.g. 24-25 Q2) — YoY same period
+//   [2] Q4 of prior year     (e.g. 24-25 Q4) — full prior crop year baseline
 function _buildDisplayRows(quarterly, curCY, curQ){
   var qLookup = {};
   quarterly.forEach(function(r){ qLookup[r.crop_year+'|'+r.quarter] = r; });
 
+  var prevCY1 = _prevCY(curCY, 1) || '';
+
   var pqCode = _PREV_Q[curQ] || null;
 
   var slots = [
-    { key: curCY+'|'+curQ,               tag: 'cur'  },
-    { key: (_prevCY(curCY,1)||'')+'|'+curQ, tag: 'py1'  },
-    { key: (_prevCY(curCY,2)||'')+'|'+curQ, tag: 'py2'  },
-    { key: pqCode ? curCY+'|'+pqCode : '__none__', tag: 'prevq' },
+    { key: curCY   + '|' + curQ,               tag: 'cur'   },   // current quarter
+    { key: prevCY1 + '|' + curQ,               tag: 'py1'   },   // same Q last year
+    { key: pqCode ? curCY+'|'+pqCode : '____', tag: 'prevq' },   // prior Q this season
   ];
 
   return slots.map(function(s){
@@ -6347,8 +6337,7 @@ function _renderCropTable(cd, curCY, curQ){
       badge = ' <span style="font-size:9px;font-weight:700;color:var(--text3);">full</span>';
 
     var desc = '';
-    if(s.tag==='py1')   desc = ' <span style="font-size:9px;color:var(--text4);">-1yr</span>';
-    if(s.tag==='py2')   desc = ' <span style="font-size:9px;color:var(--text4);">-2yr</span>';
+    if(s.tag==='py1')   desc = ' <span style="font-size:9px;color:var(--text4);">same Q −1yr</span>';
     if(s.tag==='prevq') desc = ' <span style="font-size:9px;color:var(--text4);">prev Q</span>';
 
     return '<span style="font-weight:700;'+(isCur?'color:var(--amber);':'')+'">'+short+' '+q+'</span>'
@@ -6402,7 +6391,6 @@ function renderAafcAll(){
   var curQ  = AAFC_DATA.current_quarter   || '';
   var curQL = AAFC_DATA.current_quarter_label || '';
   var h = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curCY+' '+curQ);
-  h += _statscanCallout(curCY, curQ, curQL);
   Object.keys(AAFC_DATA.crops).sort().forEach(function(cropName){
     var cd = AAFC_DATA.crops[cropName];
     if(!(cd.quarterly||[]).length) return;
@@ -6431,7 +6419,6 @@ function renderAafc(){
   var curQ  = AAFC_DATA.current_quarter   || '';
   var curQL = AAFC_DATA.current_quarter_label || '';
   var h = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curCY+' '+curQ);
-  h += _statscanCallout(curCY, curQ, curQL);
   h += _renderCropTable(cd, curCY, curQ);
   document.getElementById('aafc-content').innerHTML = h;
 }
