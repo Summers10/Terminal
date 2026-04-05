@@ -6240,7 +6240,6 @@ renderAafc();
 }
 function renderAafcAll(){
 const crops = Object.keys(AAFC_DATA.crops);
-// Dynamic years from data
 var allYears = {};
 crops.forEach(function(c){ AAFC_DATA.crops[c].rows.forEach(function(r){ allYears[r.year]=1; }); });
 const years = Object.keys(allYears).sort();
@@ -6248,55 +6247,79 @@ const curYr = years.length ? years[years.length - 1] : '';
 const prevYr = years.length >= 2 ? years[years.length - 2] : null;
 const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
 const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
-function dc(cur,prev){ if(cur===null||prev===null||cur===undefined||prev===undefined) return ''; return cur>prev?'aafc-up':cur<prev?'aafc-dn':''; }
+const fmtChg = (cur,prev) => {
+  if(cur===null||prev===null||cur===undefined||prev===undefined||prev===0) return '—';
+  var d = cur - prev; var p = (d/Math.abs(prev)*100);
+  var cls = d > 0 ? 'color:var(--green)' : d < 0 ? 'color:var(--red)' : '';
+  return '<span style="font-weight:700;'+cls+'">'+(d>=0?'+':'')+fmt(Math.round(d))+' <span style="font-size:11px;">('+(p>=0?'+':'')+p.toFixed(1)+'%)</span></span>';
+};
 let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
+html += '<div style="font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:12px 0 8px;border-bottom:3px solid var(--amber);margin-bottom:14px;">CANADIAN SUPPLY & DISPOSITION — ALL CROPS</div>';
 html += `<div class="aafc-sd-wrap"><table class="aafc-all-tbl"><thead>
 <tr>
-<th style="text-align:left;">YEAR</th>
-<th>SEEDED<br><span style="font-weight:400;font-size:11px;">000 ha</span></th>
-<th>HARV.<br><span style="font-weight:400;font-size:11px;">000 ha</span></th>
-<th>YIELD<br><span style="font-weight:400;font-size:11px;">t/ha</span></th>
-<th>PROD.<br><span style="font-weight:400;font-size:11px;">000 t</span></th>
-<th>IMPORTS<br><span style="font-weight:400;font-size:11px;">000 t</span></th>
-<th>SUPPLY<br><span style="font-weight:400;font-size:11px;">000 t</span></th>
-<th>EXPORTS<br><span style="font-weight:400;font-size:11px;">000 t</span></th>
-<th>DOM. USE<br><span style="font-weight:400;font-size:11px;">000 t</span></th>
-<th>STOCKS<br><span style="font-weight:400;font-size:11px;">000 t</span></th>
-<th>S/U %</th>
-<th>PRICE<br><span style="font-weight:400;font-size:11px;">CAD/t</span></th>
+<th style="text-align:left;width:130px;">CROP</th>
+<th>PROD.<br><span style="font-weight:400;font-size:11px;">${curYr} · 000t</span></th>
+<th>EXPORTS<br><span style="font-weight:400;font-size:11px;">${curYr} · 000t</span></th>
+<th>DOM. USE<br><span style="font-weight:400;font-size:11px;">${curYr} · 000t</span></th>
+<th>STOCKS<br><span style="font-weight:400;font-size:11px;">${curYr} · 000t</span></th>
+<th>S/U %<br><span style="font-weight:400;font-size:11px;">${curYr}</span></th>
+<th>PROD. YoY<br><span style="font-weight:400;font-size:11px;">vs ${prevYr||''}</span></th>
+<th>STOCKS YoY<br><span style="font-weight:400;font-size:11px;">vs ${prevYr||''}</span></th>
 </tr>
 </thead><tbody>`;
+crops.forEach((cropName, ci) => {
+const cd = AAFC_DATA.crops[cropName];
+const rows = cd.rows;
+const cur = rows.find(x => x.year === curYr);
+const prev = prevYr ? rows.find(x => x.year === prevYr) : null;
+if(!cur) return;
+const denom = (cur.dom||0) + (cur.exports||0);
+const su = denom > 0 ? ((cur.stocks/denom)*100).toFixed(0)+'%' : '—';
+const alt = ci%2 ? ' style="background:var(--row-alt);"' : '';
+html += `<tr${alt}>
+<td style="color:var(--amber);font-weight:800;">${cropName}</td>
+<td>${fmt(cur.prod)}</td>
+<td>${fmt(cur.exports)}</td>
+<td>${fmt(cur.dom)}</td>
+<td style="font-weight:800;">${fmt(cur.stocks)}</td>
+<td style="font-weight:800;">${su}</td>
+<td>${prev ? fmtChg(cur.prod, prev.prod) : '—'}</td>
+<td>${prev ? fmtChg(cur.stocks, prev.stocks) : '—'}</td>
+</tr>`;
+});
+html += `</tbody></table></div>`;
+// Detail section: show full balance sheet for each crop
+html += '<div style="font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:12px 0 8px;border-bottom:3px solid var(--amber);margin-bottom:14px;margin-top:28px;">FULL BALANCE SHEETS</div>';
 crops.forEach(cropName => {
 const cd = AAFC_DATA.crops[cropName];
 const rows = cd.rows;
-const prev = prevYr ? rows.find(x => x.year === prevYr) : null;
-html += `<tr class="aafc-all-yr-hdr"><td colspan="12">${cropName}</td></tr>`;
-years.forEach(yr => {
-const isCur = yr === curYr;
-const r = rows.find(x => x.year === yr);
-if(!r) return;
-const isPrevRow = prevYr && yr === prevYr;
-const compare = isPrevRow ? null : prev;
-const denom = (r.dom||0) + (r.exports||0); const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
-const rowStyle = isCur ? 'background:var(--row-alt) !important;' : '';
-const yrLabel = yr.replace('f','<span style="color:var(--text3);font-size:11px;margin-left:3px;">f</span>');
-html += `<tr style="${rowStyle}">
-<td>${yrLabel}</td>
-<td>${fmt(r.area_s)}</td>
-<td>${fmt(r.area_h)}</td>
-<td class="${compare?dc(r.yield,compare.yield):''}">${fmtY(r.yield)}</td>
-<td class="${compare?dc(r.prod,compare.prod):''}">${fmt(r.prod)}</td>
-<td>${fmt(r.imports)}</td>
-<td class="${compare?dc(r.supply,compare.supply):''}">${fmt(r.supply)}</td>
-<td class="${compare?dc(r.exports,compare.exports):''}">${fmt(r.exports)}</td>
-<td class="${compare?dc(r.dom,compare.dom):''}">${fmt(r.dom)}</td>
-<td class="${compare?dc(r.stocks,compare.stocks):''}">${fmt(r.stocks)}</td>
-<td>${su}</td>
-<td class="aafc-price">${r.price ? '$'+fmt(r.price) : '—'}</td>
-</tr>`;
+html += `<div style="margin-bottom:20px;"><div style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);padding:8px 14px;background:var(--section-bg);border-top:2px solid var(--amber);border-bottom:1px solid var(--border2);">${cropName.toUpperCase()}</div>`;
+html += `<table class="aafc-all-tbl"><thead><tr>
+<th style="text-align:left;">YEAR</th>
+<th>PROD.</th><th>IMPORTS</th><th>SUPPLY</th>
+<th>EXPORTS</th><th>DOM. USE</th><th>STOCKS</th><th>S/U %</th>
+<th>YIELD<br><span style="font-weight:400;font-size:11px;">t/ha</span></th>
+</tr></thead><tbody>`;
+rows.forEach((r, i) => {
+  const prev = i > 0 ? rows[i-1] : null;
+  const isCur = r.year === curYr;
+  const denom = (r.dom||0) + (r.exports||0);
+  const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
+  function dc(a,b){ if(a==null||b==null) return ''; return a>b?'aafc-up':a<b?'aafc-dn':''; }
+  html += `<tr${isCur?' class="aafc-cur"':''}>
+  <td>${r.year}</td>
+  <td class="${prev?dc(r.prod,prev.prod):''}">${fmt(r.prod)}</td>
+  <td>${fmt(r.imports)}</td>
+  <td class="${prev?dc(r.supply,prev.supply):''}">${fmt(r.supply)}</td>
+  <td class="${prev?dc(r.exports,prev.exports):''}">${fmt(r.exports)}</td>
+  <td class="${prev?dc(r.dom,prev.dom):''}">${fmt(r.dom)}</td>
+  <td class="${prev?dc(r.stocks,prev.stocks):''}" style="font-weight:800;">${fmt(r.stocks)}</td>
+  <td style="font-weight:800;">${su}</td>
+  <td>${fmtY(r.yield)}</td>
+  </tr>`;
 });
+html += '</tbody></table></div>';
 });
-html += `</tbody></table></div>`;
 html += `<div class="aafc-notes">${AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('') : ''}</div>`;
 document.getElementById('aafc-content').innerHTML = html;
 }
