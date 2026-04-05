@@ -198,6 +198,35 @@ def main():
             result[comm]["World"][year] = dict(attrs)
         print(f"  {comm}: World totals for {len(years)} years")
  
+    # Snapshot previous WASDE values before overwriting
+    prev_wasde = {}
+    if os.path.exists(OUT):
+        try:
+            with open(OUT) as pf:
+                old_data = json.load(pf)
+            for comm in ["Corn", "Soybeans", "Wheat"]:
+                if comm not in old_data or not isinstance(old_data[comm], dict):
+                    continue
+                for country in old_data[comm]:
+                    if country.startswith("_"):
+                        continue
+                    yrs = sorted(old_data[comm][country].keys())
+                    if not yrs:
+                        continue
+                    latest_yr = yrs[-1]
+                    vals = old_data[comm][country][latest_yr]
+                    for attr in ["Ending Stocks", "Production"]:
+                        if attr in vals and vals[attr]:
+                            key = f"{comm}|{country}|{latest_yr}|{attr}"
+                            prev_wasde[key] = vals[attr]
+            if prev_wasde:
+                print(f"  Snapshot: {len(prev_wasde)} previous WASDE values preserved")
+        except Exception as e:
+            print(f"  Warning: Could not snapshot previous WASDE: {e}")
+ 
+    if prev_wasde:
+        result["_prev_wasde"] = prev_wasde
+ 
     # Save
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
@@ -217,3 +246,4 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
