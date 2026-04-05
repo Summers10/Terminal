@@ -1,9 +1,24 @@
 #!/usr/bin/env python3
 """Fetch Statistics Canada supply and disposition data (table 32-10-0013-01).
-Annual crop-year table — REF_DATE format is YYYY-YYYY (e.g. 2023-2024).
  
-This version prints ALL column headers and sample data to stdout so failures
-in GitHub Actions can be diagnosed immediately from the log output.
+CONFIRMED CSV STRUCTURE (from GH Actions log 2025-04-05):
+  Grain column : 'Type of crop'
+  SD column    : 'Supply and disposition of grains'
+  REF_DATE     : YYYY-MM  (monthly/quarterly, e.g. '1996-12')
+  VALUE        : 'VALUE'
+ 
+Canadian crop year: Aug 1 – Jul 31
+Quarter mapping (month → quarter within crop year):
+  Aug(8)  Sep(9)  Oct(10) → Q1  Aug–Oct
+  Nov(11) Dec(12) Jan(1)  → Q2  Nov–Jan
+  Feb(2)  Mar(3)  Apr(4)  → Q3  Feb–Apr
+  May(5)  Jun(6)  Jul(7)  → Q4  May–Jul  (= full-year cumulative)
+ 
+Quarterly output allows comparison of:
+  • Current quarter (e.g. Q2 2024-25)
+  • Prev quarter    (e.g. Q1 2024-25)  → QoQ
+  • Same Q prev yr  (e.g. Q2 2023-24)  → YoY
+  • Same Q 2yrs ago (e.g. Q2 2022-23)  → YoY-2
 """
 import os, sys, json, urllib.request, csv, io, zipfile
 from datetime import datetime
@@ -14,98 +29,104 @@ OUT = os.path.join(
 )
 URL = "https://www150.statcan.gc.ca/n1/tbl/csv/32100013-eng.zip"
  
+# ── Commodity name mapping (lower-case key → display name) ───────────────────
+# Keys must match exactly what StatsCan puts in 'Type of crop', lowercased.
+# Add variants if StatsCan uses different phrasing.
 COMMODITIES = {
-    "wheat, excluding durum":  "Wheat (ex Durum)",
-    "durum wheat":             "Durum",
-    "barley":                  "Barley",
-    "corn for grain":          "Corn",
-    "oats":                    "Oats",
-    "canola (rapeseed)":       "Canola",
-    "soybeans":                "Soybeans",
-    "dry peas":                "Dry Peas",
-    "lentils":                 "Lentils",
-    "flaxseed":                "Flaxseed",
-    "rye":                     "Rye",
+    "wheat, excluding durum":        "Wheat (ex Durum)",
+    "wheat (excluding durum)":       "Wheat (ex Durum)",
+    "wheat excluding durum":         "Wheat (ex Durum)",
+    "spring wheat":                  "Wheat (ex Durum)",
+    "durum wheat":                   "Durum",
+    "barley":                        "Barley",
+    "corn for grain":                "Corn",
+    "grain corn":                    "Corn",
+    "corn":                          "Corn",
+    "oats":                          "Oats",
+    "canola (rapeseed)":             "Canola",
+    "canola":                        "Canola",
+    "rapeseed":                      "Canola",
+    "soybeans":                      "Soybeans",
+    "soybean":                       "Soybeans",
+    "dry peas":                      "Dry Peas",
+    "field peas":                    "Dry Peas",
+    "lentils":                       "Lentils",
+    "flaxseed":                      "Flaxseed",
+    "flax":                          "Flaxseed",
+    "rye":                           "Rye",
+    "mixed grains":                  "Mixed Grains",
 }
  
+# ── SD item mapping (CONFIRMED actual values, lowercased → field key) ─────────
 SD_MAP = {
-    "production":              "prod",
-    "imports":                 "imports",
-    "total supply":            "supply",
-    "exports, total":          "exports",
-    "total exports":           "exports",
-    "exports":                 "exports",
-    "food and industrial use": "food",
-    "food, industrial":        "food",
-    "feed, waste and dockage": "feed",
-    "feed, waste":             "feed",
-    "total domestic use":      "dom",
-    "domestic use":            "dom",
-    "seed use":                "seed",
-    "ending stocks, total":    "stocks",
-    "total ending stocks":     "stocks",
-    "carry-over stocks, total":"stocks",
-    "ending stocks":           "stocks",
-    "beginning stocks, total": "beg_stocks",
-    "total beginning stocks":  "beg_stocks",
-    "beginning stocks":        "beg_stocks",
-    "seeded area":             "area_s",
-    "harvested area":          "area_h",
-    "average yield":           "yield",
-    "loss in handling":        "loss",
+    "production":                              "prod",
+    "imports":                                 "imports",
+    "total supply":                            "supply",
+    # Exports — two types; we sum them into 'exports'
+    "grain exports":                           "exports_grain",
+    "product exports":                         "exports_prod",
+    "total exports":                           "exports",
+    "exports":                                 "exports",
+    # Domestic use breakdown
+    "human food":                              "food",
+    "food":                                    "food",
+    "industrial use":                          "industrial",
+    "animal feed, waste and dockage":          "feed",
+    "feed, waste and dockage":                 "feed",
+    "animal feed":                             "feed",
+    "feed":                                    "feed",
+    "seed requirements":                       "seed",
+    "seed use":                                "seed",
+    "loss in handling":                        "loss",
+    "total disposition":                       "dom",
+    "total domestic use":                      "dom",
+    "domestic use":                            "dom",
+    # Stocks — two components; we sum into 'stocks'
+    "ending stocks in commercial positions":   "stocks_comm",
+    "ending stocks on farms":                  "stocks_farm",
+    "total ending stocks":                     "stocks",
+    "ending stocks, total":                    "stocks",
+    "carry-over stocks, total":                "stocks",
+    # Beginning stocks — for supply cross-check
+    "beginning stocks in commercial positions":"beg_comm",
+    "beginning stocks on farms":               "beg_farm",
+    "total beginning stocks":                  "beg_stocks",
 }
  
-STANDARD_COLS = {
-    "ref_date","geo","dguid","uom","uom_id","scalar_factor",
-    "scalar_id","vector","coordinate","value","status",
-    "symbol","terminated","decimals",
+# Month → (quarter_code, label) within the Aug-Jul crop year
+MONTH_Q = {
+    8: ("Q1","Aug–Oct"), 9: ("Q1","Aug–Oct"), 10: ("Q1","Aug–Oct"),
+    11: ("Q2","Nov–Jan"), 12: ("Q2","Nov–Jan"), 1: ("Q2","Nov–Jan"),
+    2: ("Q3","Feb–Apr"), 3: ("Q3","Feb–Apr"), 4: ("Q3","Feb–Apr"),
+    5: ("Q4","May–Jul"), 6: ("Q4","May–Jul"), 7: ("Q4","May–Jul"),
 }
+Q_ORDER = {"Q1":1,"Q2":2,"Q3":3,"Q4":4}
  
  
-def find_col(headers_lower, candidates):
-    for cand in candidates:
-        for raw, low in headers_lower.items():
-            if cand in low:
-                return raw
-    return None
- 
- 
-def parse_crop_year(s):
-    """Return (start_year:int, label:str) from any StatsCan REF_DATE format."""
+def parse_ref_date(s):
+    """Return (crop_year_str, quarter_code, q_label, cal_year, cal_month) or None×5."""
     s = str(s).strip()
- 
-    # YYYY-MM-DD or YYYY-MM  → derive crop year from calendar month
-    for fmt, ln in [("%Y-%m-%d", 10), ("%Y-%m", 7)]:
-        try:
-            d = datetime.strptime(s[:ln], fmt)
-            start = d.year if d.month >= 8 else d.year - 1
-            return start, f"{start}-{start+1}"
-        except (ValueError, TypeError):
-            pass
- 
-    # YYYY-YYYY, YYYY-YY, YYYY/YYYY, YYYY/YY
-    for sep in ("-", "/"):
-        if sep in s:
-            parts = s.split(sep)
-            if len(parts) == 2:
-                try:
-                    y1 = int(parts[0])
-                    raw2 = parts[1].strip()
-                    y2 = (y1 // 100) * 100 + int(raw2) if len(raw2) <= 2 else int(raw2)
-                    if 2000 <= y1 <= 2040 and y2 in (y1, y1+1):
-                        return y1, f"{y1}-{y1+1}"
-                except (ValueError, TypeError):
-                    pass
- 
-    # Plain YYYY
+    # YYYY-MM
     try:
-        y = int(s[:4])
-        if 2000 <= y <= 2040:
-            return y, f"{y}-{y+1}"
+        d = datetime.strptime(s[:7], "%Y-%m")
+        m, y = d.month, d.year
+        q, ql = MONTH_Q.get(m, ("Q1","Aug–Oct"))
+        start = y if m >= 8 else y - 1
+        cy = f"{start}-{start+1}"
+        return cy, q, ql, y, m
     except (ValueError, TypeError):
         pass
- 
-    return None, None
+    # YYYY-MM-DD
+    try:
+        d = datetime.strptime(s[:10], "%Y-%m-%d")
+        m, y = d.month, d.year
+        q, ql = MONTH_Q.get(m, ("Q1","Aug–Oct"))
+        start = y if m >= 8 else y - 1
+        cy = f"{start}-{start+1}"
+        return cy, q, ql, y, m
+    except (ValueError, TypeError):
+        pass
+    return None, None, None, None, None
  
  
 def download_and_parse():
@@ -125,81 +146,64 @@ def download_and_parse():
     )
     print(f"  Parsing: {csv_name}")
  
-    with zf.open(csv_name) as f:
-        reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
-        headers = list(reader.fieldnames or [])
+    # Confirmed column names
+    COL_GRAIN = "Type of crop"
+    COL_SD    = "Supply and disposition of grains"
+    COL_REF   = "REF_DATE"
+    COL_VAL   = "VALUE"
  
-    # ── Print EVERY header — the most important diagnostic ──────────────────
-    print(f"  All {len(headers)} CSV columns:")
-    for h in headers:
-        print(f"    '{h}'")
- 
-    headers_lower = {h: h.lower() for h in headers}
- 
-    col_grain = find_col(headers_lower, ["type of grain","grain","commodity","product"])
-    col_sd    = find_col(headers_lower, ["supply and disposition","supply and disp","disposition"])
-    col_ref   = find_col(headers_lower, ["ref_date","refdate","ref date","date"])
-    col_val   = find_col(headers_lower, ["value"])
- 
-    print(f"  Column mapping:")
-    print(f"    grain = {repr(col_grain)}")
-    print(f"    sd    = {repr(col_sd)}")
-    print(f"    ref   = {repr(col_ref)}")
-    print(f"    value = {repr(col_val)}")
- 
-    if not col_grain or not col_sd:
-        extras = [h for h in headers if h.lower() not in STANDARD_COLS]
-        print(f"  Non-standard columns (fallback candidates): {extras}")
-        if not col_grain and len(extras) >= 1:
-            col_grain = extras[0]
-            print(f"  → Using '{col_grain}' as grain column")
-        if not col_sd and len(extras) >= 2:
-            col_sd = extras[1]
-            print(f"  → Using '{col_sd}' as SD column")
-    if not col_ref: col_ref = "REF_DATE"
-    if not col_val: col_val = "VALUE"
- 
-    # ── Second pass: parse data ─────────────────────────────────────────────
+    # result[comm][crop_year][quarter] = {field: value, _month: int}
+    # We keep the LATEST month within each quarter (highest month number
+    # within the quarter = most complete YTD snapshot for that quarter)
     result = {}
-    count  = 0
-    sample_grains = set()
-    sample_sds    = set()
-    sample_refs   = set()
+    count = 0
+    unknown_crops = set()
+    unknown_sds   = set()
  
     with zf.open(csv_name) as f:
         reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
-        for i, row in enumerate(reader):
-            grain_raw = (row.get(col_grain) or "").strip()
-            sd_raw    = (row.get(col_sd)    or "").strip()
-            ref_raw   = (row.get(col_ref)   or "").strip()
-            val_raw   = (row.get(col_val)   or "").strip().replace(",","")
  
-            if i < 50:
-                if grain_raw: sample_grains.add(grain_raw)
-                if sd_raw:    sample_sds.add(sd_raw)
-                if ref_raw:   sample_refs.add(ref_raw)
+        # Verify columns present
+        headers = list(reader.fieldnames or [])
+        missing = [c for c in [COL_GRAIN, COL_SD, COL_REF, COL_VAL] if c not in headers]
+        if missing:
+            print(f"  WARNING: expected columns not found: {missing}")
+            print(f"  Available: {headers}")
  
-            # Commodity match (exact lower)
-            comm = None
-            for k, v in COMMODITIES.items():
-                if k == grain_raw.lower():
-                    comm = v
-                    break
+        for row in reader:
+            grain_raw = (row.get(COL_GRAIN) or "").strip()
+            sd_raw    = (row.get(COL_SD)    or "").strip()
+            ref_raw   = (row.get(COL_REF)   or "").strip()
+            val_raw   = (row.get(COL_VAL)   or "").strip().replace(",","")
+ 
+            # Commodity match (case-insensitive exact)
+            comm = COMMODITIES.get(grain_raw.lower())
             if not comm:
+                if grain_raw:
+                    unknown_crops.add(grain_raw)
                 continue
  
-            # SD item match (substring)
+            # SD item match (substring, longest match first to avoid 'exports' swallowing 'grain exports')
             item_key = None
             sd_l = sd_raw.lower()
-            for k, v in SD_MAP.items():
-                if k in sd_l or sd_l in k:
-                    item_key = v
+            # Try longest key first for specificity
+            for k in sorted(SD_MAP.keys(), key=len, reverse=True):
+                if k in sd_l:
+                    item_key = SD_MAP[k]
                     break
             if not item_key:
+                if sd_raw:
+                    unknown_sds.add(sd_raw)
                 continue
  
-            start_yr, cy_label = parse_crop_year(ref_raw)
-            if start_yr is None or start_yr < 2015:
+            cy, quarter, q_label, cal_yr, cal_m = parse_ref_date(ref_raw)
+            if cy is None:
+                continue
+            # Only keep 2018+ crop years
+            try:
+                if int(cy.split("-")[0]) < 2018:
+                    continue
+            except (ValueError, IndexError):
                 continue
  
             try:
@@ -207,19 +211,81 @@ def download_and_parse():
             except (ValueError, TypeError):
                 continue
  
-            result.setdefault(comm, {}).setdefault(cy_label, {})[item_key] = value
+            bucket = result.setdefault(comm, {}).setdefault(cy, {}).setdefault(quarter, {
+                "_q_label": q_label,
+                "_months_seen": [],
+            })
+            # Keep data from the latest month within this quarter
+            seen = bucket["_months_seen"]
+            if not seen or cal_m >= max(seen):
+                bucket[item_key] = value
+                if cal_m not in seen:
+                    seen.append(cal_m)
             count += 1
  
     print(f"  Parsed {count} data points across {len(result)} commodities")
  
-    if count == 0:
-        print("  ── SAMPLE DATA (first 50 rows) ──────────────────────────────────")
-        print(f"  Grain values seen:  {sorted(sample_grains)[:15]}")
-        print(f"  SD values seen:     {sorted(sample_sds)[:10]}")
-        print(f"  REF_DATE values:    {sorted(sample_refs)[:10]}")
-        print("  ─────────────────────────────────────────────────────────────────")
+    if unknown_crops:
+        print(f"  Unmatched crop names ({len(unknown_crops)}): {sorted(unknown_crops)[:10]}")
+    if unknown_sds:
+        print(f"  Unmatched SD items  ({len(unknown_sds)}): {sorted(unknown_sds)[:10]}")
  
     return result
+ 
+ 
+def derive_fields(d):
+    """Compute derived fields: combined exports, combined stocks, supply, dom."""
+    out = dict(d)
+    # Total exports = grain exports + product exports (if no total given)
+    if out.get("exports") is None:
+        eg = out.get("exports_grain") or 0
+        ep = out.get("exports_prod")  or 0
+        if eg or ep:
+            out["exports"] = eg + ep
+    # Total ending stocks = commercial + farm (if no total given)
+    if out.get("stocks") is None:
+        sc = out.get("stocks_comm") or 0
+        sf = out.get("stocks_farm") or 0
+        if sc or sf:
+            out["stocks"] = sc + sf
+    # Beginning stocks
+    if out.get("beg_stocks") is None:
+        bc = out.get("beg_comm") or 0
+        bf = out.get("beg_farm") or 0
+        if bc or bf:
+            out["beg_stocks"] = bc + bf
+    # Total supply (if not provided)
+    if out.get("supply") is None:
+        bs = out.get("beg_stocks") or 0
+        pr = out.get("prod")    or 0
+        im = out.get("imports") or 0
+        if pr:
+            out["supply"] = bs + pr + im
+    # Food+Industrial → food field
+    if out.get("food") is None and out.get("industrial") is not None:
+        out["food"] = out["industrial"]
+    elif out.get("food") is not None and out.get("industrial") is not None:
+        out["food"] = (out["food"] or 0) + (out["industrial"] or 0)
+    return out
+ 
+ 
+def make_sd_rec(d):
+    d2 = derive_fields(d)
+    return {
+        "prod":      d2.get("prod"),
+        "imports":   d2.get("imports"),
+        "supply":    d2.get("supply"),
+        "exports":   d2.get("exports"),
+        "food":      d2.get("food"),
+        "feed":      d2.get("feed"),
+        "dom":       d2.get("dom"),
+        "stocks":    d2.get("stocks"),
+        "beg_stocks":d2.get("beg_stocks"),
+        "area_s":    d2.get("area_s"),
+        "area_h":    d2.get("area_h"),
+        "yield":     d2.get("yield"),
+        "price":     None,
+    }
  
  
 def _current_crop_year():
@@ -228,84 +294,79 @@ def _current_crop_year():
     return f"{start}-{start+1}"
  
  
+def _current_quarter():
+    now = datetime.now()
+    return MONTH_Q.get(now.month, ("Q1","Aug–Oct"))
+ 
+ 
 def format_for_terminal(raw):
     now = datetime.now()
-    formatted = {
-        "report_date":        now.strftime("%B %d, %Y"),
-        "current_crop_year":  _current_crop_year(),
-        "current_quarter":    "Q4",
-        "current_quarter_label": "Full year (Aug–Jul)",
-        "crops":              {},
-        "_meta":              {"fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ")},
+    cur_cy = _current_crop_year()
+    cur_q, cur_ql = _current_quarter()
+ 
+    out = {
+        "report_date":           now.strftime("%B %d, %Y"),
+        "current_crop_year":     cur_cy,
+        "current_quarter":       cur_q,
+        "current_quarter_label": cur_ql,
+        "crops": {},
+        "_meta": {"fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ")},
     }
  
     for comm in sorted(raw.keys()):
-        years_data = raw[comm]
-        sorted_years = sorted(years_data.keys())
+        comm_data = raw[comm]
+        sorted_years = sorted(comm_data.keys())
  
-        def make_rec(cy, d):
-            return {
-                "year":      cy,
-                "area_s":    d.get("area_s"),
-                "area_h":    d.get("area_h"),
-                "yield":     round(d["yield"], 2) if d.get("yield") else None,
-                "prod":      d.get("prod"),
-                "imports":   d.get("imports"),
-                "supply":    d.get("supply"),
-                "exports":   d.get("exports"),
-                "food":      d.get("food"),
-                "feed":      d.get("feed"),
-                "dom":       d.get("dom"),
-                "stocks":    d.get("stocks"),
-                "beg_stocks":d.get("beg_stocks"),
-                "price":     None,
-                "is_full_year": True,
-            }
+        # ── Annual rows: best quarter per year (Q4 = full year; else latest) ─
+        rows = []
+        for cy in sorted_years[-6:]:
+            qdata = comm_data[cy]
+            best_q = next((q for q in ["Q4","Q3","Q2","Q1"] if q in qdata), None)
+            if not best_q:
+                continue
+            rec = make_sd_rec(qdata[best_q])
+            rec["year"]         = cy
+            rec["quarter"]      = best_q
+            rec["is_full_year"] = (best_q == "Q4")
+            rows.append(rec)
  
-        rows = [make_rec(cy, years_data[cy]) for cy in sorted_years[-6:]]
- 
-        # Quarterly list: annual data only, each marked Q4 (full year)
+        # ── Quarterly: all (cy, quarter) pairs for last 3 crop years ─────────
+        # newest first; within a crop year, highest quarter first
         quarterly = []
         for cy in sorted(sorted_years[-3:], reverse=True):
-            d = years_data[cy]
-            quarterly.append({
-                "crop_year":     cy,
-                "quarter":       "Q4",
-                "quarter_label": "Full year (Aug–Jul)",
-                "ref_date":      cy,
-                "prod":    d.get("prod"),
-                "imports": d.get("imports"),
-                "supply":  d.get("supply"),
-                "exports": d.get("exports"),
-                "food":    d.get("food"),
-                "feed":    d.get("feed"),
-                "dom":     d.get("dom"),
-                "stocks":  d.get("stocks"),
-                "area_s":  d.get("area_s"),
-                "area_h":  d.get("area_h"),
-                "yield":   round(d["yield"], 2) if d.get("yield") else None,
-            })
+            qdata = comm_data[cy]
+            for q in sorted(qdata.keys(), key=lambda x: Q_ORDER.get(x,0), reverse=True):
+                d = qdata[q]
+                rec = make_sd_rec(d)
+                rec["crop_year"]     = cy
+                rec["quarter"]       = q
+                rec["quarter_label"] = d.get("_q_label", q)
+                rec["ref_date"]      = cy + " " + q
+                quarterly.append(rec)
  
-        formatted["crops"][comm] = {
+        out["crops"][comm] = {
             "price_label": "",
             "rows":        rows,
             "quarterly":   quarterly,
-            "full_year":   rows,
+            "full_year":   [r for r in rows if r.get("is_full_year")],
             "notes": [
-                "StatsCan table 32-10-0013-01 — annual crop-year data (Aug 1–Jul 31).",
-                "StatsCan does not publish mid-year estimates; current year shown as YTD until Q4 is released.",
+                "StatsCan table 32-10-0013-01 — cumulative YTD quarterly data (Aug 1–Jul 31).",
+                "Q4 (May–Jul) represents the full crop year actual.",
+                "StatsCan does not publish full-year estimates mid-year.",
             ],
         }
-        print(f"  {comm}: {', '.join(r['year'] for r in rows)}")
  
-    return formatted
+        yr_qtrs = [(r["year"], r["quarter"]) for r in rows]
+        print(f"  {comm}: {', '.join(y+' '+q for y,q in yr_qtrs)}")
+ 
+    return out
  
  
 def main():
     data = download_and_parse()
     if not data:
         print("ERROR: No StatsCan data parsed.", file=sys.stderr)
-        print("See DIAGNOSTIC output above for actual column names/values.", file=sys.stderr)
+        print("Check diagnostic output above.", file=sys.stderr)
         sys.exit(1)
  
     formatted = format_for_terminal(data)
