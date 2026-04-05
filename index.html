@@ -1475,7 +1475,7 @@ function renderSummaryPage(){
     'soyoil_heat':'OIL_HEAT','crack_321':'BEANS_WTI'
   };
   const spCorrs = SPREAD_DATA.correlations || {};
-  let shtml = '<thead><tr><th style="text-align:left;">Spread</th><th>Latest</th><th>1w Chg</th><th>Pctile</th><th>Z-Score</th><th>30d Corr</th><th style="min-width:120px;">5yr Range</th></tr></thead><tbody>';
+  let shtml = '<thead><tr><th style="text-align:left;">Spread</th><th>Latest</th><th>1w Chg</th><th>30d Corr</th><th>Z-Score</th><th>Pctile</th><th style="min-width:120px;">5yr Range</th></tr></thead><tbody>';
   for(const key of spOrder){
     if(SP_SECTIONS[key]) shtml += '<tr class="row-section"><td colspan="7">' + SP_SECTIONS[key] + '</td></tr>';
     const sp = spData[key];
@@ -1495,14 +1495,14 @@ function renderSummaryPage(){
     shtml += '<td style="text-align:left;font-weight:700;color:var(--text);font-size:13px;">' + sp.short + '</td>';
     shtml += '<td style="font-weight:800;text-align:right;">' + sp.latest.toFixed(sp.unit === 'ratio' || sp.unit === '%' ? 2 : 1) + '<span style="font-size:12px;color:var(--text3);margin-left:3px;">' + sp.unit + '</span></td>';
     shtml += '<td class="' + chgCol + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '</td>';
-    const spPctFlag = pct >= 90 || pct <= 10 ? (pct >= 90 ? ' sum-flag-green' : ' sum-flag-red') : '';
-    shtml += '<td class="' + pctCol + spPctFlag + '" style="font-weight:800;">' + pct.toFixed(0) + '%</td>';
-    const spZFlag = Math.abs(z) >= 2 ? (z > 0 ? ' sum-flag-green' : ' sum-flag-red') : '';
-    shtml += '<td class="' + zCol + spZFlag + '" style="font-weight:700;">' + (z >= 0 ? '+' : '') + z.toFixed(2) + '</td>';
     var corrKey = SP_CORR_MAP[key];
     var corrVal = corrKey && spCorrs[corrKey] ? spCorrs[corrKey].px_30d : null;
     var corrCls = corrVal === null ? '' : Math.abs(corrVal) > 0.7 ? 'up' : Math.abs(corrVal) < 0.3 ? 'dn' : '';
     shtml += '<td class="' + corrCls + '" style="font-size:13px;font-weight:700;">' + (corrVal !== null ? (corrVal >= 0 ? '+' : '') + corrVal.toFixed(3) : '—') + '</td>';
+    const spZFlag = Math.abs(z) >= 2 ? (z > 0 ? ' sum-flag-green' : ' sum-flag-red') : '';
+    shtml += '<td class="' + zCol + spZFlag + '" style="font-weight:700;">' + (z >= 0 ? '+' : '') + z.toFixed(2) + '</td>';
+    const spPctFlag = pct >= 90 || pct <= 10 ? (pct >= 90 ? ' sum-flag-green' : ' sum-flag-red') : '';
+    shtml += '<td class="' + pctCol + spPctFlag + '" style="font-weight:800;">' + pct.toFixed(0) + '%</td>';
     shtml += '<td><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;position:relative;"><div style="width:' + barW + '%;height:100%;background:' + barColor + ';border-radius:3px;"></div></div><span style="font-size:11px;color:var(--text3);min-width:28px;text-align:right;">' + pct.toFixed(0) + '</span></div></td>';
     shtml += '</tr>';
   }
@@ -4877,7 +4877,7 @@ let html = `<div class="gsw-card" style="margin-bottom:14px;">
 <th>${prevYr}</th>
 <th>YOY (Kt)</th>
 <th>YOY %</th>
-<th style="border-left:2px solid var(--border3);color:var(--text3);font-style:italic;font-size:12px;letter-spacing:.08em;">→ WK52 PROJ.</th>
+<th style="border-left:2px solid var(--border3);color:var(--text3);font-style:italic;font-size:12px;letter-spacing:.08em;">→ WK52 PROJ.<br><span style="font-size:9px;font-weight:600;">10wk avg pace</span></th>
 <th style="color:var(--text3);font-size:12px;letter-spacing:.08em;">${prevYr} FINAL</th>
 </tr>
 </thead><tbody>`;
@@ -4892,12 +4892,19 @@ const deltaCls = delta === null ? '' : delta > 0 ? 'gsw-ahead' : delta < 0 ? 'gs
 const rowCls = alt ? 'gsw-alt' : '';
 alt = !alt;
 let proj52 = null;
-if(s.key !== 'commercial_stocks' && cur && prevV && prevV > 0){
-const prevFull = gData[s.key] && gData[s.key][prevYr];
-if(prevFull){
-const prevWk52 = prevFull.find(p=>p.week===52) || prevFull[prevFull.length-1];
-if(prevWk52 && prevWk52.value > 0){
-proj52 = cur * (prevWk52.value / prevV);
+if(s.key !== 'commercial_stocks' && cur){
+const curFull = gData[s.key] && gData[s.key][curYear];
+if(curFull && curFull.length >= 2){
+const trail = curFull.slice(-10);
+const deltas = [];
+for(let ti=1;ti<trail.length;ti++){
+  const wg = trail[ti].week - trail[ti-1].week;
+  if(wg > 0) deltas.push((trail[ti].value - trail[ti-1].value) / wg);
+}
+if(deltas.length > 0){
+  const avgPace = deltas.reduce((a,b)=>a+b,0) / deltas.length;
+  const wksLeft = 52 - curWeek;
+  proj52 = cur + avgPace * wksLeft;
 }
 }
 }
@@ -4931,7 +4938,7 @@ const legendHtml = isBarChart
 <span style="${legStyle}"><span style="display:inline-block;width:14px;height:10px;background:rgba(140,130,120,0.45);border-radius:2px;flex-shrink:0;"></span>${prevYr}</span>`
 : `<span style="${legStyle}"><span style="display:inline-block;width:18px;height:2.5px;background:#f5a623;vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>${curYear}</span>
 <span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #5b9cf0;vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>${prevYr}</span>
-<span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:1.5px dashed rgba(245,166,35,0.5);vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>Proj.</span>`;
+<span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:1.5px dashed rgba(245,166,35,0.5);vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>Proj. (10wk avg pace)</span>`;
 const subLabel = isBarChart ? 'Weekly increment · Ktonnes' : 'Cumulative YTD · Ktonnes';
 return `<div class="gsw-card">
 <div class="gsw-card-header">
@@ -5148,9 +5155,6 @@ ctx.font = `700 12px ${CHART_FONT}`;
 ctx.fillStyle = '#f5a623';
 ctx.textAlign = 'right';
 ctx.fillText(fmtKt(projected52), xP(prevAtWk52.week)-6, yP(projected52)-6);
-ctx.font = `600 9px ${CHART_FONT}`;
-ctx.fillStyle = DARK() ? 'rgba(245,166,35,0.6)' : 'rgba(180,130,60,0.7)';
-ctx.fillText('10wk avg pace', xP(prevAtWk52.week)-6, yP(projected52)+8);
 ctx.globalAlpha = 1;
 }
 }
