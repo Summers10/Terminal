@@ -688,7 +688,13 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   <div class="info-panel" id="aafc-info"><strong>STATSCAN S&D</strong> — Canadian crop supply & demand from Statistics Canada (table 32-10-0013-01). Area, yield, production, trade, and ending stocks for Canadian crops. Updated automatically via pipeline.</div>
   <div id="aafc-page">
     <div style="padding:4px 0 0;"><span id="statscan-freshness" style="font-size:11px;letter-spacing:.05em;"></span></div>
-    <div class="aafc-toolbar" id="aafc-crop-btns"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;flex-wrap:wrap;">
+      <div class="bu-toggle" style="flex-shrink:0;">
+        <button class="bu-btn active" id="aafc-view-annual" onclick="setAafcView('annual')">ANNUAL</button>
+        <button class="bu-btn" id="aafc-view-quarterly" onclick="setAafcView('quarterly')">QUARTERLY</button>
+      </div>
+      <div class="aafc-toolbar" id="aafc-crop-btns" style="padding:0;background:none;border:none;"></div>
+    </div>
     <div id="aafc-content"></div>
   </div>
 </div>
@@ -6215,6 +6221,23 @@ el.innerHTML = html;
 var AAFC_DATA = null;
 let aafcInited = false;
 let aafcCrop = 'ALL';
+let aafcView = 'annual';
+function setAafcView(v){
+  aafcView = v;
+  var a = document.getElementById('aafc-view-annual');
+  var q = document.getElementById('aafc-view-quarterly');
+  if(a){ a.classList.toggle('active', v==='annual'); }
+  if(q){ q.classList.toggle('active', v==='quarterly'); }
+  if(v === 'quarterly' && aafcCrop === 'ALL' && AAFC_DATA){
+    var crops = Object.keys(AAFC_DATA.crops);
+    if(crops.length){ aafcCrop = crops[0]; }
+    document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
+      var label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
+      b.classList.toggle('active', label === aafcCrop);
+    });
+  }
+  renderAafc();
+}
 function initAafc(){
 aafcInited = true;
 if(!AAFC_DATA || !AAFC_DATA.crops){
@@ -6236,7 +6259,77 @@ document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
 const label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
 b.classList.toggle('active', label===c);
 });
+if(aafcView === 'quarterly' && c === 'ALL'){ aafcView='annual'; var a=document.getElementById('aafc-view-annual'); var q=document.getElementById('aafc-view-quarterly'); if(a)a.classList.add('active'); if(q)q.classList.remove('active'); }
 renderAafc();
+}
+function renderAafcQuarterly(){
+  if(!AAFC_DATA) return;
+  var cd = AAFC_DATA.crops[aafcCrop];
+  if(!cd){ document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);">Select a specific crop to view quarterly comparison.</div>'; return; }
+  var quarterly = cd.quarterly || [];
+  if(!quarterly.length){
+    document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);"><strong style="color:var(--amber);">No quarterly data.</strong> Deploy updated fetch_statscan.py and trigger the workflow.</div>';
+    return;
+  }
+  var currQ  = quarterly[0];
+  var prevQ  = quarterly.length > 1 ? quarterly[1] : null;
+  var samePY = quarterly.filter(function(q){ return q.quarter === currQ.quarter && q.crop_year !== currQ.crop_year; }).slice(0,2);
+  var currCY  = AAFC_DATA.current_crop_year || currQ.crop_year;
+  var currQCode = AAFC_DATA.current_quarter || currQ.quarter;
+  var currQL    = AAFC_DATA.current_quarter_label || currQ.quarter_label;
+  var fmt = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toLocaleString(); };
+  var fmtY = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toFixed(2); };
+  function delta(a,b){ if(a===null||b===null||a===undefined||b===undefined) return {str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5) return {str:'—',cls:''}; var s=(d>=0?'+':'')+Math.round(d).toLocaleString(); return {str:s, cls:d>0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'}; }
+  var isFullYear = (currQ.quarter === 'Q4');
+  var h = '';
+  h += freshStamp('STATSCAN', _pipelineDates['STATSCAN'], currCY+' '+currQCode);
+  h += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">';
+  h += '<strong style="color:var(--amber);letter-spacing:.08em;">QUARTERLY COMPARISON — '+aafcCrop.toUpperCase()+'</strong><br>';
+  h += 'Crop year: <strong>Aug 1 – Jul 31</strong> &nbsp;|&nbsp; Current: <strong>'+currCY+' '+currQCode+' ('+currQL+')</strong> ';
+  if(isFullYear) h += '— <em>Q4 = full-year actual</em>'; else h += '— <em>cumulative YTD, not a full-year estimate</em>';
+  h += '<br>Columns compare the same quarter across seasons. All volumes in 000 tonnes unless noted.';
+  h += '</div>';
+  var items = [
+    {key:'prod',    label:'Production',          fmt:fmt},
+    {key:'supply',  label:'Total Supply',        fmt:fmt},
+    {key:'exports', label:'Exports',             fmt:fmt},
+    {key:'dom',     label:'Dom. Use',            fmt:fmt},
+    {key:'stocks',  label:'Ending Stocks',       fmt:fmt},
+    {key:'area_s',  label:'Seeded Area (000 ha)',fmt:fmt},
+    {key:'area_h',  label:'Harv. Area (000 ha)', fmt:fmt},
+    {key:'yield',   label:'Yield (t/ha)',         fmt:fmtY},
+  ];
+  function colHead(q){ return q.crop_year+' '+q.quarter+'<br><span style="font-size:10px;font-weight:600;color:var(--text3);">'+q.quarter_label+'</span>'; }
+  h += '<div style="overflow-x:auto;"><table class="bal-table" style="table-layout:auto;min-width:600px;">';
+  h += '<thead><tr>';
+  h += '<th style="text-align:left;width:180px;font-size:13px;">ITEM</th>';
+  h += '<th class="latest">'+colHead(currQ)+'</th>';
+  if(prevQ){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">QoQ Δ</th>'; h += '<th>'+colHead(prevQ)+'</th>'; }
+  samePY.forEach(function(q){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">YoY Δ</th>'; h += '<th>'+colHead(q)+'</th>'; });
+  h += '</tr></thead><tbody>';
+  items.forEach(function(item, ri){
+    var cv=currQ[item.key], pv=prevQ?prevQ[item.key]:null;
+    var qod=delta(cv,pv);
+    var alt=ri%2?' class="row-alt"':'';
+    h += '<tr'+alt+'>';
+    h += '<td style="text-align:left;font-weight:700;">'+item.label+'</td>';
+    h += '<td class="latest">'+item.fmt(cv)+'</td>';
+    if(prevQ){ h += '<td style="font-size:13px;'+qod.cls+'">'+qod.str+'</td><td>'+item.fmt(pv)+'</td>'; }
+    samePY.forEach(function(q){ var yv=q[item.key]; var yod=delta(cv,yv); h += '<td style="font-size:13px;'+yod.cls+'">'+yod.str+'</td><td>'+item.fmt(yv)+'</td>'; });
+    h += '</tr>';
+  });
+  function su(r){ if(!r) return null; var d=(r.dom||0)+(r.exports||0); return d>0?((r.stocks/d)*100):null; }
+  var sc=su(currQ),sp=su(prevQ); var spy=samePY.map(su);
+  var fsu=function(v){return v===null?'—':v.toFixed(0)+'%';};
+  function sud(a,b){if(a===null||b===null)return{str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5)return{str:'—',cls:''}; return{str:(d>=0?'+':'')+d.toFixed(0)+'pp',cls:d<0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'};}
+  var alt2=items.length%2?' class="row-alt"':'';
+  h += '<tr'+alt2+'><td style="text-align:left;font-weight:700;font-style:italic;">S/U Ratio</td><td class="latest">'+fsu(sc)+'</td>';
+  if(prevQ){ var qd2=sud(sc,sp); h += '<td style="font-size:13px;'+qd2.cls+'">'+qd2.str+'</td><td>'+fsu(sp)+'</td>'; }
+  spy.forEach(function(s){ var yd=sud(sc,s); h += '<td style="font-size:13px;'+yd.cls+'">'+yd.str+'</td><td>'+fsu(s)+'</td>'; });
+  h += '</tr>';
+  h += '</tbody></table></div>';
+  h += '<div style="font-size:12px;color:var(--text3);margin-top:12px;font-style:italic;line-height:1.6;">Quarterly figures are <strong>cumulative YTD</strong> from Aug 1. Q4 = full crop-year actual. StatsCan does not publish mid-year full-year estimates. Switch to <strong>ANNUAL</strong> view for historical S&D balance sheets.</div>';
+  document.getElementById('aafc-content').innerHTML = h;
 }
 function renderAafcAll(){
 const crops = Object.keys(AAFC_DATA.crops);
@@ -6248,7 +6341,11 @@ const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleS
 const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
 function dc(a,b){ if(a==null||b==null) return ''; return a>b?'aafc-up':a<b?'aafc-dn':''; }
 let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
-html += '<div style="font-size:11px;color:var(--text3);margin-bottom:14px;font-style:italic;">Canadian crop year: Aug 1 – Jul 31. Current year data is cumulative year-to-date as of last quarterly release. All units in 000 tonnes unless noted.</div>';
+html += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--text2);">'
+  + '<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>'
+  + 'The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. '
+  + 'YoY change coloring is suppressed on the YTD row to avoid misleading comparisons. All volumes in 000 tonnes unless noted.'
+  + '</div>';
 // Render each crop as its own balance sheet (same format as individual view)
 crops.forEach(cropName => {
 const cd = AAFC_DATA.crops[cropName];
@@ -6269,16 +6366,18 @@ rows.forEach((r, i) => {
   const isCur = r.year === curYr;
   const denom = (r.dom||0) + (r.exports||0);
   const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
-  const yrLbl = isCur ? r.year+' <span style="font-size:9px;color:var(--text3);font-style:italic;">YTD</span>' : r.year;
+  const yrLbl = isCur ? r.year+' <span style="font-size:10px;font-weight:900;color:var(--amber);letter-spacing:.04em;">YTD</span>' : r.year;
   const cls = isCur ? ' style="background:var(--row-alt);"' : (i%2?' style="background:var(--row-alt);"':'');
+  // Suppress YoY coloring on the current (YTD) row — partial-year data is not comparable
+  const dcFn = isCur ? (()=>'') : dc;
   html += '<tr'+(isCur?' style="background:var(--row-latest);"':cls)+'>';
   html += '<td style="'+(isCur?'color:var(--amber);font-weight:800;':'')+'">'+yrLbl+'</td>';
-  html += '<td class="'+dc(r.prod,prev?prev.prod:null)+'">'+fmt(r.prod)+'</td>';
+  html += '<td class="'+dcFn(r.prod,prev?prev.prod:null)+'">'+fmt(r.prod)+'</td>';
   html += '<td>'+fmt(r.supply)+'</td>';
-  html += '<td class="'+dc(r.exports,prev?prev.exports:null)+'">'+fmt(r.exports)+'</td>';
+  html += '<td class="'+dcFn(r.exports,prev?prev.exports:null)+'">'+fmt(r.exports)+'</td>';
   if(showFood) html += '<td>'+fmt(r.food)+'</td>';
   html += '<td>'+fmt(r.dom)+'</td>';
-  html += '<td class="'+dc(r.stocks,prev?prev.stocks:null)+'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
+  html += '<td class="'+dcFn(r.stocks,prev?prev.stocks:null)+'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
   html += '<td style="font-weight:700;">'+su+'</td>';
   html += '<td>'+fmtY(r.yield)+'</td>';
   html += '</tr>';
@@ -6293,6 +6392,7 @@ if(AAFC_DATA && AAFC_DATA.report_date){
 const el = document.getElementById('aafc-report-date-label');
 if(el) el.textContent = AAFC_DATA.report_date;
 }
+if(aafcView === 'quarterly'){ renderAafcQuarterly(); return; }
 if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
 const cd = AAFC_DATA.crops[aafcCrop];
 if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
@@ -6307,19 +6407,29 @@ function deltaClass(cur, prev){
 if(cur===null||prev===null||cur===undefined||prev===undefined) return '';
 return cur>prev ? 'aafc-up' : cur<prev ? 'aafc-dn' : '';
 }
+// Check if area/yield data exists (may be null for current partial year)
+const hasAreaData = rows.some(r=>r.area_s!=null||r.area_h!=null);
+const showArea = hasAreaData;
+// Count area group span: seeded + harv + yield = 3, or 0 if suppressed
+const areaSpan = showArea ? 3 : 0;
 let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
+html += `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">`
+  + `<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>`
+  + `The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. `
+  + `YoY change coloring is suppressed on the YTD row to avoid misleading comparisons.`
+  + `</div>`;
 html += `<div class="aafc-price-label">${cd.price_label}</div>`;
 html += `<div class="aafc-sd-wrap"><table class="aafc-tbl"><thead>`;
 html += `<tr class="aafc-group">
 <th rowspan="2" style="text-align:left;border-right:1px solid var(--border2);">CROP YEAR</th>
-<th colspan="3" class="span-area" style="border-left:1px solid var(--border2);">AREA (000 ha)</th>
+${showArea?`<th colspan="3" class="span-area" style="border-left:1px solid var(--border2);">AREA (000 ha)</th>`:''}
 <th colspan="3" class="span-supply" style="border-left:1px solid var(--border2);">SUPPLY (000 t)</th>
 <th colspan="${showFood?4:3}" class="span-demand" style="border-left:1px solid var(--border2);">DEMAND (000 t)</th>
 <th colspan="2" style="border-left:1px solid var(--border2);">BALANCE</th>
 ${hasPrice?'<th style="border-left:1px solid var(--border2);">PRICE</th>':''}
 </tr>`;
 html += `<tr class="aafc-cols">
-<th style="border-left:1px solid var(--border2);">SEEDED</th><th>HARV.</th><th class="span-area">YIELD t/ha</th>
+${showArea?`<th style="border-left:1px solid var(--border2);">SEEDED</th><th>HARV.</th><th class="span-area">YIELD t/ha</th>`:''}
 <th style="border-left:1px solid var(--border2);">PROD.</th><th>IMPORTS</th><th class="span-supply">TOTAL</th>
 <th style="border-left:1px solid var(--border2);">EXPORTS</th>
 ${showFood?'<th>FOOD/IND</th>':''}
@@ -6333,19 +6443,22 @@ const prev = i > 0 ? rows[i-1] : null;
 const isCur = r.year === curYr;
 const rowCls = isCur ? 'aafc-cur' : '';
 const denom = (r.dom||0) + (r.exports||0); const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
+// Suppress YoY delta coloring on current (YTD) row — partial year is not comparable to prior full year
+const dc2 = isCur ? (()=>'') : deltaClass;
+const yrCell = isCur
+  ? `${r.year} <span style="font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--amber);">YTD</span>`
+  : r.year;
 html += `<tr class="${rowCls}">
-<td>${r.year}</td>
-<td style="border-left:1px solid var(--border2);">${fmt(r.area_s)}</td>
-<td>${fmt(r.area_h)}</td>
-<td class="${prev?deltaClass(r.yield,prev.yield):''}">${fmtY(r.yield)}</td>
+<td>${yrCell}</td>
+${showArea?`<td style="border-left:1px solid var(--border2);">${fmt(r.area_s)}</td><td>${fmt(r.area_h)}</td><td class="${prev?dc2(r.yield,prev.yield):''}">${fmtY(r.yield)}</td>`:''}
 <td style="border-left:1px solid var(--border2);">${fmt(r.prod)}</td>
 <td>${fmt(r.imports)}</td>
-<td class="${prev?deltaClass(r.supply,prev.supply):''}">${fmt(r.supply)}</td>
-<td style="border-left:1px solid var(--border2);" class="${prev?deltaClass(r.exports,prev.exports):''}">${fmt(r.exports)}</td>
+<td class="${prev?dc2(r.supply,prev.supply):''}">${fmt(r.supply)}</td>
+<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.exports,prev.exports):''}">${fmt(r.exports)}</td>
 ${showFood?`<td>${fmt(r.food)}</td>`:''}
 <td>${fmt(r.feed)}</td>
-<td class="${prev?deltaClass(r.dom,prev.dom):''}">${fmt(r.dom)}</td>
-<td style="border-left:1px solid var(--border2);" class="${prev?deltaClass(r.stocks,prev.stocks):''}">${fmt(r.stocks)}</td>
+<td class="${prev?dc2(r.dom,prev.dom):''}">${fmt(r.dom)}</td>
+<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.stocks,prev.stocks):''}">${fmt(r.stocks)}</td>
 <td>${su}</td>
 ${hasPrice?`<td class="aafc-price" style="border-left:1px solid var(--border2);">$${fmt(r.price)}</td>`:''}
 </tr>`;
@@ -8338,87 +8451,111 @@ function initFxDashboard(){
   var el = document.getElementById('fx-dashboard');
   if(!el) return;
   var FRED_D = fredData || {};
-  // Check if we have FX data
+
+  // ── FX data access helpers (fredData is newest-first: index 0 = most recent) ──
+  function fxLatest(arr)  { return (arr && arr.length) ? arr[0].v : null; }
+  function fxPrev(arr)    { return (arr && arr.length > 1) ? arr[1].v : null; }
+  // Returns chronological array of values (oldest→newest) for charting
+  function fxChronVals(arr){ return arr ? arr.slice().reverse().map(function(d){ return d.v; }) : []; }
+  function fxLatestDate(arr){ return (arr && arr.length) ? arr[0].d : ''; }
+
   var hasFx = FX_PAIRS.some(function(p){ return FRED_D[p.id] && FRED_D[p.id].length > 0; });
   if(!hasFx){
-    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:14px;">FX data loading — FRED pipeline needs to run with new series (DEXCAUS, DEXUSEU, etc.)<br>Deploy updated fetch_fred.py and trigger workflow.</div>';
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:14px;">'
+      + '<strong style="color:var(--amber);">FX DATA NOT YET LOADED</strong><br><br>'
+      + 'Deploy the updated <code>fetch_fred.py</code> to the repo and trigger the GitHub Actions workflow.<br>'
+      + 'New series required: DEXCAUS, DEXUSEU, DEXUSUK, DEXJPUS, DEXUSAL, DEXBZUS + 6 foreign 10Y yields.<br><br>'
+      + '<span style="font-size:12px;color:var(--text4);">Macro Dashboard data (yield curve, credit, labor) loads separately and is unaffected.</span>'
+      + '</div>';
     return;
   }
-  var us10 = FRED_D['DGS10'] || [];
-  var usRate = us10.length ? parseFloat(us10[us10.length-1][1]) : null;
+
+  var us10arr = FRED_D['DGS10'] || [];
+  var usRate = fxLatest(us10arr);  // latest US 10Y yield
+
   var h = '';
-  h += '<div style="font-size:16px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:0 0 10px;border-bottom:3px solid var(--amber);margin-bottom:16px;">CURRENCY DASHBOARD</div>';
-  // Scoreboard
+  h += freshStamp('FRED', _pipelineDates && _pipelineDates['FRED'], 'CURRENCIES');
+
+  // ── Scoreboard ─────────────────────────────────────────────────────────────
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">';
   FX_PAIRS.forEach(function(p){
-    var data = FRED_D[p.id] || [];
-    if(!data.length){ h += '<div></div>'; return; }
-    var latest = parseFloat(data[data.length-1][1]);
-    var prev = data.length > 1 ? parseFloat(data[data.length-2][1]) : latest;
-    var chg = latest - prev;
-    var pctChg = prev ? (chg / prev * 100) : 0;
+    var arr = FRED_D[p.id] || [];
+    if(!arr.length){ h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px 14px;opacity:.4;"><div style="font-size:13px;font-weight:700;color:var(--text3);">'+p.label+'</div><div style="font-size:12px;color:var(--text4);margin-top:4px;">No data — run pipeline</div></div>'; return; }
+    var latest = fxLatest(arr);
+    var prev   = fxPrev(arr) !== null ? fxPrev(arr) : latest;
+    var chg    = latest - prev;
+    var pct    = prev ? (chg / prev * 100) : 0;
+    var dec    = (p.id === 'DEXJPUS') ? 2 : 4;
     var chgCls = chg > 0.0001 ? 'color:var(--green)' : chg < -0.0001 ? 'color:var(--red)' : 'color:var(--text3)';
-    // Rate differential
-    var foreignRate = null;
-    var rateData = p.rateId ? (FRED_D[p.rateId] || []) : [];
-    if(rateData.length) foreignRate = parseFloat(rateData[rateData.length-1][1]);
+    var rateArr = p.rateId ? (FRED_D[p.rateId] || []) : [];
+    var foreignRate = fxLatest(rateArr);
     var rateDiff = (usRate !== null && foreignRate !== null) ? (usRate - foreignRate) : null;
+    var asof = fxLatestDate(arr);
     h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px 14px;">';
-    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
-    h += '<span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);">'+p.label+'</span>';
-    h += '<span style="font-size:12px;color:var(--text3);">'+p.desc+'</span></div>';
-    h += '<div style="font-size:22px;font-weight:800;color:var(--text);line-height:1;">'+latest.toFixed(p.id==='DEXJPUS'?2:4)+'</div>';
-    h += '<div style="font-size:13px;font-weight:700;margin-top:4px;'+chgCls+'">'+(chg>=0?'+':'')+chg.toFixed(4)+' ('+pctChg.toFixed(2)+'%)</div>';
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">';
+    h += '<span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);">'+p.flag+' '+p.label+'</span>';
+    h += '<span style="font-size:11px;color:var(--text3);">'+p.desc+'</span></div>';
+    h += '<div style="font-size:24px;font-weight:800;color:var(--text);line-height:1;font-variant-numeric:tabular-nums;">'+latest.toFixed(dec)+'</div>';
+    h += '<div style="font-size:13px;font-weight:700;margin-top:5px;'+chgCls+'">'+(chg>=0?'+':'')+chg.toFixed(dec)+' ('+(pct>=0?'+':'')+pct.toFixed(2)+'%)</div>';
+    h += '<div style="font-size:11px;color:var(--text4);margin-top:3px;">as of '+asof+'</div>';
     if(rateDiff !== null){
-      var rdCls = rateDiff > 0 ? 'color:var(--green)' : 'color:var(--red)';
-      h += '<div style="font-size:11px;color:var(--text3);margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">Rate Spread: <span style="font-weight:800;'+rdCls+'">'+(rateDiff*100).toFixed(0)+' bps</span></div>';
+      var bps = rateDiff * 100;
+      var rdCls = bps > 0 ? 'color:var(--green)' : 'color:var(--red)';
+      h += '<div style="font-size:11px;color:var(--text3);margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">US−Foreign spread: <span style="font-weight:800;'+rdCls+'">'+(bps>=0?'+':'')+bps.toFixed(0)+' bps</span></div>';
     }
     h += '</div>';
   });
   h += '</div>';
-  // Charts - 2 column grid
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">';
+
+  // ── Charts: 2-column grid ──────────────────────────────────────────────────
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">';
   FX_PAIRS.forEach(function(p, idx){
     var cid = 'fx-chart-'+idx;
-    h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:0;overflow:hidden;">';
+    var arr = FRED_D[p.id] || [];
+    var latestVal = arr.length ? fxLatest(arr).toFixed(p.id==='DEXJPUS'?2:4) : '—';
+    h += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden;">';
     h += '<div style="padding:8px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;">';
-    h += '<span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);">'+p.label+'</span>';
-    h += '<span style="font-size:12px;color:var(--text3);">'+p.desc+' · 1Y Daily</span></div>';
-    h += '<div style="padding:10px 14px;"><canvas id="'+cid+'" style="width:100%;height:200px;display:block;background:var(--bg);"></canvas></div></div>';
+    h += '<span style="font-size:13px;font-weight:900;letter-spacing:.10em;color:var(--amber);">'+p.flag+' '+p.label+'</span>';
+    h += '<span style="font-size:12px;color:var(--text3);">'+latestVal+' · 1Y</span></div>';
+    h += '<div style="padding:10px 14px 8px;"><canvas id="'+cid+'" style="width:100%;height:180px;display:block;background:var(--bg);"></canvas></div></div>';
   });
   h += '</div>';
-  // Rate differentials table
-  h += '<div style="margin-top:20px;">';
-  h += '<div style="font-size:14px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);padding:10px 0 8px;border-bottom:2px solid var(--amber);margin-bottom:0;">RATE DIFFERENTIALS — US 10Y vs FOREIGN 10Y</div>';
+
+  // ── Rate differential table ────────────────────────────────────────────────
+  h += '<div style="font-size:13px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);padding:10px 0 8px;border-bottom:2px solid var(--amber);margin-bottom:0;">RATE DIFFERENTIALS — US 10Y vs FOREIGN 10Y</div>';
   h += '<table class="bal-table" style="table-layout:auto;"><thead><tr>';
-  h += '<th style="width:120px;">Pair</th><th>US 10Y</th><th>Foreign 10Y</th><th>Spread</th><th>Signal</th>';
+  h += '<th style="text-align:left;width:120px;">Pair</th>';
+  h += '<th>US 10Y</th><th>Foreign 10Y</th><th>Spread (bps)</th><th>Signal</th><th style="text-align:left;font-size:12px;color:var(--text3);">Interpretation</th>';
   h += '</tr></thead><tbody>';
-  FX_PAIRS.forEach(function(p,i){
-    var foreignRate = null;
-    var rateData = p.rateId ? (FRED_D[p.rateId] || []) : [];
-    if(rateData.length) foreignRate = parseFloat(rateData[rateData.length-1][1]);
-    var spread = (usRate!==null && foreignRate!==null) ? usRate - foreignRate : null;
-    var signal = '—';
-    var sigCls = '';
-    if(spread !== null){
-      var spreadBps = spread * 100;
-    if(spreadBps > 100){ signal = 'USD bullish'; sigCls = 'color:var(--green)'; }
-      else if(spreadBps > 0){ signal = 'Mild USD+'; sigCls = 'color:var(--text)'; }
-      else if(spreadBps > -100){ signal = 'Mild USD−'; sigCls = 'color:var(--text)'; }
-      else { signal = 'USD bearish'; sigCls = 'color:var(--red)'; }
+  FX_PAIRS.forEach(function(p, i){
+    var rateArr = p.rateId ? (FRED_D[p.rateId] || []) : [];
+    var foreignRate = fxLatest(rateArr);
+    var spread = (usRate !== null && foreignRate !== null) ? (usRate - foreignRate) : null;
+    var spreadBps = spread !== null ? spread * 100 : null;
+    var signal = '—', sigCls = '', note = '—';
+    if(spreadBps !== null){
+      if(spreadBps > 150)  { signal='USD strongly bullish'; sigCls='color:var(--green)'; note='Large yield advantage attracts capital to USD'; }
+      else if(spreadBps > 50)  { signal='Mild USD bullish'; sigCls='color:var(--green)'; note='Modest carry advantage favors USD'; }
+      else if(spreadBps > -50) { signal='Neutral'; sigCls='color:var(--text)'; note='Near-parity, watch for shifts'; }
+      else if(spreadBps > -150){ signal='Mild USD bearish'; sigCls='color:var(--red)'; note='Foreign yield advantage may weigh on USD'; }
+      else                      { signal='USD strongly bearish'; sigCls='color:var(--red)'; note='Significant foreign yield advantage'; }
     }
     var alt = i%2 ? ' class="row-alt"' : '';
+    var bpsStr = spreadBps !== null ? (spreadBps>=0?'+':'')+spreadBps.toFixed(0) : '—';
+    var bpsCls = spreadBps !== null ? (spreadBps>0?'color:var(--green)':'color:var(--red)') : '';
     h += '<tr'+alt+'>';
-    h += '<td style="font-weight:800;">'+p.label+'</td>';
-    h += '<td>'+(usRate!==null ? usRate.toFixed(2)+'%' : '—')+'</td>';
-    h += '<td>'+(foreignRate!==null ? foreignRate.toFixed(2)+'%' : '—')+'</td>';
-    h += '<td style="font-weight:800;'+(spread!==null?(spreadBps>0?'color:var(--green)':'color:var(--red)'):'')+'\">'+(spread!==null ? (spreadBps>=0?'+':'')+spreadBps.toFixed(0)+' bps' : '—')+'</td>';
+    h += '<td style="font-weight:800;">'+p.flag+' '+p.label+'</td>';
+    h += '<td>'+(usRate !== null ? usRate.toFixed(2)+'%' : '—')+'</td>';
+    h += '<td>'+(foreignRate !== null ? foreignRate.toFixed(2)+'%' : '<span style="color:var(--text4);font-size:12px;">no data</span>')+'</td>';
+    h += '<td style="font-weight:800;'+bpsCls+'">'+bpsStr+'</td>';
     h += '<td style="font-weight:700;'+sigCls+'">'+signal+'</td>';
+    h += '<td style="font-size:12px;color:var(--text3);">'+note+'</td>';
     h += '</tr>';
   });
-  h += '</tbody></table></div>';
+  h += '</tbody></table>';
   el.innerHTML = h;
-  // Draw charts
+
+  // ── Draw charts (data is newest-first → reverse for chronological display) ─
   setTimeout(function(){
     var isDark = document.body.classList.contains('dark');
     var tc = isDark ? '#7a8a9a' : '#5a6878';
@@ -8426,41 +8563,44 @@ function initFxDashboard(){
     FX_PAIRS.forEach(function(p, idx){
       var canvas = document.getElementById('fx-chart-'+idx);
       if(!canvas) return;
-      var data = FRED_D[p.id] || [];
-      if(!data.length) return;
+      var arr = FRED_D[p.id] || [];
+      if(!arr.length) return;
+      // Reverse from newest-first to oldest-first for left→right chronological chart
+      var vals = fxChronVals(arr);
+      if(!vals.length) return;
       var dpr = window.devicePixelRatio || 1;
-      var W = canvas.clientWidth, H = canvas.clientHeight;
+      var W = canvas.clientWidth || 300;
+      var H = canvas.clientHeight || 180;
       canvas.width = W * dpr; canvas.height = H * dpr;
       var ctx = canvas.getContext('2d');
       ctx.scale(dpr, dpr);
-      var PAD = {t:10, r:52, b:22, l:6};
-      var vals = data.map(function(d){ return parseFloat(d[1]); }).filter(function(v){ return !isNaN(v); });
-      if(!vals.length) return;
+      var PAD = {t:8, r:50, b:20, l:6};
       var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
-      var range = mx - mn || 1;
+      var range = mx - mn || 0.001;
       mn -= range * 0.05; mx += range * 0.05;
       var pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
-      var xP = function(i){ return PAD.l + (i / (vals.length - 1)) * pw; };
+      var n = vals.length;
+      var xP = function(i){ return PAD.l + (n > 1 ? (i / (n-1)) * pw : pw/2); };
       var yP = function(v){ return PAD.t + (1 - (v - mn) / (mx - mn)) * ph; };
-      // Grid
+      var dec = (p.id === 'DEXJPUS') ? 1 : 3;
+      // Grid lines + labels
       ctx.strokeStyle = gc; ctx.lineWidth = 0.5;
-      for(var g=0;g<4;g++){
+      for(var g = 0; g < 4; g++){
         var gy = PAD.t + (g/3)*ph;
-        ctx.beginPath(); ctx.moveTo(PAD.l,gy); ctx.lineTo(W-PAD.r,gy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PAD.l, gy); ctx.lineTo(W - PAD.r, gy); ctx.stroke();
         ctx.font = '600 10px Courier New'; ctx.fillStyle = tc; ctx.textAlign = 'right';
-        ctx.fillText((mx - (g/3)*(mx-mn)).toFixed(p.id==='DEXJPUS'?1:3), W-PAD.r+48, gy+4);
+        ctx.fillText((mx - (g/3)*(mx-mn)).toFixed(dec), W - PAD.r + 48, gy + 4);
       }
-      // Line
-      ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 1.5;
+      // Price line
+      ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
       ctx.beginPath();
-      for(var i=0;i<vals.length;i++){
-        if(i===0) ctx.moveTo(xP(i), yP(vals[i]));
-        else ctx.lineTo(xP(i), yP(vals[i]));
+      for(var i = 0; i < n; i++){
+        i === 0 ? ctx.moveTo(xP(i), yP(vals[i])) : ctx.lineTo(xP(i), yP(vals[i]));
       }
       ctx.stroke();
-      // Endpoint
-      var last = vals[vals.length-1];
-      ctx.beginPath(); ctx.arc(xP(vals.length-1), yP(last), 3, 0, Math.PI*2);
+      // Terminal dot
+      var lastV = vals[n-1];
+      ctx.beginPath(); ctx.arc(xP(n-1), yP(lastV), 3, 0, Math.PI*2);
       ctx.fillStyle = '#f5a623'; ctx.fill();
     });
   }, 100);
