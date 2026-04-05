@@ -494,8 +494,8 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
             </div>
             <span id="cot-chart-asof" style="margin-left:auto;font-size:11px;color:var(--text3);letter-spacing:.08em;"></span>
           </div>
-          <canvas id="cot-chart-canvas" style="width:100%;height:680px;display:block;background:var(--bg);"></canvas>
-      <canvas id="cot-oi-canvas" style="width:100%;height:220px;display:block;margin-top:4px;background:var(--bg);"></canvas>
+          <canvas id="cot-chart-canvas" style="width:100%;height:600px;display:block;background:var(--bg);"></canvas>
+      <canvas id="cot-oi-canvas" style="width:100%;height:160px;display:block;margin-top:4px;background:var(--bg);"></canvas>
         </div><!-- charts area -->
       </div><!-- flex container -->
     </div>
@@ -1789,7 +1789,7 @@ function groupNavClick(group, tab){
     document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
     document.getElementById(tab + '-page-wrap').classList.add('active');
     window.scrollTo(0,0);
-    if(tab==='cot' && !cotInited){initCot();}
+    if(tab==='cot' && !cotInited){initCot();} else if(tab==='cot'){requestAnimationFrame(()=>drawCotChart());}
     if(tab==='reg' && !regInited){initRegression();}
     if(tab==='spreads' && !spreadsInited){initSpreads();}
     if(tab==='carry' && !carryInited){initCarry();}
@@ -3486,6 +3486,7 @@ return String(Math.round(v));
 function fmtKsgn(v){return (v>=0?'+':'')+fmtK(v);}
 function fmtPct(v){return v.toFixed(1)+'%';}
 let cotChartMarket = null;
+let cotChartSection = null;  // null=individual market, else category name
 let cotChartMode = 'fund';
 let cotChartUnit = 'contracts';
 function openCotChart(name, noScroll){
@@ -3520,7 +3521,51 @@ document.getElementById('cot-tog-contracts').classList.toggle('active', unit==='
 document.getElementById('cot-tog-pct').classList.toggle('active', unit==='pct');
 drawCotChart();
 }
+function setCotSection(cat){
+cotChartSection = cat;
+cotChartMarket = null;
+// Update active state on sidebar
+document.querySelectorAll('.cot-sb-cat').forEach(b=>{
+  const active = b.dataset.cat === cat;
+  b.classList.toggle('active', active);
+  b.style.borderLeftColor = active ? 'var(--amber)' : 'transparent';
+  b.style.color = active ? 'var(--amber)' : '';
+});
+document.querySelectorAll('.cot-sb-btn').forEach(b=>b.classList.remove('active'));
+document.querySelectorAll('.cot-row-active').forEach(r=>r.classList.remove('cot-row-active'));
+drawCotChart();
+}
 function drawCotChart(){
+// ── Section-aggregate mode ────────────────────────────────────────────────
+if(cotChartSection && !cotChartMarket){
+  const CAT_MARKETS = Object.entries(COT).filter(([,d])=>d.cat===cotChartSection).map(([k,v])=>v);
+  if(!CAT_MARKETS.length) return;
+  // Build aggregated rows by date
+  const dateMap = {};
+  for(const md of CAT_MARKETS){
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-3);
+    const cutStr = cutoff.toISOString().slice(0,10);
+    for(const r of md.rows){
+      if(r.date < cutStr) continue;
+      if(!dateMap[r.date]) dateMap[r.date] = {date:r.date, mm_l:0, mm_s:0, mm_net:0, pm_l:0, pm_s:0, pm_net:0, oi:0};
+      const agg = dateMap[r.date];
+      agg.mm_l   += r.mm_l   || 0;
+      agg.mm_s   += r.mm_s   || 0;
+      agg.mm_net += r.mm_net || 0;
+      agg.pm_l   += r.pm_l   || 0;
+      agg.pm_s   += r.pm_s   || 0;
+      agg.pm_net += r.pm_net || 0;
+      agg.oi     += r.oi     || 0;
+    }
+  }
+  const aggRows = Object.values(dateMap).sort((a,b)=>a.date<b.date?-1:1);
+  if(!aggRows.length) return;
+  const last = aggRows[aggRows.length-1];
+  const asofEl = document.getElementById('cot-chart-asof');
+  if(asofEl) asofEl.textContent = cotChartSection.toUpperCase() + ' AGGREGATE · AS OF ' + last.date;
+  _drawCotChartFromRows(aggRows, cotChartSection.toUpperCase() + ' — AGGREGATE');
+  return;
+}
 if(!cotChartMarket){
 const firstKey = Object.keys(COT)[0];
 if(firstKey) cotChartMarket = firstKey;
@@ -3534,10 +3579,18 @@ if(asofEl) asofEl.textContent = 'AS OF ' + last.date;
 }
 const d = COT[cotChartMarket];
 if(!d || !d.rows.length) return;
+const cutoff2 = new Date(); cutoff2.setFullYear(cutoff2.getFullYear()-3);
+const cutStr2 = cutoff2.toISOString().slice(0,10);
+const filteredRows = d.rows.filter(r => r.date >= cutStr2);
+_drawCotChartFromRows(filteredRows, cotChartMarket);
+}
+function _drawCotChartFromRows(rows, title){
 const canvas = document.getElementById('cot-chart-canvas');
 const isDark = document.body.classList.contains('dark');
-const W = canvas.parentElement.clientWidth || canvas.offsetWidth || 900;
-const PANEL_H = 410;
+// Robust width: try getBoundingClientRect first (works even before layout settles)
+const rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
+const W = (rect && rect.width > 10) ? rect.width : (canvas.offsetWidth || 900);
+const PANEL_H = 290;
 const GAP = 26;
 const H = PANEL_H * 2 + GAP;
 const dpr = window.devicePixelRatio || 1;
@@ -3547,12 +3600,8 @@ const ctx = canvas.getContext('2d');
 ctx.scale(dpr, dpr);
 ctx.fillStyle = bg0();
 ctx.fillRect(0,0,W,H);
-const cutoff = new Date();
-cutoff.setFullYear(cutoff.getFullYear() - 3);
-const cutStr = cutoff.toISOString().slice(0,10);
-const rows = d.rows.filter(r => r.date >= cutStr);
-if(!rows.length) return;
 const n = rows.length;
+if(!n) return;
 const isPct = cotChartUnit === 'pct';
 const labelFont  = `700 12px ${CHART_FONT}`;
 const tickFont   = `700 12px ${CHART_FONT}`;
@@ -3704,8 +3753,9 @@ drawCotOiChart(rows, isDark);
 function drawCotOiChart(rows, isDark){
 const canvas = document.getElementById('cot-oi-canvas');
 if(!canvas || !rows || !rows.length) return;
-const W = canvas.parentElement.clientWidth || canvas.offsetWidth || 900;
-const H = 220;
+const oiRect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
+const W = (oiRect && oiRect.width > 10) ? oiRect.width : (canvas.offsetWidth || 900);
+const H = 160;
 const dpr = window.devicePixelRatio || 1;
 canvas.width = W*dpr; canvas.height = H*dpr;
 canvas.style.width = W+'px'; canvas.style.height = H+'px';
@@ -3719,7 +3769,8 @@ const barBC = isDark ? 'rgba(91,156,240,0.7)' : 'rgba(58,106,170,0.6)';
 const priceC = isDark ? '#f5a623' : '#D4850A';
 ctx.fillStyle = bg;
 ctx.fillRect(0,0,W,H);
-const PAD = {top:26, right:68, bottom:28, left:14};
+// Left pad=58 to give price axis labels room; right pad=68 for OI labels
+const PAD = {top:22, right:68, bottom:24, left:58};
 const pw = W - PAD.left - PAD.right;
 const ph = H - PAD.top - PAD.bottom;
 const n = rows.length;
@@ -3849,16 +3900,17 @@ var sideHtml = '';
 for(const cat of CAT_ORDER){
 const markets = Object.entries(COT).filter(([,d])=>d.cat===cat).map(([k])=>k);
 if(!markets.length) continue;
-sideHtml += '<div class="rpt-nav-section" style="margin-top:0;padding:8px 12px 5px;border-top:1px solid var(--border2);">'+cat+'</div>';
+sideHtml += '<button class="rpt-nav-section cot-sb-cat" data-cat="'+cat+'" onclick="setCotSection(''+cat+'')" style="margin-top:0;padding:8px 12px 5px;border-top:1px solid var(--border2);width:100%;text-align:left;background:none;border-left:3px solid transparent;cursor:pointer;display:block;color:var(--amber);font-size:11px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;">&#9654; '+cat+'</button>';
 for(const m of markets){
-sideHtml += '<button class="rpt-nav-item cot-sb-btn" data-market="'+m+'" onclick="setCotSidebar(\''+m.replace(/'/g,"\\'")+'\')" style="padding:7px 12px;font-size:12px;">'+m+'</button>';
+sideHtml += '<button class="rpt-nav-item cot-sb-btn" data-market="'+m+'" onclick="setCotSidebar(''+m.replace(/'/g,"\'")+'''+')" style="padding:7px 12px;font-size:12px;">'+m+'</button>';
 }
 }
 sel.innerHTML = sideHtml;
 const firstMarket = Object.keys(COT)[0];
 cotChartMarket = firstMarket;
+cotChartSection = null;
 setCotSidebar(firstMarket, true);
-drawCotChart();
+requestAnimationFrame(() => { drawCotChart(); });
 renderCot();
 }
 function renderCot(){
