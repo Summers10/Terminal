@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: '3.11'
  
+      - name: Install dependencies
+        run: pip install yfinance
+ 
       - name: Run NASS fetch
         env:
           NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
@@ -44,6 +47,10 @@ jobs:
         run: python scripts/fetch_statscan.py
         continue-on-error: true
  
+      - name: Run Yahoo prices fetch
+        run: python scripts/fetch_prices.py
+        continue-on-error: true
+ 
       - name: Commit data
         run: |
           git config user.name "github-actions[bot]"
@@ -52,5 +59,4 @@ jobs:
           git diff --staged --quiet || git commit -m "Auto-update data $(date -u +%Y-%m-%d)"
           git pull --rebase
           git push
- 
  
