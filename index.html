@@ -4839,7 +4839,7 @@ return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
 const SERIES = [{ key:'producer_deliveries', label:'Producer Deliveries', unit:'Kt', showForGrain:['Canola','Wheat','Barley'] },
 { key:'crush', label:'Domestic Disappearance', unit:'Kt', showForGrain:['Canola','Wheat','Barley'] },
 { key:'exports', label:'Exports', unit:'Kt', showForGrain:['Canola','Wheat','Barley'] },
-{ key:'commercial_stocks', label:'Commercial Stocks (Current Wk)', unit:'Kt', showForGrain:['Canola','Wheat','Barley'] },];
+{ key:'commercial_stocks', label:'Commercial Stocks', unit:'Kt', showForGrain:['Canola','Wheat','Barley'] },];
 const activeS = SERIES.filter(s => {
 if(!s.showForGrain.includes(g)) return false;
 if(!gData[s.key]) return false;
@@ -4933,12 +4933,13 @@ function buildSeriesCard(s, curYear, compareYears, curWeek, gData){
 const prevYr = compareYears[0] || '';
 const isBarChart = (s.key === 'producer_deliveries' || s.key === 'crush');
 const legStyle = 'display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;font-family:"Courier New",monospace;color:var(--text);';
+const hasProj = (s.key === 'exports');
 const legendHtml = isBarChart
 ? `<span style="${legStyle}"><span style="display:inline-block;width:14px;height:10px;background:rgba(245,166,35,0.8);border-radius:2px;flex-shrink:0;"></span>${curYear}</span>
 <span style="${legStyle}"><span style="display:inline-block;width:14px;height:10px;background:rgba(140,130,120,0.45);border-radius:2px;flex-shrink:0;"></span>${prevYr}</span>`
 : `<span style="${legStyle}"><span style="display:inline-block;width:18px;height:2.5px;background:#f5a623;vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>${curYear}</span>
-<span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #5b9cf0;vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>${prevYr}</span>
-<span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:1.5px dashed rgba(245,166,35,0.5);vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>Proj. (10wk avg pace)</span>`;
+<span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:2.5px dashed #5b9cf0;vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>${prevYr}</span>` +
+(hasProj ? `<span style="${legStyle}"><span style="display:inline-block;width:18px;height:0;border-top:1.5px dashed rgba(245,166,35,0.5);vertical-align:middle;margin-right:2px;flex-shrink:0;"></span>Proj. (10wk avg pace)</span>` : '');
 const subLabel = isBarChart ? 'Weekly increment · Ktonnes' : 'Cumulative YTD · Ktonnes';
 return `<div class="gsw-card">
 <div class="gsw-card-header">
@@ -5125,6 +5126,17 @@ if(lastCur.length){
 const lp = lastCur[lastCur.length-1];
 ctx.beginPath(); ctx.arc(xP(lp.week), yP(lp.value), 3.5, 0, Math.PI*2);
 ctx.fillStyle = '#f5a623'; ctx.fill();
+// Label previous year endpoint
+const lastPrev = (seriesData[prevYear]||[]).filter(p=>p.week<=52);
+if(lastPrev.length){
+const pp = lastPrev[lastPrev.length-1];
+ctx.beginPath(); ctx.arc(xP(pp.week), yP(pp.value), 2.5, 0, Math.PI*2);
+ctx.fillStyle = '#5b9cf0'; ctx.globalAlpha = 0.7; ctx.fill(); ctx.globalAlpha = 1;
+ctx.font = `700 11px ${CHART_FONT}`;
+ctx.fillStyle = DARK() ? 'rgba(91,156,240,0.7)' : 'rgba(50,100,180,0.7)';
+ctx.textAlign = 'left';
+ctx.fillText(fmtKt(pp.value), xP(pp.week)+6, yP(pp.value)+4);
+}
 if(skey === 'exports' || skey === 'crush' || skey === 'producer_deliveries'){
 const prevPtsFull = (seriesData[prevYear]||[]).filter(p=>p.week<=52);
 const prevAtWk52  = prevPtsFull.find(p=>p.week===52) || prevPtsFull[prevPtsFull.length-1];
@@ -6491,7 +6503,6 @@ html += '<div class="panel-hdr"><span class="panel-title">WEEKLY EXPORT DATA</sp
 html += '<div class="exp-tbl-wrap"><table class="exp-tbl"><thead>';
 html += '<tr>';
 html += '<th rowspan="2" style="text-align:left;vertical-align:bottom;">COMMODITY</th>';
-html += '<th rowspan="2" style="text-align:left;vertical-align:bottom;font-size:14px;color:var(--text3);">UNIT&nbsp;/&nbsp;WK</th>';
 html += '<th colspan="3" style="text-align:center;border-left:2px solid var(--border2);border-bottom:1px solid var(--border2);">WEEKLY INSPECTIONS</th>';
 html += '<th colspan="3" style="text-align:center;border-left:2px solid var(--border2);border-bottom:1px solid var(--border2);">WEEKLY NET SALES</th>';
 html += '<th colspan="3" style="text-align:center;border-left:2px solid var(--border2);border-bottom:1px solid var(--border2);">YTD NET SALES</th>';
@@ -6514,7 +6525,6 @@ var yoyWkS  = (cd.wkSalCur!==null&&cd.wkSalPrev&&cd.wkSalPrev>0)?((cd.wkSalCur-c
 var yoyYtdS = (cd.ytdSalCur&&cd.ytdSalPrev&&cd.ytdSalPrev>0)?((cd.ytdSalCur-cd.ytdSalPrev)/cd.ytdSalPrev*100):null;
 html += '<tr>';
 html += '<td>'+cd.label+'</td>';
-html += '<td style="color:var(--text3);font-size:14px;">'+cd.unit+'&nbsp;/&nbsp;Wk'+cd.latestWk+'</td>';
 html += '<td class="exp-cur" style="border-left:2px solid var(--border2);">'+fmt(cd.wkInspCur)+'</td>';
 html += '<td>'+fmt(cd.wkInspPrev)+'</td>';
 html += '<td class="'+pcc(yoyWkI)+'">'+pcf(yoyWkI)+'</td>';
@@ -6683,9 +6693,9 @@ ctx.fillText(projLabel, projX - 6, projY - 7);
 ctx.globalAlpha = 1;
 ctx.fillStyle = comm.color; ctx.globalAlpha = 0.45;
 ctx.setLineDash([6,4]); ctx.strokeStyle = comm.color; ctx.lineWidth = 1.5;
-ctx.beginPath(); ctx.moveTo(PAD.l+300, 15); ctx.lineTo(PAD.l+318, 15); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(PAD.l+280, 9); ctx.lineTo(PAD.l+298, 9); ctx.stroke();
 ctx.setLineDash([]); ctx.globalAlpha = 1;
-ctx.fillStyle = tc; ctx.fillText('Proj. wk52', PAD.l+322, 18);
+ctx.fillStyle = tc; ctx.fillText('Proj. wk52', PAD.l+302, 12);
 }
 }
 ctx.save();
@@ -6694,15 +6704,15 @@ ctx.translate(12, H/2); ctx.rotate(-Math.PI/2);
 ctx.fillText('COMMITMENTS ('+comm.unit+')', 0, 0);
 ctx.restore();
 ctx.font=`700 12px ${CHART_FONT}`; ctx.textAlign='left';
-ctx.fillStyle=comm.color; ctx.fillRect(PAD.l,14,18,3);
-ctx.fillStyle=tc; ctx.fillText(curYear, PAD.l+22, 18);
+ctx.fillStyle=comm.color; ctx.fillRect(PAD.l,8,18,3);
+ctx.fillStyle=tc; ctx.fillText(curYear, PAD.l+22, 12);
 ctx.strokeStyle=prevCol; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
-ctx.beginPath(); ctx.moveTo(PAD.l+75,15); ctx.lineTo(PAD.l+93,15); ctx.stroke(); ctx.setLineDash([]);
-ctx.fillStyle=tc; ctx.fillText(prevYear, PAD.l+97, 18);
-ctx.fillStyle='rgba('+rr+','+gg+','+bb+','+(isDark?'0.45':'0.40')+')'; ctx.fillRect(PAD.l+155,10,10,8);
-ctx.fillStyle=tc; ctx.fillText('Ahead', PAD.l+169, 18);
-ctx.fillStyle=isDark?'rgba(148,163,184,0.45)':'rgba(100,116,139,0.4)'; ctx.fillRect(PAD.l+230,10,10,8);
-ctx.fillStyle=tc; ctx.fillText('Behind', PAD.l+244, 18);
+ctx.beginPath(); ctx.moveTo(PAD.l+75,9); ctx.lineTo(PAD.l+93,9); ctx.stroke(); ctx.setLineDash([]);
+ctx.fillStyle=tc; ctx.fillText(prevYear, PAD.l+97, 12);
+ctx.fillStyle='rgba('+rr+','+gg+','+bb+','+(isDark?'0.45':'0.40')+')'; ctx.fillRect(PAD.l+155,4,10,8);
+ctx.fillStyle=tc; ctx.fillText('Ahead', PAD.l+169, 12);
+ctx.fillStyle=isDark?'rgba(148,163,184,0.45)':'rgba(100,116,139,0.4)'; ctx.fillRect(PAD.l+215,4,10,8);
+ctx.fillStyle=tc; ctx.fillText('Behind', PAD.l+229, 12);
 }
 }
 var r2 = makeCanvas('exp-c2', 250);
@@ -10495,32 +10505,48 @@ function renderRptWasde(){
   var refYrs = getYears('Corn','United States');
   var cy = refYrs[0], py = refYrs[1];
   if(!cy){ el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data available</div>'; return; }
+  var prevWasde = PSD._prev_wasde || {};
+  function getPrevWasde(comm, country, yr, attr){
+    var key = comm+'|'+country+'|'+yr+'|'+attr;
+    return prevWasde[key] || null;
+  }
   function buildSection(title, unit, rows, convertFn, dec){
     var h = '<div class="panel" style="margin-bottom:18px;">';
     h += '<div class="panel-hdr"><div class="panel-title">'+title+'</div>';
     h += '<div class="panel-sub" style="font-size:13px;color:var(--text3);letter-spacing:.06em;">'+unit+'</div></div>';
     h += '<table class="bal-table" style="table-layout:auto;">';
     h += '<thead><tr><th style="width:140px;"></th>';
-    h += '<th class="latest" style="width:120px;">'+cy+'</th>';
-    h += '<th style="width:120px;">'+(py||'')+'</th>';
-    h += '<th style="width:100px;">Change</th>';
+    h += '<th class="latest" style="width:110px;">'+cy+'</th>';
+    h += '<th style="width:110px;color:var(--text3);font-size:12px;">Prev WASDE</th>';
+    h += '<th style="width:80px;font-size:12px;">MoM Δ</th>';
+    h += '<th style="width:110px;">'+(py||'')+'</th>';
+    h += '<th style="width:80px;">YoY Δ</th>';
     h += '</tr></thead><tbody>';
     rows.forEach(function(r,i){
       var curRaw = getVal(r.comm, r.country, cy, r.attr);
       var prevRaw = getVal(r.comm, r.country, py, r.attr);
+      var prevWRaw = getPrevWasde(r.comm, r.country, cy, r.attr);
       var cur = convertFn(curRaw, r.comm);
       var prev = convertFn(prevRaw, r.comm);
+      var prevW = convertFn(prevWRaw, r.comm);
       var chg = (cur!=null && prev!=null) ? cur - prev : null;
-      var chgStr = '—';
-      var chgCls = '';
+      var momChg = (cur!=null && prevW!=null) ? cur - prevW : null;
+      var chgStr = '—', chgCls = '';
       if(chg!=null){
         chgStr = (chg >= 0 ? '+' : '') + fN(chg, dec);
         chgCls = chg > 0.05 ? 'color:var(--green);' : chg < -0.05 ? 'color:var(--red);' : '';
       }
+      var momStr = '—', momCls = '';
+      if(momChg!=null && Math.abs(momChg) > 0.01){
+        momStr = (momChg >= 0 ? '+' : '') + fN(momChg, dec);
+        momCls = momChg > 0.05 ? 'color:var(--green);' : momChg < -0.05 ? 'color:var(--red);' : '';
+      } else if(prevW!=null) { momStr = '—'; }
       var alt = i%2 ? ' class="row-alt"' : '';
       h += '<tr'+alt+'>';
       h += '<td style="font-size:15px;font-weight:700;">'+r.label+'</td>';
       h += '<td class="latest">'+fN(cur, dec)+'</td>';
+      h += '<td style="color:var(--text3);">'+fN(prevW, dec)+'</td>';
+      h += '<td style="'+momCls+'font-weight:700;font-size:13px;">'+momStr+'</td>';
       h += '<td>'+fN(prev, dec)+'</td>';
       h += '<td style="'+chgCls+'font-weight:700;">'+chgStr+'</td>';
       h += '</tr>';
@@ -10530,6 +10556,9 @@ function renderRptWasde(){
   }
   var h = '';
   h += freshStamp('USDA PSD', _pipelineDates['USDA PSD'], cy + ' WASDE');
+
+  // ── ENDING STOCKS ──
+  h += '<div style="font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:16px 0 8px;border-bottom:2px solid var(--amber);margin-bottom:14px;">ENDING STOCKS</div>';
   h += buildSection('U.S. Ending Stocks', 'Million Bushels', [
     {comm:'Corn',country:'United States',attr:'Ending Stocks',label:'Corn'},
     {comm:'Soybeans',country:'United States',attr:'Ending Stocks',label:'Soybeans'},
@@ -10540,6 +10569,9 @@ function renderRptWasde(){
     {comm:'Soybeans',country:'World',attr:'Ending Stocks',label:'Soybeans'},
     {comm:'Wheat',country:'World',attr:'Ending Stocks',label:'Wheat'},
   ], toMMT, 1);
+
+  // ── PRODUCTION ──
+  h += '<div style="font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:16px 0 8px;border-bottom:2px solid var(--amber);margin-bottom:14px;margin-top:10px;">PRODUCTION</div>';
   h += buildSection('U.S. Production', 'Million Bushels', [
     {comm:'Corn',country:'United States',attr:'Production',label:'Corn'},
     {comm:'Soybeans',country:'United States',attr:'Production',label:'Soybeans'},
@@ -10558,6 +10590,9 @@ function renderRptWasde(){
     {comm:'Soybeans',country:'World',attr:'Production',label:'Soybeans'},
     {comm:'Wheat',country:'World',attr:'Production',label:'Wheat'},
   ], toMMT, 1);
+
+  // ── KEY EXPORTERS ──
+  h += '<div style="font-size:12px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:16px 0 8px;border-bottom:2px solid var(--amber);margin-bottom:14px;margin-top:10px;">KEY EXPORTERS</div>';
   h += buildSection('Wheat — Key Exporters', 'MMT · Production', [
     {comm:'Wheat',country:'Russia',attr:'Production',label:'Russia'},
     {comm:'Wheat',country:'European Union',attr:'Production',label:'EU'},
