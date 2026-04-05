@@ -726,14 +726,14 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <!-- Conditions view -->
         <div class="rpt-view" id="rpt-v-conditions">
           <div id="rpt-cond-score" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;align-items:stretch;">
-            <div class="panel" style="margin-bottom:0;display:flex;flex-direction:column;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;align-items:start;">
+            <div class="panel" style="margin-bottom:0;">
               <div class="panel-hdr"><div class="panel-title" id="rpt-cond-title">CROP CONDITIONS</div></div>
-              <div style="overflow:hidden;flex:1;"><table class="bal-table" id="rpt-cond-tbl" style="table-layout:auto;width:100%;"></table></div>
+              <div><table class="bal-table" id="rpt-cond-tbl" style="table-layout:auto;width:100%;"></table></div>
             </div>
-            <div class="panel" style="margin-bottom:0;display:flex;flex-direction:column;">
+            <div class="panel" style="margin-bottom:0;">
               <div class="panel-hdr"><div class="panel-title">GOOD / EXCELLENT %</div></div>
-              <div style="padding:14px 16px;flex:1;min-height:400px;"><canvas id="rpt-ge-chart" style="display:block;width:100%;height:100%;"></canvas></div>
+              <div style="padding:14px 16px;height:480px;"><canvas id="rpt-ge-chart" class="chart-canvas" style="height:100%;"></canvas></div>
             </div>
           </div>
         </div>
