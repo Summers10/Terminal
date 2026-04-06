@@ -697,10 +697,9 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <div class="page" id="reports-page-wrap" style="background:var(--bg);min-height:100vh;">
   <div class="toolbar">
     <div class="brand">
-    <div class="brand-sub">USDA NASS · Weekly Reports Dashboard</div></div>
+    <div class="brand-sub">USDA NASS · Reports</div></div>
     <div class="toolbar-sep"></div>
-    <span id="rpt-asof" style="font-size:13px;color:var(--text3);letter-spacing:.06em;"></span>
-    <span id="pipeline-freshness" style="font-size:11px;letter-spacing:.05em;display:flex;gap:12px;flex-wrap:wrap;"></span>
+
   </div>
   <div id="reports-page" style="max-width:1500px;margin:0 auto;padding:0 20px 40px;">
     <div id="rpt-loading" style="padding:40px 0;text-align:center;color:var(--text3);font-size:14px;letter-spacing:.1em;">Loading NASS data...</div>
@@ -711,6 +710,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       </div>
       <!-- RIGHT CONTENT -->
       <div id="rpt-main" style="flex:1;min-width:0;padding:0 0 0 20px;margin-left:220px;">
+        <div style="padding:6px 0 0;font-size:12px;color:var(--text3);letter-spacing:.06em;"><span id="rpt-asof"></span></div>
         <!-- Energy view -->
         <div class="rpt-view" id="rpt-v-energy" style="display:none;">
           <div id="rpt-energy-content"></div>
@@ -1005,7 +1005,7 @@ function showDataFreshness(elId, fetchedAt, label){
   // Track all dates
   if(fetchedAt) _pipelineDates[label] = fetchedAt;
   // Update both bars (NASS toolbar + global header)
-  ['pipeline-freshness','global-freshness'].forEach(function(barId){
+  ['global-freshness'].forEach(function(barId){
     var bar = document.getElementById(barId);
     if(!bar) return;
     var html = '';
@@ -1212,8 +1212,19 @@ function _parseCOT() {
     if (el2) el2.textContent = 'COT: API error (' + err.message + ')';
   }
 })();
-const EXPORTERS = {Wheat:["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],Corn:["United States","Brazil","Argentina","Ukraine"],Soybeans:["United States","Brazil","Argentina"],"Rapeseed/Canola":["Canada","Australia","European Union","Ukraine"],Cotton:["United States","Brazil","Australia","India"],"Beef and Veal":["United States","Australia","Brazil","Argentina"],"Soybean Meal":["Argentina","United States","Brazil","European Union"],"Soybean Oil":["Argentina","Brazil","United States","European Union"],Grains:["European Union","Russia","United States","Canada","Australia","Ukraine","Argentina","Brazil"],Oilseeds:["United States","Brazil","Argentina","Canada","Australia"]};
-const IMPORTERS = {Wheat:["Egypt","Turkey","Japan","China","Mexico"],Corn:["China","Mexico","Japan","Vietnam","Egypt","Indonesia"],Soybeans:["China","European Union","Japan","Mexico","Thailand","Indonesia"],"Rapeseed/Canola":["China","Japan","European Union","Mexico"],Cotton:["China","Vietnam","Bangladesh","Turkey"],"Beef and Veal":["United States","Japan","China","South Korea"],"Soybean Meal":["European Union","Indonesia","Vietnam","Thailand"],"Soybean Oil":["India","China","European Union","Pakistan"],Grains:["Egypt","China","Mexico","Japan","Indonesia","Turkey"],Oilseeds:["China","European Union","Japan","Mexico","Indonesia"]};
+const EXPORTERS = {Wheat:["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina","China"],Corn:["United States","Brazil","Argentina","Ukraine","China"],Soybeans:["United States","Brazil","Argentina","China"],"Rapeseed/Canola":["Canada","Australia","European Union","Ukraine","China"],Cotton:["United States","Brazil","Australia","India"],"Beef and Veal":["United States","Australia","Brazil","Argentina"],"Soybean Meal":["Argentina","United States","Brazil","European Union"],"Soybean Oil":["Argentina","Brazil","United States","European Union"],Grains:["European Union","Russia","United States","Canada","Australia","Ukraine","Argentina","Brazil"],Oilseeds:["United States","Brazil","Argentina","Canada","Australia"]};
+const IMPORTERS = {
+  Wheat:["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],
+  Corn:["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
+  Soybeans:["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
+  "Rapeseed/Canola":["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
+  Cotton:["China","Vietnam","Bangladesh","Pakistan","Turkey","Indonesia","India"],
+  "Beef and Veal":["United States","China","Japan","South Korea","European Union","Canada","United Kingdom"],
+  "Soybean Meal":["European Union","Indonesia","Philippines","Vietnam","Thailand","Bangladesh","South Korea","Japan","Egypt"],
+  "Soybean Oil":["China","India","Bangladesh","European Union","Pakistan","Algeria","Iran","Morocco"],
+  Grains:["China","Egypt","European Union","Indonesia","Mexico","Japan","Algeria","Turkey","Brazil","Bangladesh","Philippines","South Korea"],
+  Oilseeds:["China","European Union","Japan","Mexico","Bangladesh","Indonesia","Turkey"]
+};
 const BU_PER_MT  = {Wheat:36.744,Soybeans:36.744,Corn:39.368,"Rapeseed/Canola":44.092};
 const YIELD_CONV = {Wheat:14.87,Soybeans:14.87,Corn:15.93,"Rapeseed/Canola":17.84};
 let currentComm = 'Rapeseed/Canola';
@@ -10372,14 +10383,12 @@ var _rptHarvChart = null;
 var RPT_VIEWS = [
   {id:'energy',     label:'Energy',           section:'BALANCE SHEETS'},
   {id:'sd',         label:'USDA (S&D)',       section:null},
-  {id:'aafc',       label:'StatsCan (S&D)',   section:null},
   {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
   {id:'exports',    label:'Export Sales',     section:null},
   {id:'gsw',        label:'Grain Stats Weekly', section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
   {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
-  {id:'cattle',     label:'Cattle on Feed',   section:'LIVESTOCK'},
-  {id:'hogs',       label:'Hogs & Pigs',      section:null},
+
   {id:'wasde',      label:'WASDE (S&D)',      section:'MONTHLY'}
 ];
 
