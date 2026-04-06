@@ -8347,6 +8347,15 @@ function initRegression(){
 
 try { renderSummaryPage(); } catch(e) { console.warn('Initial summary render:', e); }
 
+// Pre-load FRED and weather data in background so Macro Snapshot + Weather
+// are ready without the user having to visit those tabs first.
+setTimeout(function(){
+  try { if(!macroInited) initMacro(); } catch(e){}
+}, 1500);
+setTimeout(function(){
+  try { if(!wxInited) initWx(); } catch(e){}
+}, 3000);
+
 // ══ MACRO DASHBOARD (FRED) ══
 let macroInited = false;
 let fredApiKey = "db2f5ad351573c6f6e34c1e1ec667feb";
