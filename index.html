@@ -10498,8 +10498,7 @@ function renderRptScoreboard(){
       h += '</div>';
       return;
     }
-    var cy = rptLatestYear(rows);
-    var cyRows = rows.filter(function(r){ return r.year === cy; });
+      var cyRows = rows.filter(function(r){ return r.year === cy; });
     var pyRows = rows.filter(function(r){ return r.year === cy - 1; });
     var latest = cyRows.length ? cyRows[cyRows.length - 1] : null;
     var prev = cyRows.length > 1 ? cyRows[cyRows.length - 2] : null;
@@ -10560,8 +10559,29 @@ function renderRptGEChart(){
   var cond = _nassData.crop_conditions || {};
   var rows = cond[_rptCrop] || [];
   var cy = rptLatestYear(rows);
-  function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
-  function yearPts(yr){ return rows.filter(function(r){ return r.year===yr; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); }).map(function(r){ return {x:weekNum(r.week_ending),y:rptGetGE(r)}; }); }
+  // Crop-year week: weeks since Aug 1 of the crop-year start.
+  // This gives a continuous 1-52 axis for any crop, including winter wheat
+  // which spans two calendar years (Oct of yr N → Jul of yr N+1).
+  function cropWeek(we){
+    var d = new Date(we + 'T12:00:00');
+    // Aug 1 of the crop year that contains this date
+    var aug1 = new Date(d.getFullYear(), 7, 1);
+    if(d < aug1) aug1 = new Date(d.getFullYear()-1, 7, 1);
+    return Math.max(1, Math.round((d - aug1) / (7*24*3600*1000)) + 1);
+  }
+  // For multi-year crops like winter wheat, the pipeline stores year as the
+  // CALENDAR year of the week_ending date. So Oct-Dec rows have year=N,
+  // Jan-Jul rows have year=N+1. We group by CROP year (Aug-Jul).
+  function cropYear(r){
+    var d = new Date(r.week_ending + 'T12:00:00');
+    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear()-1;
+  }
+  // Get all unique crop years in the data, newest first
+  var cropYears = [];
+  rows.forEach(function(r){ var cy2=cropYear(r); if(cropYears.indexOf(cy2)<0) cropYears.push(cy2); });
+  cropYears.sort(function(a,b){return b-a;});
+  var cy = cropYears[0] || new Date().getFullYear();
+  function yearPts(cropYr){ return rows.filter(function(r){ return cropYear(r)===cropYr; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); }).map(function(r){ return {x:cropWeek(r.week_ending),y:rptGetGE(r)}; }); }
   // Replace canvas element entirely - prevents Chart.js height accumulation on commodity change
   if(_rptGEChart){ _rptGEChart.destroy(); _rptGEChart = null; }
   var wrap = document.getElementById('rpt-ge-chart').parentElement;
@@ -10589,7 +10609,7 @@ function renderRptGEChart(){
     data: { datasets: datasets },
     options: { responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: tc }, ticks: { color: tc, stepSize: 4 }, grid: { color: gc } },
+        x: { type: 'linear', title: { display: true, text: 'Crop Week (Aug–Jul)', color: tc }, ticks: { color: tc, stepSize: 4 }, grid: { color: gc } },
         y: { title: { display: true, text: '% Good/Excellent', color: tc }, ticks: { color: tc }, grid: { color: gc } }
       },
       plugins: { legend: { labels: { color: tc, font: { family: "'Courier New',monospace", weight: '700', size: 11 }, boxWidth: 24, padding: 10 } } }
