@@ -736,21 +736,21 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
               <div style="padding:14px 16px;height:480px;position:relative;"><canvas id="rpt-ge-chart" style="position:absolute;top:14px;left:16px;right:16px;bottom:14px;width:calc(100% - 32px) !important;height:calc(100% - 28px) !important;"></canvas></div>
             </div>
           </div>
-        </div>
-        <!-- Progress view -->
-        <div class="rpt-view" id="rpt-v-progress" style="display:none;">
-          <div class="panel">
-            <div class="panel-hdr"><div class="panel-title" id="rpt-prog-title">CROP PROGRESS</div></div>
-            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-prog-tbl"></table></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-hdr"><div class="panel-title">PLANTING PACE</div></div>
-              <div style="padding:14px 16px;"><canvas id="rpt-plant-chart" class="chart-canvas" style="height:280px;"></canvas></div>
+          <!-- Progress section — merged into same tab -->
+          <div style="margin-top:20px;">
+            <div class="panel">
+              <div class="panel-hdr"><div class="panel-title" id="rpt-prog-title">CROP PROGRESS</div></div>
+              <div><table class="bal-table" id="rpt-prog-tbl" style="table-layout:auto;width:100%;"></table></div>
             </div>
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-hdr"><div class="panel-title">HARVEST PACE</div></div>
-              <div style="padding:14px 16px;"><canvas id="rpt-harv-chart" class="chart-canvas" style="height:280px;"></canvas></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-hdr"><div class="panel-title">PLANTING PACE</div></div>
+                <div style="padding:14px 16px;"><canvas id="rpt-plant-chart" class="chart-canvas" style="height:280px;"></canvas></div>
+              </div>
+              <div class="panel" style="margin-bottom:0;">
+                <div class="panel-hdr"><div class="panel-title">HARVEST PACE</div></div>
+                <div style="padding:14px 16px;"><canvas id="rpt-harv-chart" class="chart-canvas" style="height:280px;"></canvas></div>
+              </div>
             </div>
           </div>
         </div>
@@ -10373,8 +10373,7 @@ var RPT_VIEWS = [
   {id:'energy',     label:'Energy',           section:'BALANCE SHEETS'},
   {id:'sd',         label:'USDA (S&D)',       section:null},
   {id:'aafc',       label:'StatsCan (S&D)',   section:null},
-  {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
-  {id:'progress',   label:'Crop Progress',    section:null},
+  {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS', hasCrops:true},
   {id:'exports',    label:'Export Sales',     section:null},
   {id:'gsw',        label:'Grain Stats Weekly', section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
@@ -10454,13 +10453,12 @@ function setRptCrop(c, view){
 }
 
 function renderRptView(){
-  if(!_nassData && ['conditions','progress','stocks','acreage','cattle','hogs'].indexOf(_rptView) >= 0) return;
+  if(!_nassData && ['conditions','stocks','acreage','cattle','hogs'].indexOf(_rptView) >= 0) return;
   switch(_rptView){
     case 'energy': renderRptEnergy(); break;
     case 'sd': renderRptSD(); break;
     case 'aafc': renderRptAAFC(); break;
-    case 'conditions': renderRptScoreboard(); renderRptCondTable(); renderRptGEChart(); break;
-    case 'progress': renderRptProgressTable(); renderRptProgressCharts(); break;
+    case 'conditions': renderRptScoreboard(); renderRptCondTable(); renderRptGEChart(); renderRptProgressTable(); renderRptProgressCharts(); break;
     case 'stocks': renderRptStocks(); break;
     case 'acreage': renderRptAcreage(); break;
     case 'cattle': renderRptCattle(); break;
@@ -10657,90 +10655,236 @@ function renderRptGEChart(){
 }
 
 function renderRptProgressTable(){
+  if(!_nassData) return;
   var prog = _nassData.crop_progress || {};
-  var cy = new Date().getFullYear();
   var cropProg = prog[_rptCrop] || {};
-  // Find latest year across all stages
-  var allProgRows = [];
-  Object.values(cropProg).forEach(function(arr){ allProgRows = allProgRows.concat(arr); });
-  if(allProgRows.length) cy = rptLatestYear(allProgRows);
+  var isWinter = _rptCrop && _rptCrop.indexOf('WHEAT') >= 0;
+
+  // Collect all rows to find latest series year
+  var allRows = [];
+  Object.values(cropProg).forEach(function(arr){ allRows = allRows.concat(arr); });
+  if(!allRows.length){
+    document.getElementById('rpt-prog-title').textContent = _rptCrop + ' — PROGRESS';
+    document.getElementById('rpt-prog-tbl').innerHTML =
+      '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for ' + _rptCrop + ' yet this season</td></tr></tbody>';
+    return;
+  }
+
+  // seriesYear: use crop year (Aug-Jul) for winter wheat, calendar year for others
+  function seriesYear(r){
+    if(!isWinter) return r.year;
+    var d = new Date(r.week_ending + 'T12:00:00');
+    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1;
+  }
+
+  // Find current series year (newest)
+  var cy = 0;
+  allRows.forEach(function(r){ var sy = seriesYear(r); if(sy > cy) cy = sy; });
+
+  // Find prior-year match: go back exactly 52 weeks (364 days), fuzzy ±4 days
+  function findPY(pyRows, we){
+    var d = new Date(we + 'T12:00:00');
+    d.setDate(d.getDate() - 364);
+    var best = null, bestDiff = Infinity;
+    pyRows.forEach(function(r){
+      var diff = Math.abs(new Date(r.week_ending) - d);
+      if(diff < bestDiff && diff <= 4 * 86400000){ best = r; bestDiff = diff; }
+    });
+    return best;
+  }
+
   document.getElementById('rpt-prog-title').textContent = _rptCrop + ' — PROGRESS';
-  var stageKeys = Object.keys(cropProg).filter(function(s){ return s !== 'OTHER'; });
-  var h = '<thead><tr><th style="text-align:left;">Stage</th><th style="color:var(--amber);">This Week</th><th>Last Week</th><th>Last Year</th></tr></thead><tbody>';
-  var ri = 0;
+  var stageKeys = Object.keys(cropProg).filter(function(s){ return s !== 'OTHER'; })
+    .sort(); // alphabetical so order is stable
+
+  var h = '<thead><tr>'
+    + '<th style="text-align:left;">Stage</th>'
+    + '<th style="color:var(--amber);">This Week</th>'
+    + '<th>Last Week</th>'
+    + '<th>Last Year</th>'
+    + '</tr></thead><tbody>';
+
+  var ri = 0, shown = 0;
   stageKeys.forEach(function(stage){
-    var data = cropProg[stage];
-    var cyData = data.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return b.week_ending.localeCompare(a.week_ending); });
-    var pyData = data.filter(function(r){ return r.year === cy - 1; });
-    if(!cyData.length) return;
-    var latest = cyData[0];
-    var prev = cyData.length > 1 ? cyData[1] : null;
-    var pyWE = latest.week_ending.replace(String(cy), String(cy-1));
-    var pyMatch = pyData.filter(function(r){ return r.week_ending === pyWE; });
+    var data = cropProg[stage] || [];
+    var cyRows = data.filter(function(r){ return seriesYear(r) === cy; })
+                     .sort(function(a,b){ return b.week_ending.localeCompare(a.week_ending); });
+    var pyRows = data.filter(function(r){ return seriesYear(r) === cy - 1; });
+    if(!cyRows.length) return;
+    var latest = cyRows[0];
+    var prev   = cyRows.length > 1 ? cyRows[1] : null;
+    var pyRow  = findPY(pyRows, latest.week_ending);
     h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
     h += '<td style="text-align:left;font-size:14px;font-weight:800;letter-spacing:.06em;">' + stage + '</td>';
     h += '<td class="latest" style="font-size:16px;">' + latest.value + '%</td>';
     h += '<td>' + (prev ? prev.value + '%' : '—') + '</td>';
-    h += '<td style="color:var(--text3);">' + (pyMatch.length ? pyMatch[0].value + '%' : '—') + '</td>';
+    h += '<td style="color:var(--text3);">' + (pyRow ? pyRow.value + '%' : '—') + '</td>';
     h += '</tr>';
-    ri++;
+    ri++; shown++;
   });
-  if(!stageKeys.length) h += '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for ' + _rptCrop + ' yet this season</td></tr>';
+
+  if(!shown) h += '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for ' + _rptCrop + ' yet this season</td></tr>';
   h += '</tbody>';
   document.getElementById('rpt-prog-tbl').innerHTML = h;
 }
 
 function renderRptProgressCharts(){
+  if(!_nassData) return;
   var prog = _nassData.crop_progress || {};
+  var cropProg = prog[_rptCrop] || {};
+  var isWinter = _rptCrop && _rptCrop.indexOf('WHEAT') >= 0;
   var isDark = document.body.classList.contains('dark');
-  var cropProg = prog[_rptCrop] || {};
-  var allProgRows = [];
-  Object.values(cropProg).forEach(function(arr){ allProgRows = allProgRows.concat(arr); });
-  var cy = allProgRows.length ? rptLatestYear(allProgRows) : new Date().getFullYear();
-  function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
-  var cropProg = prog[_rptCrop] || {};
 
-  // Planting chart
-  var plantData = cropProg['PLANTED'] || [];
-  var cyPlant = plantData.filter(function(r){ return r.year === cy; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var pyPlant = plantData.filter(function(r){ return r.year === cy-1; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var ctxP = document.getElementById('rpt-plant-chart');
-  if(_rptPlantChart) _rptPlantChart.destroy();
-  _rptPlantChart = new Chart(ctxP, {
-    type: 'line',
-    data: { datasets: [
-      { label: String(cy), data: cyPlant, borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
-      { label: String(cy-1), data: pyPlant, borderColor: isDark ? 'rgba(245,166,35,0.35)' : 'rgba(212,133,10,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
-    ] },
-    options: { responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-        y: { min: 0, max: 100, title: { display: true, text: '% Planted', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
-      },
-      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
-    }
-  });
+  // seriesYear: crop year (Aug-Jul) for winter wheat, calendar year for others
+  function seriesYear(r){
+    if(!isWinter) return r.year;
+    var d = new Date(r.week_ending + 'T12:00:00');
+    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1;
+  }
 
-  // Harvest chart
-  var harvData = cropProg['HARVESTED'] || [];
-  var cyHarv = harvData.filter(function(r){ return r.year === cy; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var pyHarv = harvData.filter(function(r){ return r.year === cy-1; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var ctxH = document.getElementById('rpt-harv-chart');
-  if(_rptHarvChart) _rptHarvChart.destroy();
-  _rptHarvChart = new Chart(ctxH, {
-    type: 'line',
-    data: { datasets: [
-      { label: String(cy), data: cyHarv, borderColor: isDark ? '#2e8f52' : '#0E7A3A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
-      { label: String(cy-1), data: pyHarv, borderColor: isDark ? 'rgba(46,143,82,0.35)' : 'rgba(14,122,58,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
-    ] },
-    options: { responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-        y: { min: 0, max: 100, title: { display: true, text: '% Harvested', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
-      },
-      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
+  // xPos: crop week (weeks since Aug 1) for winter wheat, calendar week for others
+  function xPos(we){
+    var d = new Date(we + 'T12:00:00');
+    if(isWinter){
+      var aug1 = new Date(d.getFullYear(), 7, 1);
+      if(d < aug1) aug1 = new Date(d.getFullYear() - 1, 7, 1);
+      return Math.max(1, Math.round((d - aug1) / (7 * 24 * 3600 * 1000)) + 1);
+    } else {
+      var jan1 = new Date(d.getFullYear(), 0, 1);
+      return Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7);
     }
-  });
+  }
+
+  // Find current series year
+  var allRows = [];
+  Object.values(cropProg).forEach(function(arr){ allRows = allRows.concat(arr); });
+  var cy = 0;
+  allRows.forEach(function(r){ var sy = seriesYear(r); if(sy > cy) cy = sy; });
+  if(!cy) cy = new Date().getFullYear();
+
+  // Get points for a given stage and series year
+  function stagePts(stage, yr){
+    var data = cropProg[stage] || [];
+    return data
+      .filter(function(r){ return seriesYear(r) === yr; })
+      .sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); })
+      .map(function(r){ return {x: xPos(r.week_ending), y: r.value}; });
+  }
+
+  // Find unique series years present, descending
+  var allYears = [];
+  allRows.forEach(function(r){ var sy = seriesYear(r); if(allYears.indexOf(sy) < 0) allYears.push(sy); });
+  allYears.sort(function(a,b){ return b - a; });
+
+  var gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+  var tc = isDark ? '#6a7a8a' : '#5a6878';
+  var xLabel = isWinter ? 'Crop Week (Aug–Jul)' : 'Week #';
+
+  // Prior-year colors: fading amber for plant, fading green for harvest
+  var plantPriorColors = isDark
+    ? ['rgba(245,166,35,0.55)','rgba(245,166,35,0.35)','rgba(245,166,35,0.20)','rgba(245,166,35,0.12)']
+    : ['rgba(212,133,10,0.55)','rgba(212,133,10,0.35)','rgba(212,133,10,0.20)','rgba(212,133,10,0.12)'];
+  var harvPriorColors = isDark
+    ? ['rgba(46,143,82,0.55)','rgba(46,143,82,0.35)','rgba(46,143,82,0.20)','rgba(46,143,82,0.12)']
+    : ['rgba(14,122,58,0.55)','rgba(14,122,58,0.35)','rgba(14,122,58,0.20)','rgba(14,122,58,0.12)'];
+
+  // Helper: build datasets for a stage
+  function buildDatasets(stage, curColor, priorColors){
+    var datasets = [];
+    var curPts = stagePts(stage, cy);
+    if(curPts.length){
+      datasets.push({ label: String(cy), data: curPts,
+        borderColor: curColor, borderWidth: 2.5, pointRadius: 2.5,
+        fill: false, tension: 0.3 });
+    }
+    allYears.forEach(function(yr, idx){
+      if(yr === cy) return;
+      var offset = cy - yr - 1; // 0-based index into priorColors
+      if(offset < 0 || offset >= priorColors.length) return;
+      var pts = stagePts(stage, yr);
+      if(!pts.length) return;
+      datasets.push({ label: String(yr), data: pts,
+        borderColor: priorColors[offset], borderWidth: offset < 2 ? 1.8 : 1.2,
+        borderDash: [5, 3], pointRadius: 0, fill: false, tension: 0.3 });
+    });
+    return datasets;
+  }
+
+  function makeChartOpts(yLabel){
+    return {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { type: 'linear',
+             title: { display: true, text: xLabel, color: tc },
+             ticks: { color: tc, stepSize: 4 }, grid: { color: gc } },
+        y: { min: 0, max: 100,
+             title: { display: true, text: yLabel, color: tc },
+             ticks: { color: tc }, grid: { color: gc } }
+      },
+      plugins: {
+        legend: { labels: { color: tc,
+          font: { family: "'Courier New',monospace", weight: '700', size: 11 },
+          boxWidth: 24, padding: 10 } }
+      }
+    };
+  }
+
+  // Replace canvas elements entirely to prevent Chart.js height accumulation
+  function freshCanvas(id){
+    if(id === 'rpt-plant-chart' && _rptPlantChart){ _rptPlantChart.destroy(); _rptPlantChart = null; }
+    if(id === 'rpt-harv-chart'  && _rptHarvChart) { _rptHarvChart.destroy();  _rptHarvChart  = null; }
+    var old = document.getElementById(id);
+    if(!old) return null;
+    var wrap = old.parentElement;
+    wrap.innerHTML = '<canvas id="' + id + '" style="display:block;width:100%;height:280px;"></canvas>';
+    return document.getElementById(id);
+  }
+
+  // PLANTING PACE
+  var ctxP = freshCanvas('rpt-plant-chart');
+  if(ctxP){
+    var plantDs = buildDatasets('PLANTED',
+      isDark ? '#f5a623' : '#D4850A', plantPriorColors);
+    // For winter wheat also include EMERGED on same chart if data exists
+    if(isWinter){
+      var emPts = stagePts('EMERGED', cy);
+      if(emPts.length) plantDs.push({
+        label: String(cy) + ' Emerged', data: emPts,
+        borderColor: isDark ? '#5b9cf0' : '#3a6aaa',
+        borderWidth: 1.8, borderDash: [3,2], pointRadius: 0, fill: false, tension: 0.3
+      });
+    }
+    if(plantDs.length){
+      _rptPlantChart = new Chart(ctxP, {
+        type: 'line',
+        data: { datasets: plantDs },
+        options: makeChartOpts(isWinter ? '% Planted / Emerged' : '% Planted')
+      });
+    }
+  }
+
+  // HARVEST PACE
+  var ctxH = freshCanvas('rpt-harv-chart');
+  if(ctxH){
+    var harvDs = buildDatasets('HARVESTED',
+      isDark ? '#2e8f52' : '#0E7A3A', harvPriorColors);
+    // For winter wheat add HEADED stage
+    if(isWinter){
+      var hdPts = stagePts('HEADED', cy);
+      if(hdPts.length) harvDs.push({
+        label: String(cy) + ' Headed', data: hdPts,
+        borderColor: isDark ? '#5b9cf0' : '#3a6aaa',
+        borderWidth: 1.8, borderDash: [3,2], pointRadius: 0, fill: false, tension: 0.3
+      });
+    }
+    if(harvDs.length){
+      _rptHarvChart = new Chart(ctxH, {
+        type: 'line',
+        data: { datasets: harvDs },
+        options: makeChartOpts(isWinter ? '% Harvested / Headed' : '% Harvested')
+      });
+    }
+  }
 }
 
 function renderRptStocks(){
