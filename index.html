@@ -733,7 +733,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
             </div>
             <div class="panel" style="margin-bottom:0;">
               <div class="panel-hdr"><div class="panel-title">GOOD / EXCELLENT %</div></div>
-              <div style="padding:14px 16px;height:480px;"><canvas id="rpt-ge-chart" class="chart-canvas" style="height:100%;"></canvas></div>
+              <div style="padding:14px 16px;height:480px;position:relative;"><canvas id="rpt-ge-chart" style="position:absolute;top:14px;left:16px;right:16px;bottom:14px;width:calc(100% - 32px) !important;height:calc(100% - 28px) !important;"></canvas></div>
             </div>
           </div>
         </div>
@@ -10391,7 +10391,7 @@ function initReports(){
   if(!_nassData){
     fetch('data/nass_reports.json')
       .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){ _nassData = d; if(_nassData.fetched){ document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); showDataFreshness(null, _nassData.fetched, 'NASS'); } buildRptNav(); })
+      .then(function(d){ _nassData = d; if(_nassData.fetched){ document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); showDataFreshness(null, _nassData.fetched, 'NASS'); } console.log('NASS crop_conditions keys:', Object.keys(_nassData.crop_conditions||{})); buildRptNav(); })
       .catch(function(e){ console.warn('NASS data not available:', e.message); });
   }
 }
@@ -10406,8 +10406,12 @@ function showRptContent(){
 }
 
 function buildRptNav(){
-  var crops = _nassData ? Object.keys(_nassData.crop_conditions || {}) : [];
-  if(!crops.length) crops = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
+  // Always show all 4 crops in nav; data may be absent for some
+  var ALL_COND_CROPS = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
+  var condData = _nassData ? (_nassData.crop_conditions || {}) : {};
+  // Merge: known crops first, then any extras from pipeline
+  var crops = ALL_COND_CROPS.slice();
+  Object.keys(condData).forEach(function(c){ if(crops.indexOf(c) < 0) crops.push(c); });
   if(crops.indexOf(_rptCrop) < 0) _rptCrop = crops[0];
   var h = '';
   var lastSection = '';
@@ -10479,11 +10483,21 @@ function rptLatestYear(rows){
 
 function renderRptScoreboard(){
   var cond = _nassData.crop_conditions || {};
-  var crops = Object.keys(cond);
+  // Always show all 4 expected crops; show placeholder if data missing
+  var ALL_CROPS = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
+  var crops = ALL_CROPS.filter(function(c){ return cond[c] !== undefined; });
+  if(!crops.length) crops = Object.keys(cond);
   var h = '';
   crops.forEach(function(c){
     var rows = cond[c] || [];
-    if(!rows.length){ return; }
+    if(!rows.length){
+      // Show placeholder card for crops with no data yet
+      h += '<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--border3);border-radius:4px;padding:12px 14px;opacity:0.5;">';
+      h += '<div style="font-size:12px;font-weight:900;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">' + c + '</div>';
+      h += '<div style="font-size:14px;color:var(--text3);font-weight:600;">No data yet this season</div>';
+      h += '</div>';
+      return;
+    }
     var cy = rptLatestYear(rows);
     var cyRows = rows.filter(function(r){ return r.year === cy; });
     var pyRows = rows.filter(function(r){ return r.year === cy - 1; });
@@ -10548,21 +10562,25 @@ function renderRptGEChart(){
   var cy = rptLatestYear(rows);
   function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
   function yearPts(yr){ return rows.filter(function(r){ return r.year===yr; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); }).map(function(r){ return {x:weekNum(r.week_ending),y:rptGetGE(r)}; }); }
+  // Replace canvas element entirely - prevents Chart.js height accumulation on commodity change
+  if(_rptGEChart){ _rptGEChart.destroy(); _rptGEChart = null; }
+  var wrap = document.getElementById('rpt-ge-chart').parentElement;
+  wrap.innerHTML = '<canvas id="rpt-ge-chart" style="display:block;width:100%;height:100%;"></canvas>';
   var ctx = document.getElementById('rpt-ge-chart');
-  if(_rptGEChart){ _rptGEChart.destroy(); }
   var isDark = document.body.classList.contains('dark');
   // Current year = solid amber; prior years = progressively lighter
   var priorColors = isDark
-    ? ['rgba(245,166,35,0.55)','rgba(245,166,35,0.32)','rgba(245,166,35,0.18)']
-    : ['rgba(212,133,10,0.55)','rgba(212,133,10,0.32)','rgba(212,133,10,0.18)'];
+    ? ['rgba(245,166,35,0.60)','rgba(245,166,35,0.40)','rgba(245,166,35,0.26)','rgba(245,166,35,0.16)','rgba(245,166,35,0.10)']
+    : ['rgba(212,133,10,0.60)','rgba(212,133,10,0.40)','rgba(212,133,10,0.26)','rgba(212,133,10,0.16)','rgba(212,133,10,0.10)'];
   var datasets = [
     { label: String(cy), data: yearPts(cy), borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2.5, fill: false, tension: 0.3 }
   ];
-  [1,2,3].forEach(function(offset){
+  [1,2,3,4,5].forEach(function(offset){
     var yr = cy - offset;
     var pts = yearPts(yr);
     if(!pts.length) return;
-    datasets.push({ label: String(yr), data: pts, borderColor: priorColors[offset-1], borderWidth: offset===1?1.8:1.2, borderDash: [5,3], pointRadius: 0, fill: false, tension: 0.3 });
+    var bw = offset <= 2 ? 1.8 : 1.2;
+    datasets.push({ label: String(yr), data: pts, borderColor: priorColors[offset-1], borderWidth: bw, borderDash: [5,3], pointRadius: 0, fill: false, tension: 0.3 });
   });
   var gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
   var tc = isDark ? '#6a7a8a' : '#5a6878';
