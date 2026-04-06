@@ -46,7 +46,7 @@ def fetch_conditions():
     for crop in ["CORN","SOYBEANS"]:
         records = api_get({"commodity_desc":crop,"source_desc":"SURVEY",
             "statisticcat_desc":"CONDITION","agg_level_desc":"NATIONAL",
-            "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+            "year__GE":str(CURRENT_YEAR-5),"freq_desc":"WEEKLY"})
         weeks = {}
         for r in records:
             we,yr,unit,val = r.get("week_ending",""),r.get("year",0),r.get("unit_desc",""),r.get("Value","")
@@ -62,7 +62,7 @@ def fetch_conditions():
     # Wheat: fetch all, split by short_desc (avoids brittle prodn_practice_desc filter)
     wheat_recs = api_get({"commodity_desc":"WHEAT","source_desc":"SURVEY",
         "statisticcat_desc":"CONDITION","agg_level_desc":"NATIONAL",
-        "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+        "year__GE":str(CURRENT_YEAR-5),"freq_desc":"WEEKLY"})
     print(f"  WHEAT raw records: {len(wheat_recs)}")
     by_type = {"WINTER WHEAT":{},"SPRING WHEAT":{}}
     for r in wheat_recs:
@@ -110,13 +110,13 @@ def fetch_progress():
     for crop in ["CORN","SOYBEANS"]:
         records = api_get({"commodity_desc":crop,"source_desc":"SURVEY",
             "statisticcat_desc":"PROGRESS","agg_level_desc":"NATIONAL",
-            "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+            "year__GE":str(CURRENT_YEAR-5),"freq_desc":"WEEKLY"})
         out[crop] = parse_stages(records, crop)
  
     # Wheat: fetch all, split by short_desc
     wheat_recs = api_get({"commodity_desc":"WHEAT","source_desc":"SURVEY",
         "statisticcat_desc":"PROGRESS","agg_level_desc":"NATIONAL",
-        "year__GE":str(CURRENT_YEAR-2),"freq_desc":"WEEKLY"})
+        "year__GE":str(CURRENT_YEAR-5),"freq_desc":"WEEKLY"})
     print(f"  WHEAT progress raw records: {len(wheat_recs)}")
     for wlabel,wtype in [("WINTER WHEAT","WINTER"),("SPRING WHEAT","SPRING")]:
         filtered = []
