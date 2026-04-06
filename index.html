@@ -110,7 +110,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       <div class="toolbar-sep"></div>
       <button class="info-btn" id="sum-info-btn" onclick="toggleInfo('sum')">i</button>
     </div>
-    <div class="info-panel" id="sum-info"><strong>SUMMARY</strong> — Aggregates key metrics from all pages. Price = latest nearby settlement. Prem/Disc = price vs regression fair value. S/U = current year stocks-to-use. Curve = forward curve structure. Exp Pace = cumulative exports vs last year. Spec %OI = managed money net as % of open interest.</div>
+    <div class="info-panel" id="sum-info"><strong>SUMMARY</strong> — At-a-glance view of the terminal. Commodity Overview shows price, regression fair value prem/disc, S/U ratio, forward curve structure, and managed money positioning. Relativities shows spread percentiles and z-scores. Macro Snapshot shows live FRED data (load by visiting MACRO tab).</div>
 
     <div style="display:grid;grid-template-columns:1fr 280px;gap:16px 16px;align-items:start;">
     <!-- Row 1: Commodity Overview + Headlines -->
@@ -122,14 +122,11 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <table class="bal-table" id="sum-comm-tbl" style="table-layout:auto;"></table>
       </div>
     </div>
-    <div id="sum-sidebar-news" style="border-top:3px solid var(--amber);border:1px solid var(--border);background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;">
-      <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <span style="font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);">HEADLINES</span>
-        <span id="news-status" style="font-size:10px;color:var(--text3);"></span>
+    <div id="sum-sidebar-macro" style="border-top:3px solid var(--amber);border:1px solid var(--border);background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;">
+      <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);flex-shrink:0;">
+        <span style="font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);">MACRO SNAPSHOT</span>
       </div>
-      <div id="sum-news-feed" style="overflow-y:auto;font-size:12px;flex:1;min-height:0;">
-        <div style="color:var(--text3);padding:12px 14px;">Loading headlines...</div>
-      </div>
+      <div id="sum-macro-body" style="flex:1;min-height:0;overflow-y:auto;"></div>
     </div>
     <!-- Row 2: Relativities + Upcoming Events -->
     <div id="sum-panel-relativ" class="panel" style="margin-bottom:0;">
@@ -188,7 +185,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <button class="icon-btn" onclick="window.print()" title="Print tables">🖨</button>
   </div>
-  <div class="info-panel" id="sd-info"><strong>USDA S&D</strong> — World & US balance sheets from the USDA PSD database. Production, consumption, trade, and ending stocks for major commodities. 2015–2026 (11 marketing years). Stocks-to-Use ratio is the key metric — lower S/U = tighter supplies = typically higher prices.</div>
+  <div class="info-panel" id="sd-info"><strong>USDA S&D</strong> — Supply & demand balance sheets from USDA FAS PSD database. Covers Wheat, Corn, Soybeans, Canola, Soy products, Beef, Cotton, and aggregates. Table 1: selected country full balance sheet (toggle country with buttons). Table 2: World. Tables 3–4: major exporter and importer aggregates. Stocks/Use ratio is the primary tightness indicator.</div>
   <div id="sd-page">
     <!-- Panel 1: US/Country (toggled) -->
     <div class="panel" id="p1-panel">
@@ -266,7 +263,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <div style="display:flex;gap:6px;align-items:center;" id="exp-comm-btns"></div>
     <span id="exp-freshness" style="font-size:11px;letter-spacing:.05em;"></span> <span id="exp-asof" style="font-size:12px;color:var(--text3);letter-spacing:.06em;margin-left:8px;"></span>
   </div>
-  <div class="info-panel" id="exp-info"><strong>EXPORT INSPECTIONS & SALES</strong> — Weekly US grain export data from USDA. Tracks actual shipments leaving US ports and weekly sales bookings. Compares current marketing year pace vs prior years to gauge demand strength.</div>
+  <div class="info-panel" id="exp-info"><strong>EXPORT SALES</strong> — USDA FAS weekly export data for US wheat, corn, and soybeans. Shows net sales (new bookings minus cancellations) and actual export inspections. Compares cumulative marketing-year pace against prior seasons to assess demand.</div>
   <div id="exp-page" style="max-width:1440px;margin:0 auto;padding:0 20px 40px;">
     <div id="exp-content"></div>
   </div>
@@ -302,7 +299,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       <button class="bu-btn active" id="reg-lb-all" onclick="setRegLookback(0)">All</button>
     </div>
   </div>
-  <div class="info-panel" id="reg-info"><strong>REGRESSION</strong> — Fits a curve to the historical stocks-to-use vs price relationship. Produces a "fair value" for current S/U levels. R² = fit quality. Premium/discount = how far price deviates from fundamentals. up to 26 data points (2000–2025).</div>
+  <div class="info-panel" id="reg-info"><strong>S/U REGRESSION</strong> — Fits a regression curve to historical stocks-to-use vs price. Estimates a "fair value" price for the current S/U ratio. R² measures fit quality. Premium/discount shows how far current price deviates from fundamental value. Uses USDA PSD data 2000–present.</div>
   <div id="reg-page" style="max-width:1440px;margin:0 auto;padding:0 20px 40px;">
     <!-- Best Fit Summary -->
     <div class="panel">
@@ -394,7 +391,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <button class="cal-today" onclick="calToday()">Today</button>
       </div>
     </div>
-  <div class="info-panel" id="cal-info"><strong>AG & MACRO CALENDAR</strong> — Report dates for USDA (WASDE, export sales, crop progress), CFTC COT, AAFC, Statistics Canada, EIA petroleum, FOMC, and other central bank decisions.</div>
+  <div class="info-panel" id="cal-info"><strong>CALENDAR</strong> — Scheduled report dates for USDA (WASDE, Export Sales, Crop Progress/Conditions, Grain Stocks, Prospective Plantings), CFTC COT, Statistics Canada, CGC Grain Stats, EIA petroleum, FOMC and G10 central bank decisions. Switch to List view for a timeline.</div>
     <!-- Month nav moved to cal-toolbar -->
     <div id="cal-page" style="max-width:1600px;margin:0 auto;padding:0 20px 40px;">
       <div class="cal-inner">
@@ -443,7 +440,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <button class="cot-cat-btn" onclick="setCotCat('Energy')">Energy</button>
     <button class="cot-cat-btn" onclick="setCotCat('Metals')">Metals</button>
   </div>
-  <div class="info-panel" id="cot-info"><strong>COMMITMENTS OF TRADERS</strong> — Weekly CFTC positioning data. Shows how commercials (hedgers), swap dealers, and managed money (specs) are positioned. Net positioning extremes often signal sentiment turning points. ~10 years of weekly data.</div>
+  <div class="info-panel" id="cot-info"><strong>COT — CFTC Disaggregated</strong> — Weekly futures positioning for grains, oilseeds, softs, livestock, energy, and metals. Managed money (specs) and commercial (hedger) positioning shown as gross longs, shorts, and net. Click any market row or sidebar to chart 3 years of history. Section buttons aggregate all markets in that category.</div>
   <div id="cot-wrap">
     <div id="cot-asof-bar"></div>
     <table class="cot-tbl" id="cot-table">
@@ -494,8 +491,8 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
             </div>
             <span id="cot-chart-asof" style="margin-left:auto;font-size:11px;color:var(--text3);letter-spacing:.08em;"></span>
           </div>
-          <canvas id="cot-chart-canvas" style="width:100%;height:600px;display:block;background:var(--bg);"></canvas>
-      <canvas id="cot-oi-canvas" style="width:100%;height:160px;display:block;margin-top:4px;background:var(--bg);"></canvas>
+          <canvas id="cot-chart-canvas" style="width:100%;height:680px;display:block;background:var(--bg);"></canvas>
+      <canvas id="cot-oi-canvas" style="width:100%;height:220px;display:block;margin-top:4px;background:var(--bg);"></canvas>
         </div><!-- charts area -->
       </div><!-- flex container -->
     </div>
@@ -523,7 +520,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <button class="info-btn" id="gsw-info-btn" onclick="toggleInfo('gsw')" title="About this page">i</button>
   </div>
-  <div class="info-panel" id="gsw-info"><strong>GRAIN STATS WEEKLY</strong> — Weekly cumulative data from the Canadian Grain Commission. Deliveries, exports, domestic use, and visible supply. Shows current year pace vs 2020–2025. Key indicator of Canadian export program progress.</div>
+  <div class="info-panel" id="gsw-info"><strong>GRAIN STATS WEEKLY</strong> — Canadian Grain Commission weekly data. Tracks cumulative deliveries, exports, and visible supply for wheat, durum, barley, canola, and other crops. Current marketing year vs prior years — key indicator of Canadian export program progress relative to USDA WASDE targets.</div>
   <div id="gsw-page">
     <div class="gsw-toolbar">
       <button class="gsw-grain-btn active" onclick="setGswGrain('Canola')">Canola</button>
@@ -615,7 +612,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <button class="info-btn" id="energy-info-btn" onclick="toggleInfo('energy')" title="About this page">i</button>
   </div>
-  <div class="info-panel" id="energy-info"><strong>EIA PETROLEUM & NAT GAS</strong> — US weekly petroleum and natural gas storage data from the Energy Information Administration. Crude oil, gasoline, distillate, and natural gas inventories with 5-year range bands. Includes STEO (Short-Term Energy Outlook) forecasts.</div>
+  <div class="info-panel" id="energy-info"><strong>EIA ENERGY</strong> — US weekly petroleum and natural gas inventory data from the EIA. Tracks crude oil, gasoline, distillate, and natural gas storage vs 5-year seasonal ranges. Includes STEO (Short-Term Energy Outlook) price and production forecasts. Relevant to input costs and biofuel margins.</div>
   <div id="energy-page">
     <!-- ── WEEKLY EIA STOCKS (moved to top) ───────────────────────── -->
     <div class="energy-header">
@@ -685,10 +682,16 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <button class="info-btn" id="aafc-info-btn" onclick="toggleInfo('aafc')" title="About this page">i</button>
   </div>
-  <div class="info-panel" id="aafc-info"><strong>STATSCAN S&D</strong> — Canadian crop supply & demand from Statistics Canada (table 32-10-0013-01). Area, yield, production, trade, and ending stocks for Canadian crops. Updated automatically via pipeline.</div>
+  <div class="info-panel" id="aafc-info"><strong>STATSCAN S&D</strong> — Statistics Canada supply & disposition for Canadian field crops (table 32-10-0013-01). Quarterly cumulative data (Aug–Jul crop year) for wheat, durum, canola, barley, oats, flax, lentils, peas, and others. Shows current YTD quarter vs same quarter prior year and prior quarter. Pipeline updates automatically.</div>
   <div id="aafc-page">
     <div style="padding:4px 0 0;"><span id="statscan-freshness" style="font-size:11px;letter-spacing:.05em;"></span></div>
-    <div class="aafc-toolbar" id="aafc-crop-btns"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;flex-wrap:wrap;">
+      <div class="bu-toggle" style="flex-shrink:0;">
+        <button class="bu-btn active" id="aafc-view-annual" onclick="setAafcView('annual')">ANNUAL</button>
+        <button class="bu-btn" id="aafc-view-quarterly" onclick="setAafcView('quarterly')">QUARTERLY</button>
+      </div>
+      <div class="aafc-toolbar" id="aafc-crop-btns" style="padding:0;background:none;border:none;"></div>
+    </div>
     <div id="aafc-content"></div>
   </div>
 </div>
@@ -699,7 +702,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <div class="brand">
     <div class="brand-sub">USDA NASS · Reports</div></div>
     <div class="toolbar-sep"></div>
-
+    <span id="rpt-asof" style="font-size:13px;color:var(--text3);letter-spacing:.06em;"></span>
   </div>
   <div id="reports-page" style="max-width:1500px;margin:0 auto;padding:0 20px 40px;">
     <div id="rpt-loading" style="padding:40px 0;text-align:center;color:var(--text3);font-size:14px;letter-spacing:.1em;">Loading NASS data...</div>
@@ -726,31 +729,31 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <!-- Conditions view -->
         <div class="rpt-view" id="rpt-v-conditions">
           <div id="rpt-cond-score" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;align-items:start;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
             <div class="panel" style="margin-bottom:0;">
               <div class="panel-hdr"><div class="panel-title" id="rpt-cond-title">CROP CONDITIONS</div></div>
-              <div><table class="bal-table" id="rpt-cond-tbl" style="table-layout:auto;width:100%;"></table></div>
+              <div style="overflow-x:auto;"><table class="bal-table" id="rpt-cond-tbl"></table></div>
             </div>
             <div class="panel" style="margin-bottom:0;">
               <div class="panel-hdr"><div class="panel-title">GOOD / EXCELLENT %</div></div>
-              <div style="padding:14px 16px;height:480px;position:relative;"><canvas id="rpt-ge-chart" style="position:absolute;top:14px;left:16px;right:16px;bottom:14px;width:calc(100% - 32px) !important;height:calc(100% - 28px) !important;"></canvas></div>
+              <div style="padding:14px 16px;"><canvas id="rpt-ge-chart" class="chart-canvas" style="height:300px;"></canvas></div>
             </div>
           </div>
-          <!-- Progress section — merged into same tab -->
-          <div style="margin-top:20px;">
-            <div class="panel">
-              <div class="panel-hdr"><div class="panel-title" id="rpt-prog-title">CROP PROGRESS</div></div>
-              <div><table class="bal-table" id="rpt-prog-tbl" style="table-layout:auto;width:100%;"></table></div>
+        </div>
+        <!-- Progress view -->
+        <div class="rpt-view" id="rpt-v-progress" style="display:none;">
+          <div class="panel">
+            <div class="panel-hdr"><div class="panel-title" id="rpt-prog-title">CROP PROGRESS</div></div>
+            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-prog-tbl"></table></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-hdr"><div class="panel-title">PLANTING PACE</div></div>
+              <div style="padding:14px 16px;"><canvas id="rpt-plant-chart" class="chart-canvas" style="height:280px;"></canvas></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
-              <div class="panel" style="margin-bottom:0;">
-                <div class="panel-hdr"><div class="panel-title">PLANTING PACE</div></div>
-                <div style="padding:14px 16px;"><canvas id="rpt-plant-chart" class="chart-canvas" style="height:280px;"></canvas></div>
-              </div>
-              <div class="panel" style="margin-bottom:0;">
-                <div class="panel-hdr"><div class="panel-title">HARVEST PACE</div></div>
-                <div style="padding:14px 16px;"><canvas id="rpt-harv-chart" class="chart-canvas" style="height:280px;"></canvas></div>
-              </div>
+            <div class="panel" style="margin-bottom:0;">
+              <div class="panel-hdr"><div class="panel-title">HARVEST PACE</div></div>
+              <div style="padding:14px 16px;"><canvas id="rpt-harv-chart" class="chart-canvas" style="height:280px;"></canvas></div>
             </div>
           </div>
         </div>
@@ -1212,19 +1215,8 @@ function _parseCOT() {
     if (el2) el2.textContent = 'COT: API error (' + err.message + ')';
   }
 })();
-const EXPORTERS = {Wheat:["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina","China"],Corn:["United States","Brazil","Argentina","Ukraine","China"],Soybeans:["United States","Brazil","Argentina","China"],"Rapeseed/Canola":["Canada","Australia","European Union","Ukraine","China"],Cotton:["United States","Brazil","Australia","India"],"Beef and Veal":["United States","Australia","Brazil","Argentina"],"Soybean Meal":["Argentina","United States","Brazil","European Union"],"Soybean Oil":["Argentina","Brazil","United States","European Union"],Grains:["European Union","Russia","United States","Canada","Australia","Ukraine","Argentina","Brazil"],Oilseeds:["United States","Brazil","Argentina","Canada","Australia"]};
-const IMPORTERS = {
-  Wheat:["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],
-  Corn:["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
-  Soybeans:["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
-  "Rapeseed/Canola":["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
-  Cotton:["China","Vietnam","Bangladesh","Pakistan","Turkey","Indonesia","India"],
-  "Beef and Veal":["United States","China","Japan","South Korea","European Union","Canada","United Kingdom"],
-  "Soybean Meal":["European Union","Indonesia","Philippines","Vietnam","Thailand","Bangladesh","South Korea","Japan","Egypt"],
-  "Soybean Oil":["China","India","Bangladesh","European Union","Pakistan","Algeria","Iran","Morocco"],
-  Grains:["China","Egypt","European Union","Indonesia","Mexico","Japan","Algeria","Turkey","Brazil","Bangladesh","Philippines","South Korea"],
-  Oilseeds:["China","European Union","Japan","Mexico","Bangladesh","Indonesia","Turkey"]
-};
+const EXPORTERS = {Wheat:["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],Corn:["United States","Brazil","Argentina","Ukraine"],Soybeans:["United States","Brazil","Argentina"],"Rapeseed/Canola":["Canada","Australia","European Union","Ukraine"],Cotton:["United States","Brazil","Australia","India"],"Beef and Veal":["United States","Australia","Brazil","Argentina"],"Soybean Meal":["Argentina","United States","Brazil","European Union"],"Soybean Oil":["Argentina","Brazil","United States","European Union"],Grains:["European Union","Russia","United States","Canada","Australia","Ukraine","Argentina","Brazil"],Oilseeds:["United States","Brazil","Argentina","Canada","Australia"]};
+const IMPORTERS = {Wheat:["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],Corn:["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],Soybeans:["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],"Rapeseed/Canola":["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],Cotton:["China","Vietnam","Bangladesh","Pakistan","Turkey","Indonesia","India"],"Beef and Veal":["United States","China","Japan","South Korea","European Union","Canada","United Kingdom"],"Soybean Meal":["European Union","Indonesia","Philippines","Vietnam","Thailand","Bangladesh","South Korea","Japan","Egypt"],"Soybean Oil":["China","India","Bangladesh","European Union","Pakistan","Algeria","Iran","Morocco"],Grains:["China","Egypt","European Union","Indonesia","Mexico","Japan","Algeria","Turkey","Brazil","Bangladesh","Philippines","South Korea"],Oilseeds:["China","European Union","Japan","Mexico","Bangladesh","Indonesia","Turkey"]};
 const BU_PER_MT  = {Wheat:36.744,Soybeans:36.744,Corn:39.368,"Rapeseed/Canola":44.092};
 const YIELD_CONV = {Wheat:14.87,Soybeans:14.87,Corn:15.93,"Rapeseed/Canola":17.84};
 let currentComm = 'Rapeseed/Canola';
@@ -1556,138 +1548,71 @@ function renderSummaryPage(){
     var evEl = document.getElementById('sum-events-list');
     if(evEl) evEl.innerHTML = evHtml;
   } catch(e2){ console.warn('Events sidebar:', e2); }
-  // Fetch news headlines + sync sidebar heights
-  fetchNewsFeed();
+  // Render macro snapshot + sync sidebar heights
+  renderMacroSnapshot();
   setTimeout(syncSidebarHeights, 50);
 } catch(e) { console.warn('Summary page render deferred:', e.message); }
 }
 
+// MACRO SNAPSHOT — Summary tab sidebar
+function renderMacroSnapshot(){
+  var el = document.getElementById('sum-macro-body');
+  if(!el) return;
+  function fv(id){ var a=fredData[id]; if(!a||!a.length)return null; var v=a[0].v; return(v!==null&&v!==undefined&&v!=='.')?parseFloat(v):null; }
+  function fv2(id){ var a=fredData[id]; if(!a||a.length<2)return null; var v=a[1].v; return(v!==null&&v!==undefined&&v!=='.')?parseFloat(v):null; }
+  var isDark=document.body.classList.contains('dark');
+  var green=isDark?'#2e8f52':'#0E7A3A',red=isDark?'#b83838':'#C4302B',amber=isDark?'#f5a623':'#D4850A';
+  var t2='var(--text2)',t3='var(--text3)';
+  function pct(v){return v===null?'\u2014':v.toFixed(2)+'%';}
+  function fmt(v,d){return v===null?'\u2014':v.toFixed(d===undefined?2:d);}
+  function chgC(d,inv){if(d===null||Math.abs(d)<0.001)return t3;var up=d>0;if(inv)up=!up;return up?green:red;}
+  var dgs10=fv('DGS10'),dgs10p=fv2('DGS10'),dff=fv('DFF'),dffp=fv2('DFF');
+  var t10y2y=fv('T10Y2Y'),t10y3m=fv('T10Y3M'),dfii10=fv('DFII10'),t10yie=fv('T10YIE');
+  var hyOAS=fv('BAMLH0A0HYM2'),hyp=fv2('BAMLH0A0HYM2'),bbbOAS=fv('BAMLC0A4CBBB');
+  var unrate=fv('UNRATE'),cpi=fv('CPALTT01USM657N');
+  var cad=fv('DEXCAUS'),cadp=fv2('DEXCAUS'),eur=fv('DEXUSEU'),gbp=fv('DEXUSUK');
+  var dg10c=(dgs10!==null&&dgs10p!==null)?dgs10-dgs10p:null;
+  var cadc=(cad!==null&&cadp!==null)?cad-cadp:null;
+  function crv(v){if(v===null)return{l:'\u2014',c:t3};if(v<-0.2)return{l:'INVERTED',c:red};if(v<0.2)return{l:'FLAT',c:amber};return{l:'STEEPENING',c:green};}
+  function rr(v){if(v===null)return{l:'\u2014',c:t3};if(v>1.5)return{l:'RESTRICTIVE',c:red};if(v>0.5)return{l:'ELEVATED',c:amber};return{l:'ACCOMM.',c:green};}
+  function hy(v){if(v===null)return{l:'\u2014',c:t3};if(v>550)return{l:'STRESS',c:red};if(v>350)return{l:'CAUTION',c:amber};return{l:'RISK-ON',c:green};}
+  function inf(v){if(v===null)return{l:'\u2014',c:t3};if(v>4)return{l:'HOT',c:red};if(v>2.5)return{l:'ELEVATED',c:amber};return{l:'ANCHORED',c:green};}
+  var CV=crv(t10y2y),RR=rr(dfii10),HY=hy(hyOAS),INF=inf(cpi);
+  function sec(l){return '<div style="font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:'+amber+';padding:6px 12px 3px;background:var(--section-bg);border-bottom:1px solid var(--border2);">'+l+'</div>';}
+  function row(lbl,val,vc,sub,alt){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);'+(alt?'background:var(--row-alt);':'')+'">'+'<div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:'+t3+';">'+lbl+'</div>'+'<div style="text-align:right;">'+'<span style="font-size:12px;font-weight:800;color:'+(vc||t2)+';">'+val+'</span>'+(sub?'<span style="font-size:10px;color:'+t3+';margin-left:5px;font-weight:600;">'+sub+'</span>':'')+'</div></div>';}
+  var h='';
+  h+=sec('Rates');
+  h+=row('Fed Funds',pct(dff),chgC(dff&&dffp?dff-dffp:null,false),dff&&dffp?(dff-dffp>=0?'+':'')+fmt(dff-dffp)+'pp':'',false);
+  h+=row('10Y UST',pct(dgs10),chgC(dg10c,false),dg10c!==null?(dg10c>=0?'+':'')+fmt(dg10c)+'pp':'',true);
+  h+=row('Real Yield',pct(dfii10),RR.c,RR.l,false);
+  h+=row('Breakeven',pct(t10yie),t10yie!==null?(t10yie>2.5?amber:green):t3,'10Y inf.exp',true);
+  h+=sec('Curve');
+  h+=row('2s10s',t10y2y!==null?(t10y2y>=0?'+':'')+pct(t10y2y):'\u2014',CV.c,CV.l,false);
+  h+=row('3m10y',t10y3m!==null?(t10y3m>=0?'+':'')+pct(t10y3m):'\u2014',t10y3m!==null?(t10y3m<-0.5?red:t10y3m<0.2?amber:green):t3,'',true);
+  h+=sec('Credit / Risk');
+  h+=row('HY Spread',hyOAS!==null?Math.round(hyOAS)+'bp':'\u2014',HY.c,HY.l,false);
+  h+=row('BBB Spread',bbbOAS!==null?Math.round(bbbOAS)+'bp':'\u2014',bbbOAS!==null?(bbbOAS>200?red:bbbOAS>130?amber:green):t3,'',true);
+  h+=sec('Macro');
+  h+=row('CPI YoY',pct(cpi),INF.c,INF.l,false);
+  h+=row('Unemployment',pct(unrate),unrate!==null?(unrate>5.5?red:unrate>4.5?amber:green):t3,'',true);
+  h+=sec('FX');
+  h+=row('USD/CAD',cad!==null?cad.toFixed(4):'\u2014',chgC(cadc,false),cadc!==null?(cadc>=0?'+':'')+cadc.toFixed(4):'',false);
+  h+=row('EUR/USD',eur!==null?eur.toFixed(4):'\u2014',t2,'',true);
+  h+=row('GBP/USD',gbp!==null?gbp.toFixed(4):'\u2014',t2,'',false);
+  if(!fredData['DGS10']||!fredData['DGS10'].length){h='<div style="color:var(--text3);padding:16px 12px;font-size:11px;line-height:1.7;">Visit MACRO tab to load FRED data.</div>';}
+  el.innerHTML=h;
+}
+
+
 function syncSidebarHeights() {
   var p1 = document.getElementById('sum-panel-overview');
-  var s1 = document.getElementById('sum-sidebar-news');
+  var s1 = document.getElementById('sum-sidebar-macro');
   var p2 = document.getElementById('sum-panel-relativ');
   var s2 = document.getElementById('sum-sidebar-events');
   if(p1 && s1) s1.style.maxHeight = p1.offsetHeight + 'px';
   if(p2 && s2) s2.style.maxHeight = p2.offsetHeight + 'px';
 }
 
-// ============================================================
-// NEWS FEED — Google News RSS + USDA RSS via rss2json proxy
-// ============================================================
-var _newsFetched = false;
-var NEWS_GOOGLE = [
-  {label:'GRAINS', q:'wheat corn soybeans USDA crop report', color:'#2e8f52'},
-  {label:'OILSEEDS', q:'canola rapeseed soybean oil palm oil crush', color:'#e09010'},
-  {label:'ENERGY', q:'crude oil WTI natural gas biofuel renewable diesel', color:'#5b9cf0'},
-  {label:'LIVESTOCK', q:'cattle beef hogs packer market', color:'#b83838'},
-  {label:'MACRO', q:'Federal Reserve interest rates inflation trade tariff agriculture', color:'#8a7a68'},
-  {label:'WEATHER', q:'drought crop weather prairie agriculture flood', color:'#3aaa78'}
-];
-var NEWS_USDA = [
-  {label:'USDA', url:'https://www.nass.usda.gov/rss/reports.xml', color:'#d4850a'},
-  {label:'USDA', url:'https://www.usda.gov/rss/latest-releases.xml', color:'#d4850a'}
-];
-
-async function fetchNewsFeed() {
-  if(_newsFetched) return;
-  var el = document.getElementById('sum-news-feed');
-  var st = document.getElementById('news-status');
-  if(!el) return;
-
-  var allItems = [];
-  var proxy = 'https://api.rss2json.com/v1/api.json?rss_url=';
-
-  // Fetch Google News searches
-  for(var i = 0; i < NEWS_GOOGLE.length; i++) {
-    var nq = NEWS_GOOGLE[i];
-    var rssUrl = 'https://news.google.com/rss/search?q=' + encodeURIComponent(nq.q) + '&hl=en-US&gl=US&ceid=US:en';
-    try {
-      var r = await fetch(proxy + encodeURIComponent(rssUrl));
-      if(!r.ok) continue;
-      var data = await r.json();
-      if(data.status === 'ok' && data.items) {
-        var items = data.items.slice(0, 3);
-        for(var j = 0; j < items.length; j++) {
-          allItems.push({
-            cat: nq.label, color: nq.color,
-            title: items[j].title,
-            link: items[j].link,
-            ts: new Date(items[j].pubDate).getTime() || 0,
-            pubDate: items[j].pubDate,
-            source: items[j].author || ''
-          });
-        }
-      }
-    } catch(e) { continue; }
-  }
-
-  // Fetch USDA RSS feeds
-  for(var i = 0; i < NEWS_USDA.length; i++) {
-    var uf = NEWS_USDA[i];
-    try {
-      var r = await fetch(proxy + encodeURIComponent(uf.url));
-      if(!r.ok) continue;
-      var data = await r.json();
-      if(data.status === 'ok' && data.items) {
-        var items = data.items.slice(0, 5);
-        for(var j = 0; j < items.length; j++) {
-          allItems.push({
-            cat: uf.label, color: uf.color,
-            title: items[j].title,
-            link: items[j].link,
-            ts: new Date(items[j].pubDate).getTime() || 0,
-            pubDate: items[j].pubDate,
-            source: 'USDA'
-          });
-        }
-      }
-    } catch(e) { continue; }
-  }
-
-  if(allItems.length === 0) {
-    el.innerHTML = '<div style="color:var(--text3);padding:12px 14px;font-size:12px;">Unable to load headlines</div>';
-    return;
-  }
-
-  // Filter out items older than 50 days, then sort newest first
-  var cutoff = Date.now() - 50 * 86400000;
-  allItems = allItems.filter(function(item) { return item.ts > cutoff; });
-  allItems.sort(function(a, b) { return b.ts - a.ts; });
-
-  // Deduplicate by title similarity (first 40 chars)
-  var seen = {};
-  var unique = [];
-  for(var i = 0; i < allItems.length; i++) {
-    var key = allItems[i].title.slice(0, 40).toLowerCase();
-    if(!seen[key]) { seen[key] = 1; unique.push(allItems[i]); }
-  }
-
-  // Render — inline category tag on each item
-  var html = '';
-  for(var i = 0; i < Math.min(unique.length, 30); i++) {
-    var item = unique[i];
-    var ago = '';
-    try {
-      var diff = Date.now() - item.ts;
-      var hrs = Math.floor(diff / 3600000);
-      ago = hrs < 1 ? 'just now' : hrs < 24 ? hrs + 'h ago' : Math.floor(hrs/24) + 'd ago';
-    } catch(e){}
-    var cleanTitle = item.title.replace(/ - [^-]*$/, '');
-    html += '<a href="' + item.link + '" target="_blank" rel="noopener" style="display:block;padding:5px 12px;border-bottom:1px solid var(--border);text-decoration:none;line-height:1.3;">';
-    html += '<div style="display:flex;align-items:baseline;gap:6px;">';
-    html += '<span style="font-size:9px;font-weight:900;letter-spacing:.06em;color:' + item.color + ';white-space:nowrap;flex-shrink:0;">' + item.cat + '</span>';
-    html += '<span style="font-size:12px;font-weight:600;color:var(--text2);">' + cleanTitle + '</span>';
-    html += '</div>';
-    html += '<div style="font-size:10px;color:var(--text3);margin-top:1px;padding-left:0;">' + ago;
-    if(item.source) html += ' · ' + item.source;
-    html += '</div></a>';
-  }
-
-  el.innerHTML = html;
-  if(st) st.textContent = 'Live';
-  _newsFetched = true;
-  syncSidebarHeights();
-}
 
 function showFundamentals(){
 try {
@@ -1800,7 +1725,7 @@ function groupNavClick(group, tab){
     document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
     document.getElementById(tab + '-page-wrap').classList.add('active');
     window.scrollTo(0,0);
-    if(tab==='cot' && !cotInited){initCot();} else if(tab==='cot'){requestAnimationFrame(()=>drawCotChart());}
+    if(tab==='cot' && !cotInited){initCot();}
     if(tab==='reg' && !regInited){initRegression();}
     if(tab==='spreads' && !spreadsInited){initSpreads();}
     if(tab==='carry' && !carryInited){initCarry();}
@@ -2143,7 +2068,9 @@ return mergeComms(['Wheat','Corn']);
 } else if(comm==='Oilseeds'){
 return mergeComms(['Soybeans','Rapeseed/Canola']);
 }
-return PSD[comm] || {};
+// Try exact, then case-insensitive
+var d = PSD[comm]; if(d) return d;
+for(var k in PSD){ if(k.toLowerCase()===comm.toLowerCase()) return PSD[k]; } return {};
 }
 function mergeComms(comms){
 const out = {};
@@ -2196,6 +2123,19 @@ return out;
 }
 function getP1Data(){
 const commData = getPSDComm(currentComm);
+if(currentP1Country === 'Black Sea'){
+// Sum Russia + Ukraine
+const r = commData['Russia']||{}, u = commData['Ukraine']||{};
+const out = {};
+const allYrs = new Set([...Object.keys(r),...Object.keys(u)]);
+allYrs.forEach(function(yr){
+  out[yr]={};
+  const ry=r[yr]||{}, uy=u[yr]||{};
+  const allK = new Set([...Object.keys(ry),...Object.keys(uy)]);
+  allK.forEach(function(k){ if(k!=='Yield') out[yr][k]=(ry[k]||0)+(uy[k]||0); });
+});
+return out;
+}
 return commData[currentP1Country] || {};
 }
 function fmt(val, attr, isBu){
@@ -2243,13 +2183,16 @@ const comm = currentComm;
 const commData = getPSDComm(comm);
 const years = getYears();
 const latestYear = years[years.length-1];
-const p2opts = EXPORTERS[comm] || ['United States','Canada'];
+const P1_EXTRA = {Wheat:['China'],Corn:['China'],Soybeans:['China'],'Rapeseed/Canola':['China'],Grains:['China'],Oilseeds:['China']};
+const _rawOpts = (EXPORTERS[comm] || ['United States','Canada']).concat(P1_EXTRA[comm]||[]);
+// For Grains: collapse Russia+Ukraine into a 'Black Sea' virtual option
+const p2opts = (comm==='Grains') ? _rawOpts.filter(c=>c!=='Russia'&&c!=='Ukraine').concat(['Black Sea']) : _rawOpts;
 if(!p2opts.includes(currentP1Country)) currentP1Country = p2opts[0];
 const tog = document.getElementById('p1-toggle');
 tog.innerHTML = p2opts.map(c=>
 `<button class="p2-btn${currentP1Country===c?' active':''}" data-c="${c}" onclick="setP1Country('${c}')">${{'United States':'US','European Union':'EU','South Korea':'Korea','New Zealand':'NZ'}[c]||c}</button>`
 ).join('');
-document.getElementById('p1-title').textContent = (currentP1Country==='United States'?'UNITED STATES':currentP1Country.toUpperCase()) + ' — ' + comm.toUpperCase();
+document.getElementById('p1-title').textContent = (currentP1Country==='United States'?'UNITED STATES':currentP1Country==='Black Sea'?'BLACK SEA (RU+UA)':currentP1Country.toUpperCase()) + ' — ' + comm.toUpperCase();
 document.getElementById('p2-title').textContent = 'WORLD — ' + comm.toUpperCase();
 document.getElementById('p3-title').textContent = 'MAJOR EXPORTERS — ' + comm.toUpperCase();
 document.getElementById('p4-title').textContent = 'MAJOR IMPORTERS — ' + comm.toUpperCase();
@@ -3497,7 +3440,6 @@ return String(Math.round(v));
 function fmtKsgn(v){return (v>=0?'+':'')+fmtK(v);}
 function fmtPct(v){return v.toFixed(1)+'%';}
 let cotChartMarket = null;
-let cotChartSection = null;
 let cotChartMode = 'fund';
 let cotChartUnit = 'contracts';
 function openCotChart(name, noScroll){
@@ -3532,44 +3474,7 @@ document.getElementById('cot-tog-contracts').classList.toggle('active', unit==='
 document.getElementById('cot-tog-pct').classList.toggle('active', unit==='pct');
 drawCotChart();
 }
-function setCotSection(cat){
-cotChartSection = cat;
-cotChartMarket = null;
-document.querySelectorAll('.cot-sb-cat').forEach(function(b){
-var a = b.dataset.cat === cat;
-b.classList.toggle('active', a);
-b.style.borderLeftColor = a ? 'var(--amber)' : 'transparent';
-b.style.color = a ? 'var(--amber)' : '';
-});
-document.querySelectorAll('.cot-sb-btn').forEach(function(b){ b.classList.remove('active'); });
-document.querySelectorAll('.cot-row-active').forEach(function(r){ r.classList.remove('cot-row-active'); });
-drawCotChart();
-}
 function drawCotChart(){
-// Section-aggregate mode
-if(cotChartSection && !cotChartMarket){
-var catMarkets = Object.values(COT).filter(function(d){ return d.cat===cotChartSection; });
-if(!catMarkets.length) return;
-var cutS = new Date(); cutS.setFullYear(cutS.getFullYear()-3);
-var cutStr = cutS.toISOString().slice(0,10);
-var dateMap = {};
-catMarkets.forEach(function(md){
-md.rows.forEach(function(r){
-if(r.date < cutStr) return;
-if(!dateMap[r.date]) dateMap[r.date]={date:r.date,mm_l:0,mm_s:0,mm_net:0,pm_l:0,pm_s:0,pm_net:0,oi:0};
-var a=dateMap[r.date];
-a.mm_l+=r.mm_l||0; a.mm_s+=r.mm_s||0; a.mm_net+=r.mm_net||0;
-a.pm_l+=r.pm_l||0; a.pm_s+=r.pm_s||0; a.pm_net+=r.pm_net||0;
-a.oi+=r.oi||0;
-});
-});
-var aggRows = Object.values(dateMap).sort(function(a,b){return a.date<b.date?-1:1;});
-if(!aggRows.length) return;
-var asofEl = document.getElementById('cot-chart-asof');
-if(asofEl) asofEl.textContent = cotChartSection.toUpperCase()+' AGGREGATE · AS OF '+aggRows[aggRows.length-1].date;
-_drawCotRows(aggRows, cotChartSection.toUpperCase()+' — AGGREGATE', true);
-return;
-}
 if(!cotChartMarket){
 const firstKey = Object.keys(COT)[0];
 if(firstKey) cotChartMarket = firstKey;
@@ -3583,17 +3488,10 @@ if(asofEl) asofEl.textContent = 'AS OF ' + last.date;
 }
 const d = COT[cotChartMarket];
 if(!d || !d.rows.length) return;
-var cutI = new Date(); cutI.setFullYear(cutI.getFullYear()-3);
-var cutStrI = cutI.toISOString().slice(0,10);
-var indRows = d.rows.filter(function(r){ return r.date >= cutStrI; });
-_drawCotRows(indRows, cotChartMarket, false);
-}
-function _drawCotRows(rows, title, isAggregate){
 const canvas = document.getElementById('cot-chart-canvas');
 const isDark = document.body.classList.contains('dark');
-var rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
-const W = (rect && rect.width > 10) ? rect.width : (canvas.offsetWidth || 900);
-const PANEL_H = 290;
+const W = canvas.parentElement.clientWidth || canvas.offsetWidth || 900;
+const PANEL_H = 410;
 const GAP = 26;
 const H = PANEL_H * 2 + GAP;
 const dpr = window.devicePixelRatio || 1;
@@ -3603,8 +3501,12 @@ const ctx = canvas.getContext('2d');
 ctx.scale(dpr, dpr);
 ctx.fillStyle = bg0();
 ctx.fillRect(0,0,W,H);
+const cutoff = new Date();
+cutoff.setFullYear(cutoff.getFullYear() - 3);
+const cutStr = cutoff.toISOString().slice(0,10);
+const rows = d.rows.filter(r => r.date >= cutStr);
+if(!rows.length) return;
 const n = rows.length;
-if(!n) return;
 const isPct = cotChartUnit === 'pct';
 const labelFont  = `700 12px ${CHART_FONT}`;
 const tickFont   = `700 12px ${CHART_FONT}`;
@@ -3756,9 +3658,8 @@ drawCotOiChart(rows, isDark);
 function drawCotOiChart(rows, isDark){
 const canvas = document.getElementById('cot-oi-canvas');
 if(!canvas || !rows || !rows.length) return;
-var oiR = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
-const W = (oiR && oiR.width > 10) ? oiR.width : (canvas.offsetWidth || 900);
-const H = 160;
+const W = canvas.parentElement.clientWidth || canvas.offsetWidth || 900;
+const H = 220;
 const dpr = window.devicePixelRatio || 1;
 canvas.width = W*dpr; canvas.height = H*dpr;
 canvas.style.width = W+'px'; canvas.style.height = H+'px';
@@ -3772,8 +3673,7 @@ const barBC = isDark ? 'rgba(91,156,240,0.7)' : 'rgba(58,106,170,0.6)';
 const priceC = isDark ? '#f5a623' : '#D4850A';
 ctx.fillStyle = bg;
 ctx.fillRect(0,0,W,H);
-// left:58 gives room for price axis labels on left side; right:68 for OI labels
-const PAD = {top:22, right:68, bottom:22, left:58};
+const PAD = {top:26, right:68, bottom:28, left:14};
 const pw = W - PAD.left - PAD.right;
 const ph = H - PAD.top - PAD.bottom;
 const n = rows.length;
@@ -3903,7 +3803,7 @@ var sideHtml = '';
 for(const cat of CAT_ORDER){
 const markets = Object.entries(COT).filter(([,d])=>d.cat===cat).map(([k])=>k);
 if(!markets.length) continue;
-sideHtml += '<button class="rpt-nav-section cot-sb-cat" data-cat="'+cat+'" onclick="setCotSection(this.dataset.cat)" style="margin-top:0;padding:8px 12px 5px;border-top:1px solid var(--border2);width:100%;text-align:left;background:none;border-left:3px solid transparent;cursor:pointer;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);">&#9654; '+cat+'</button>';
+sideHtml += '<div class="rpt-nav-section" style="margin-top:0;padding:8px 12px 5px;border-top:1px solid var(--border2);">'+cat+'</div>';
 for(const m of markets){
 sideHtml += '<button class="rpt-nav-item cot-sb-btn" data-market="'+m+'" onclick="setCotSidebar(\''+m.replace(/'/g,"\\'")+'\')" style="padding:7px 12px;font-size:12px;">'+m+'</button>';
 }
@@ -3911,9 +3811,8 @@ sideHtml += '<button class="rpt-nav-item cot-sb-btn" data-market="'+m+'" onclick
 sel.innerHTML = sideHtml;
 const firstMarket = Object.keys(COT)[0];
 cotChartMarket = firstMarket;
-cotChartSection = null;
 setCotSidebar(firstMarket, true);
-requestAnimationFrame(()=>drawCotChart());
+drawCotChart();
 renderCot();
 }
 function renderCot(){
@@ -6270,217 +6169,251 @@ el.innerHTML = html;
 var AAFC_DATA = null;
 let aafcInited = false;
 let aafcCrop = 'ALL';
-
+let aafcView = 'annual';
+function setAafcView(v){
+  aafcView = v;
+  var a = document.getElementById('aafc-view-annual');
+  var q = document.getElementById('aafc-view-quarterly');
+  if(a){ a.classList.toggle('active', v==='annual'); }
+  if(q){ q.classList.toggle('active', v==='quarterly'); }
+  if(v === 'quarterly' && aafcCrop === 'ALL' && AAFC_DATA){
+    var crops = Object.keys(AAFC_DATA.crops);
+    if(crops.length){ aafcCrop = crops[0]; }
+    document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
+      var label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
+      b.classList.toggle('active', label === aafcCrop);
+    });
+  }
+  renderAafc();
+}
 function initAafc(){
-  aafcInited = true;
-  if(!AAFC_DATA || !AAFC_DATA.crops){
-    var ap = document.getElementById('aafc-page');
-    if(ap) ap.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING STATSCAN DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/statscan_sd.json</div></div>';
+aafcInited = true;
+if(!AAFC_DATA || !AAFC_DATA.crops){
+  var ap = document.getElementById('aafc-page');
+  if(ap) ap.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING STATSCAN DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/statscan_sd.json</div></div>';
+  return;
+}
+const btns = document.getElementById('aafc-crop-btns');
+const crops = Object.keys(AAFC_DATA.crops);
+const allBtn = `<button class="aafc-crop-btn aafc-all-btn${aafcCrop==='ALL'?' active':''}" onclick="setAafcCrop('ALL')">ALL CROPS</button>`;
+btns.innerHTML = allBtn + crops.map(c =>
+`<button class="aafc-crop-btn${c===aafcCrop?' active':''}" onclick="setAafcCrop('${c}')">${c}</button>`
+).join('') + `<span class="aafc-report-date">STATSCAN · ${AAFC_DATA.report_date.toUpperCase()}</span>`;
+renderAafc();
+}
+function setAafcCrop(c){
+aafcCrop = c;
+document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
+const label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
+b.classList.toggle('active', label===c);
+});
+if(aafcView === 'quarterly' && c === 'ALL'){ aafcView='annual'; var a=document.getElementById('aafc-view-annual'); var q=document.getElementById('aafc-view-quarterly'); if(a)a.classList.add('active'); if(q)q.classList.remove('active'); }
+renderAafc();
+}
+function renderAafcQuarterly(){
+  if(!AAFC_DATA) return;
+  var cd = AAFC_DATA.crops[aafcCrop];
+  if(!cd){ document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);">Select a specific crop to view quarterly comparison.</div>'; return; }
+  var quarterly = cd.quarterly || [];
+  if(!quarterly.length){
+    document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);"><strong style="color:var(--amber);">No quarterly data.</strong> Deploy updated fetch_statscan.py and trigger the workflow.</div>';
     return;
   }
-  const btns = document.getElementById('aafc-crop-btns');
-  const crops = Object.keys(AAFC_DATA.crops);
-  const allBtn = `<button class="aafc-crop-btn aafc-all-btn${aafcCrop==='ALL'?' active':''}" onclick="setAafcCrop('ALL')">ALL CROPS</button>`;
-  btns.innerHTML = allBtn + crops.map(c =>
-    `<button class="aafc-crop-btn${c===aafcCrop?' active':''}" onclick="setAafcCrop('${c}')">${c}</button>`
-  ).join('') + `<span class="aafc-report-date">STATSCAN \u00b7 ${AAFC_DATA.report_date.toUpperCase()}</span>`;
-  renderAafc();
-}
-
-function setAafcCrop(c){
-  aafcCrop = c;
-  document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
-    const label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
-    b.classList.toggle('active', label===c);
-  });
-  renderAafc();
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function _fmtN(v){ return (v===null||v===undefined) ? '\u2014' : Number(v).toLocaleString(); }
-function _fmtY(v){ return (v===null||v===undefined) ? '\u2014' : Number(v).toFixed(2); }
-function _su(r){
-  if(!r) return null;
-  var d = (r.dom||0) + (r.exports||0);
-  return d > 0 ? (r.stocks / d) * 100 : null;
-}
-// Short crop-year: "2024-2025" → "24-25"
-function _shortCY(cy){
-  var p = cy ? cy.split('-') : [];
-  return p.length >= 2 ? p[0].slice(-2)+'-'+p[1].slice(-2) : (cy||'');
-}
-// deltaClass: green if cur > prev, red if cur < prev
-function _dcls(cur, prev){
-  if(cur==null||prev==null||cur===undefined||prev===undefined) return '';
-  return cur > prev ? 'aafc-up' : cur < prev ? 'aafc-dn' : '';
-}
-
-// ── Callout box ───────────────────────────────────────────────────────────────
-
-
-// ── ALL CROPS view ────────────────────────────────────────────────────────────
-// ── Shared quarter-label helpers ─────────────────────────────────────────────
-var _Q_LABELS = {Q1:'Aug\u2013Oct', Q2:'Nov\u2013Jan', Q3:'Feb\u2013Apr', Q4:'May\u2013Jul'};
-var _PREV_Q   = {Q1:null, Q2:'Q1', Q3:'Q2', Q4:'Q3'};
-
-function _prevCY(cy, n){
-  // "2024-2025" → 1yr back = "2023-2024", 2yr back = "2022-2023"
-  n = n || 1;
-  var p = (cy||'').split('-');
-  if(p.length < 2) return null;
-  var y1 = parseInt(p[0]) - n;
-  return y1 + '-' + (y1+1);
-}
-
-// Build the 3 target rows for one crop:
-//   [0] current Q            (e.g. 25-26 Q2) — YTD current season
-//   [1] same Q prior year    (e.g. 24-25 Q2) — YoY same period
-//   [2] Q4 of prior year     (e.g. 24-25 Q4) — full prior crop year baseline
-function _buildDisplayRows(quarterly, curCY, curQ){
-  var qLookup = {};
-  quarterly.forEach(function(r){ qLookup[r.crop_year+'|'+r.quarter] = r; });
-
-  // Use the most recent quarter that actually HAS data, not the calendar current_quarter.
-  // StatsCan may not have published the current calendar quarter yet.
-  var latest = quarterly[0];
-  if(!latest) return [];
-  var effCY  = latest.crop_year;
-  var effQ   = latest.quarter;
-  var prev1  = _prevCY(effCY, 1) || '';
-  var pqCode = _PREV_Q[effQ] || null;
-
-  var slots = [
-    { key: effCY  + '|' + effQ,              tag: 'cur'   },  // latest actual data
-    { key: prev1  + '|' + effQ,              tag: 'py1'   },  // same Q last year
-    { key: pqCode ? effCY+'|'+pqCode:'____', tag: 'prevq' },  // prior Q same season
+  var currQ  = quarterly[0];
+  var prevQ  = quarterly.length > 1 ? quarterly[1] : null;
+  var samePY = quarterly.filter(function(q){ return q.quarter === currQ.quarter && q.crop_year !== currQ.crop_year; }).slice(0,2);
+  var currCY  = AAFC_DATA.current_crop_year || currQ.crop_year;
+  var currQCode = AAFC_DATA.current_quarter || currQ.quarter;
+  var currQL    = AAFC_DATA.current_quarter_label || currQ.quarter_label;
+  var fmt = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toLocaleString(); };
+  var fmtY = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toFixed(2); };
+  function delta(a,b){ if(a===null||b===null||a===undefined||b===undefined) return {str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5) return {str:'—',cls:''}; var s=(d>=0?'+':'')+Math.round(d).toLocaleString(); return {str:s, cls:d>0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'}; }
+  var isFullYear = (currQ.quarter === 'Q4');
+  var h = '';
+  h += freshStamp('STATSCAN', _pipelineDates['STATSCAN'], currCY+' '+currQCode);
+  h += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">';
+  h += '<strong style="color:var(--amber);letter-spacing:.08em;">QUARTERLY COMPARISON — '+aafcCrop.toUpperCase()+'</strong><br>';
+  h += 'Crop year: <strong>Aug 1 – Jul 31</strong> &nbsp;|&nbsp; Current: <strong>'+currCY+' '+currQCode+' ('+currQL+')</strong> ';
+  if(isFullYear) h += '— <em>Q4 = full-year actual</em>'; else h += '— <em>cumulative YTD, not a full-year estimate</em>';
+  h += '<br>Columns compare the same quarter across seasons. All volumes in 000 tonnes unless noted.';
+  h += '</div>';
+  var items = [
+    {key:'prod',    label:'Production',          fmt:fmt},
+    {key:'supply',  label:'Total Supply',        fmt:fmt},
+    {key:'exports', label:'Exports',             fmt:fmt},
+    {key:'dom',     label:'Dom. Use',            fmt:fmt},
+    {key:'stocks',  label:'Ending Stocks',       fmt:fmt},
+    {key:'area_s',  label:'Seeded Area (000 ha)',fmt:fmt},
+    {key:'area_h',  label:'Harv. Area (000 ha)', fmt:fmt},
+    {key:'yield',   label:'Yield (t/ha)',         fmt:fmtY},
   ];
-
-  return slots.map(function(s){
-    return { row: qLookup[s.key] || null, tag: s.tag };
-  }).filter(function(s){ return s.row !== null; });
-}
-
-// ── Shared table renderer ─────────────────────────────────────────────────────
-function _renderCropTable(cd, curCY, curQ){
-  var quarterly = cd.quarterly || [];
-  if(!quarterly.length)
-    return '<div style="padding:10px 0;color:var(--text3);font-size:13px;">No quarterly data \u2014 trigger the pipeline.</div>';
-
-  var fmt  = _fmtN;
-  var fmtY = _fmtY;
-  var showFood = quarterly.some(function(r){ return r.food!=null; });
-
-  var slots = _buildDisplayRows(quarterly, curCY, curQ);
-  if(!slots.length)
-    return '<div style="padding:10px 0;color:var(--text3);font-size:13px;">No matching quarters found.</div>';
-
-  // The py1 row (same Q one year ago) is the YoY reference for coloring the current row
-  var py1 = null;
-  slots.forEach(function(s){ if(s.tag==='py1') py1 = s.row; });
-
-  // Period label for each slot
-  function periodCell(s){
-    var r = s.row;
-    var cy = r.crop_year || '';
-    var q  = r.quarter   || '';
-    var ql = r.quarter_label || _Q_LABELS[q] || q;
-    var short = _shortCY(cy);
-    var isCur  = (s.tag === 'cur');
-    var isQ4   = (q === 'Q4');
-
-    var badge = '';
-    if(isCur)
-      badge = isQ4
-        ? ' <span style="font-size:9px;font-weight:900;letter-spacing:.04em;color:var(--amber);">FULL</span>'
-        : ' <span style="font-size:9px;font-weight:900;letter-spacing:.04em;color:var(--amber);">YTD</span>';
-    else if(isQ4)
-      badge = ' <span style="font-size:9px;font-weight:700;color:var(--text3);">full</span>';
-
-    var desc = '';
-    if(s.tag==='py1')   desc = ' <span style="font-size:9px;color:var(--text4);">same Q −1yr</span>';
-    if(s.tag==='prevq') desc = ' <span style="font-size:9px;color:var(--text4);">prev Q</span>';
-
-    return '<span style="font-weight:700;'+(isCur?'color:var(--amber);':'')+'">'+short+' '+q+'</span>'
-      + desc + badge
-      + '<br><span style="font-size:10px;font-weight:600;color:var(--text3);">'+ql+'</span>';
-  }
-
-  var h = '<table class="aafc-all-tbl" style="width:100%;"><thead><tr>';
-  h += '<th style="text-align:left;min-width:120px;width:140px;">PERIOD</th>';
-  h += '<th>PROD.</th><th>SUPPLY</th><th>EXPORTS</th>';
-  if(showFood) h += '<th>FOOD/IND</th>';
-  h += '<th>FEED/WSTE</th><th>DOM. USE</th><th>STOCKS</th><th>S/U %</th>';
+  function colHead(q){ return q.crop_year+' '+q.quarter+'<br><span style="font-size:10px;font-weight:600;color:var(--text3);">'+q.quarter_label+'</span>'; }
+  h += '<div style="overflow-x:auto;"><table class="bal-table" style="table-layout:auto;min-width:600px;">';
+  h += '<thead><tr>';
+  h += '<th style="text-align:left;width:180px;font-size:13px;">ITEM</th>';
+  h += '<th class="latest">'+colHead(currQ)+'</th>';
+  if(prevQ){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">QoQ Δ</th>'; h += '<th>'+colHead(prevQ)+'</th>'; }
+  samePY.forEach(function(q){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">YoY Δ</th>'; h += '<th>'+colHead(q)+'</th>'; });
   h += '</tr></thead><tbody>';
-
-  slots.forEach(function(s, i){
-    var r   = s.row;
-    var isCur = (s.tag === 'cur');
-
-    // YoY coloring: only on current row, vs same-Q prior year
-    var dc = (isCur && py1) ? _dcls : function(){ return ''; };
-    var py = (isCur && py1) ? py1 : {};
-
-    var su    = _su(r);
-    var suStr = su!=null ? su.toFixed(0)+'%' : '\u2014';
-    var rowStyle = isCur
-      ? ' style="background:var(--row-latest);"'
-      : (i%2 ? ' style="background:var(--row-alt);"' : '');
-
-    h += '<tr'+rowStyle+'>';
-    h += '<td style="text-align:left;">'+periodCell(s)+'</td>';
-    h += '<td class="'+dc(r.prod,     py.prod)     +'">'+fmt(r.prod)+'</td>';
-    h += '<td class="'+dc(r.supply,   py.supply)   +'">'+fmt(r.supply)+'</td>';
-    h += '<td class="'+dc(r.exports,  py.exports)  +'">'+fmt(r.exports)+'</td>';
-    if(showFood)
-      h += '<td class="'+dc(r.food,   py.food)     +'">'+fmt(r.food)+'</td>';
-    h += '<td class="'+dc(r.feed,     py.feed)     +'">'+fmt(r.feed)+'</td>';
-    h += '<td class="'+dc(r.dom,      py.dom)      +'">'+fmt(r.dom)+'</td>';
-    h += '<td class="'+dc(r.stocks,   py.stocks)   +'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
-    h += '<td style="font-weight:700;">'+suStr+'</td>';
-    h += '';
+  items.forEach(function(item, ri){
+    var cv=currQ[item.key], pv=prevQ?prevQ[item.key]:null;
+    var qod=delta(cv,pv);
+    var alt=ri%2?' class="row-alt"':'';
+    h += '<tr'+alt+'>';
+    h += '<td style="text-align:left;font-weight:700;">'+item.label+'</td>';
+    h += '<td class="latest">'+item.fmt(cv)+'</td>';
+    if(prevQ){ h += '<td style="font-size:13px;'+qod.cls+'">'+qod.str+'</td><td>'+item.fmt(pv)+'</td>'; }
+    samePY.forEach(function(q){ var yv=q[item.key]; var yod=delta(cv,yv); h += '<td style="font-size:13px;'+yod.cls+'">'+yod.str+'</td><td>'+item.fmt(yv)+'</td>'; });
     h += '</tr>';
   });
-
-  h += '</tbody></table>';
-  return h;
+  function su(r){ if(!r) return null; var d=(r.dom||0)+(r.exports||0); return d>0?((r.stocks/d)*100):null; }
+  var sc=su(currQ),sp=su(prevQ); var spy=samePY.map(su);
+  var fsu=function(v){return v===null?'—':v.toFixed(0)+'%';};
+  function sud(a,b){if(a===null||b===null)return{str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5)return{str:'—',cls:''}; return{str:(d>=0?'+':'')+d.toFixed(0)+'pp',cls:d<0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'};}
+  var alt2=items.length%2?' class="row-alt"':'';
+  h += '<tr'+alt2+'><td style="text-align:left;font-weight:700;font-style:italic;">S/U Ratio</td><td class="latest">'+fsu(sc)+'</td>';
+  if(prevQ){ var qd2=sud(sc,sp); h += '<td style="font-size:13px;'+qd2.cls+'">'+qd2.str+'</td><td>'+fsu(sp)+'</td>'; }
+  spy.forEach(function(s){ var yd=sud(sc,s); h += '<td style="font-size:13px;'+yd.cls+'">'+yd.str+'</td><td>'+fsu(s)+'</td>'; });
+  h += '</tr>';
+  h += '</tbody></table></div>';
+  h += '<div style="font-size:12px;color:var(--text3);margin-top:12px;font-style:italic;line-height:1.6;">Quarterly figures are <strong>cumulative YTD</strong> from Aug 1. Q4 = full crop-year actual. StatsCan does not publish mid-year full-year estimates. Switch to <strong>ANNUAL</strong> view for historical S&D balance sheets.</div>';
+  document.getElementById('aafc-content').innerHTML = h;
 }
-
-// ── ALL CROPS view ────────────────────────────────────────────────────────────
 function renderAafcAll(){
-  var curCY = AAFC_DATA.current_crop_year || '';
-  var curQ  = AAFC_DATA.current_quarter   || '';
-  var curQL = AAFC_DATA.current_quarter_label || '';
-  var h = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curCY+' '+curQ);
-  Object.keys(AAFC_DATA.crops).sort().forEach(function(cropName){
-    var cd = AAFC_DATA.crops[cropName];
-    if(!(cd.quarterly||[]).length) return;
-    h += '<div style="margin-bottom:20px;">';
-    h += '<div style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);'
-      +  'padding:8px 14px;background:var(--section-bg);border-top:2px solid var(--amber);'
-      +  'border-bottom:1px solid var(--border2);cursor:pointer;" onclick="setAafcCrop(\''+cropName+'\')">'
-      +  cropName.toUpperCase()
-      +  ' <span style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.04em;">\u25b8 detail</span></div>';
-    h += _renderCropTable(cd, curCY, curQ);
-    h += '</div>';
-  });
-  document.getElementById('aafc-content').innerHTML = h;
+const crops = Object.keys(AAFC_DATA.crops);
+var allYears = {};
+crops.forEach(function(c){ AAFC_DATA.crops[c].rows.forEach(function(r){ allYears[r.year]=1; }); });
+const years = Object.keys(allYears).sort();
+const curYr = years.length ? years[years.length - 1] : '';
+const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
+const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
+function dc(a,b){ if(a==null||b==null) return ''; return a>b?'aafc-up':a<b?'aafc-dn':''; }
+let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
+html += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--text2);">'
+  + '<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>'
+  + 'The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. '
+  + 'YoY change coloring is suppressed on the YTD row to avoid misleading comparisons. All volumes in 000 tonnes unless noted.'
+  + '</div>';
+// Render each crop as its own balance sheet (same format as individual view)
+crops.forEach(cropName => {
+const cd = AAFC_DATA.crops[cropName];
+const rows = cd.rows;
+if(!rows.length) return;
+const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
+html += '<div style="margin-bottom:22px;">';
+html += '<div style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);padding:8px 14px;background:var(--section-bg);border-top:2px solid var(--amber);border-bottom:1px solid var(--border2);cursor:pointer;" onclick="setAafcCrop(\''+cropName+'\')">'+cropName.toUpperCase()+' <span style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.04em;">▸ detail</span></div>';
+html += '<table class="aafc-all-tbl"><thead><tr>';
+html += '<th style="text-align:left;width:110px;">YEAR</th>';
+html += '<th>PROD.</th><th>SUPPLY</th><th>EXPORTS</th>';
+if(showFood) html += '<th>FOOD</th>';
+html += '<th>DOM. USE</th><th>STOCKS</th><th>S/U %</th>';
+html += '<th>YIELD<br><span style="font-weight:400;font-size:10px;">t/ha</span></th>';
+html += '</tr></thead><tbody>';
+rows.forEach((r, i) => {
+  const prev = i > 0 ? rows[i-1] : null;
+  const isCur = r.year === curYr;
+  const denom = (r.dom||0) + (r.exports||0);
+  const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
+  const yrLbl = isCur ? r.year+' <span style="font-size:10px;font-weight:900;color:var(--amber);letter-spacing:.04em;">YTD</span>' : r.year;
+  const cls = isCur ? ' style="background:var(--row-alt);"' : (i%2?' style="background:var(--row-alt);"':'');
+  // Suppress YoY coloring on the current (YTD) row — partial-year data is not comparable
+  const dcFn = isCur ? (()=>'') : dc;
+  html += '<tr'+(isCur?' style="background:var(--row-latest);"':cls)+'>';
+  html += '<td style="'+(isCur?'color:var(--amber);font-weight:800;':'')+'">'+yrLbl+'</td>';
+  html += '<td class="'+dcFn(r.prod,prev?prev.prod:null)+'">'+fmt(r.prod)+'</td>';
+  html += '<td>'+fmt(r.supply)+'</td>';
+  html += '<td class="'+dcFn(r.exports,prev?prev.exports:null)+'">'+fmt(r.exports)+'</td>';
+  if(showFood) html += '<td>'+fmt(r.food)+'</td>';
+  html += '<td>'+fmt(r.dom)+'</td>';
+  html += '<td class="'+dcFn(r.stocks,prev?prev.stocks:null)+'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
+  html += '<td style="font-weight:700;">'+su+'</td>';
+  html += '<td>'+fmtY(r.yield)+'</td>';
+  html += '</tr>';
+});
+html += '</tbody></table></div>';
+});
+html += '<div class="aafc-notes">'+(AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>'<div>• '+n+'</div>').join('') : '')+'</div>';
+document.getElementById('aafc-content').innerHTML = html;
 }
-
-// ── Single-crop view ──────────────────────────────────────────────────────────
 function renderAafc(){
-  if(AAFC_DATA && AAFC_DATA.report_date){
-    var el = document.getElementById('aafc-report-date-label');
-    if(el) el.textContent = AAFC_DATA.report_date;
-  }
-  if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
-  var cd = AAFC_DATA.crops[aafcCrop];
-  if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
-  var curCY = AAFC_DATA.current_crop_year || '';
-  var curQ  = AAFC_DATA.current_quarter   || '';
-  var curQL = AAFC_DATA.current_quarter_label || '';
-  var h = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curCY+' '+curQ);
-  h += _renderCropTable(cd, curCY, curQ);
-  document.getElementById('aafc-content').innerHTML = h;
+if(AAFC_DATA && AAFC_DATA.report_date){
+const el = document.getElementById('aafc-report-date-label');
+if(el) el.textContent = AAFC_DATA.report_date;
+}
+if(aafcView === 'quarterly'){ renderAafcQuarterly(); return; }
+if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
+const cd = AAFC_DATA.crops[aafcCrop];
+if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
+const rows = cd.rows;
+const curYr = rows.length ? rows[rows.length - 1].year : '';
+const isPulse = !rows[0].price || rows[0].food===null;
+const hasPrice = rows.some(r=>r.price);
+const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
+const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
+const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
+function deltaClass(cur, prev){
+if(cur===null||prev===null||cur===undefined||prev===undefined) return '';
+return cur>prev ? 'aafc-up' : cur<prev ? 'aafc-dn' : '';
+}
+// Check if area/yield data exists (may be null for current partial year)
+const hasAreaData = rows.some(r=>r.area_s!=null||r.area_h!=null);
+const showArea = hasAreaData;
+// Count area group span: seeded + harv + yield = 3, or 0 if suppressed
+const areaSpan = showArea ? 3 : 0;
+let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
+html += `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">`
+  + `<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>`
+  + `The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. `
+  + `YoY change coloring is suppressed on the YTD row to avoid misleading comparisons.`
+  + `</div>`;
+html += `<div class="aafc-price-label">${cd.price_label}</div>`;
+html += `<div class="aafc-sd-wrap"><table class="aafc-tbl"><thead>`;
+html += `<tr class="aafc-group">
+<th rowspan="2" style="text-align:left;border-right:1px solid var(--border2);">CROP YEAR</th>
+${showArea?`<th colspan="3" class="span-area" style="border-left:1px solid var(--border2);">AREA (000 ha)</th>`:''}
+<th colspan="3" class="span-supply" style="border-left:1px solid var(--border2);">SUPPLY (000 t)</th>
+<th colspan="${showFood?4:3}" class="span-demand" style="border-left:1px solid var(--border2);">DEMAND (000 t)</th>
+<th colspan="2" style="border-left:1px solid var(--border2);">BALANCE</th>
+${hasPrice?'<th style="border-left:1px solid var(--border2);">PRICE</th>':''}
+</tr>`;
+html += `<tr class="aafc-cols">
+${showArea?`<th style="border-left:1px solid var(--border2);">SEEDED</th><th>HARV.</th><th class="span-area">YIELD t/ha</th>`:''}
+<th style="border-left:1px solid var(--border2);">PROD.</th><th>IMPORTS</th><th class="span-supply">TOTAL</th>
+<th style="border-left:1px solid var(--border2);">EXPORTS</th>
+${showFood?'<th>FOOD/IND</th>':''}
+<th>FEED/WSTE</th><th class="span-demand">DOM. USE</th>
+<th style="border-left:1px solid var(--border2);">STOCKS</th>
+<th>S/U %</th>
+${hasPrice?`<th style="border-left:1px solid var(--border2);">$/t</th>`:''}
+</tr></thead><tbody>`;
+rows.forEach((r, i) => {
+const prev = i > 0 ? rows[i-1] : null;
+const isCur = r.year === curYr;
+const rowCls = isCur ? 'aafc-cur' : '';
+const denom = (r.dom||0) + (r.exports||0); const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
+// Suppress YoY delta coloring on current (YTD) row — partial year is not comparable to prior full year
+const dc2 = isCur ? (()=>'') : deltaClass;
+const yrCell = isCur
+  ? `${r.year} <span style="font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--amber);">YTD</span>`
+  : r.year;
+html += `<tr class="${rowCls}">
+<td>${yrCell}</td>
+${showArea?`<td style="border-left:1px solid var(--border2);">${fmt(r.area_s)}</td><td>${fmt(r.area_h)}</td><td class="${prev?dc2(r.yield,prev.yield):''}">${fmtY(r.yield)}</td>`:''}
+<td style="border-left:1px solid var(--border2);">${fmt(r.prod)}</td>
+<td>${fmt(r.imports)}</td>
+<td class="${prev?dc2(r.supply,prev.supply):''}">${fmt(r.supply)}</td>
+<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.exports,prev.exports):''}">${fmt(r.exports)}</td>
+${showFood?`<td>${fmt(r.food)}</td>`:''}
+<td>${fmt(r.feed)}</td>
+<td class="${prev?dc2(r.dom,prev.dom):''}">${fmt(r.dom)}</td>
+<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.stocks,prev.stocks):''}">${fmt(r.stocks)}</td>
+<td>${su}</td>
+${hasPrice?`<td class="aafc-price" style="border-left:1px solid var(--border2);">$${fmt(r.price)}</td>`:''}
+</tr>`;
+});
+html += `</tbody></table></div>`;
+html += `<div class="aafc-notes">${AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('') : ''}</div>`;
+document.getElementById('aafc-content').innerHTML = html;
 }
 onCommChange();
 setTimeout(()=>{
@@ -8642,52 +8575,29 @@ async function refreshFred() {
     if (resp.ok) {
       var jsonData = await resp.json();
       var ok = 0;
-      // Load standard macro dashboard series
       allSeries.forEach(function(s) {
         if (jsonData[s.id] && jsonData[s.id].length) { fredData[s.id] = jsonData[s.id]; ok++; updateFredMetric(s); }
       });
-      // CRITICAL: also load FX pairs and foreign 10Y yields for the currency dashboard
-      // These are not in FRED_SERIES (macro dashboard) but ARE in the pipeline JSON
-      var fxAndRateIds = FX_PAIRS.map(function(p){ return p.id; })
-        .concat(FX_PAIRS.filter(function(p){ return p.rateId; }).map(function(p){ return p.rateId; }));
-      var fxLoaded = 0;
-      fxAndRateIds.forEach(function(sid){
-        if (jsonData[sid] && jsonData[sid].length) {
-          fredData[sid] = jsonData[sid];
-          fxLoaded++;
-          console.log('FX/Rate loaded:', sid, jsonData[sid].length, 'obs, latest:', jsonData[sid][0].d, '=', jsonData[sid][0].v);
-        } else {
-          console.warn('FX/Rate NOT in pipeline JSON:', sid);
-        }
-      });
-      console.log('FX/Rate series loaded:', fxLoaded + '/' + fxAndRateIds.length);
-      if (ok > 0 || fxLoaded > 0) {
-        console.log('FRED loaded from pipeline JSON:', ok, 'macro series,', fxLoaded, 'FX/rate series');
+      if (ok > 0) {
+        console.log('FRED loaded from pipeline JSON:', ok, 'series');
         if(jsonData._meta && jsonData._meta.fetched_at) showDataFreshness(null, jsonData._meta.fetched_at, 'FRED');
         updateFredCharts();
         setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
         if (lb) lb.style.display = 'none';
-        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, (ok + fxLoaded) + ' series');
+        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, ok + '/' + allSeries.length + ' series');
         return;
       }
     }
   } catch(e) { console.log('FRED pipeline JSON not available, trying live API...'); }
-  // Fallback: live API (fetches macro series + FX/rate series)
+  // Fallback: live API
   if (!fredApiKey) { if(lb) lb.style.display='none'; return; }
   var ok = 0, fail = 0;
-  // Build combined series list: macro + FX + foreign yields
-  var fxExtraSeries = [];
-  FX_PAIRS.forEach(function(p){
-    fxExtraSeries.push({id: p.id, lim: 252, extra: ''});
-    if(p.rateId) fxExtraSeries.push({id: p.rateId, lim: 60, extra: ''});
-  });
-  var combinedSeries = allSeries.concat(fxExtraSeries);
-  for (var i = 0; i < combinedSeries.length; i++) {
-    var s = combinedSeries[i];
-    if (lp) lp.style.width = ((i + 1) / combinedSeries.length * 100) + '%';
+  for (var i = 0; i < allSeries.length; i++) {
+    var s = allSeries[i];
+    if (lp) lp.style.width = ((i + 1) / allSeries.length * 100) + '%';
     try {
       var data = await fredFetch(s.id, s.lim, s.extra);
-      if (data && data.length > 0) { fredData[s.id] = data; ok++; if(s.id in allSeries.reduce(function(o,x){o[x.id]=1;return o;},{})) updateFredMetric(s); } else { fail++; }
+      if (data && data.length > 0) { fredData[s.id] = data; ok++; updateFredMetric(s); } else { fail++; }
     } catch(e) { fail++; }
   }
   updateFredCharts();
@@ -10384,6 +10294,7 @@ var RPT_VIEWS = [
   {id:'energy',     label:'Energy',           section:'BALANCE SHEETS'},
   {id:'sd',         label:'USDA (S&D)',       section:null},
   {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
+  {id:'progress',   label:'Crop Progress',    section:null},
   {id:'exports',    label:'Export Sales',     section:null},
   {id:'gsw',        label:'Grain Stats Weekly', section:null},
   {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
@@ -10399,7 +10310,7 @@ function initReports(){
   if(!_nassData){
     fetch('data/nass_reports.json')
       .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){ _nassData = d; if(_nassData.fetched){ document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); showDataFreshness(null, _nassData.fetched, 'NASS'); } console.log('NASS crop_conditions keys:', Object.keys(_nassData.crop_conditions||{})); buildRptNav(); })
+      .then(function(d){ _nassData = d; if(_nassData.fetched){ document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); showDataFreshness(null, _nassData.fetched, 'NASS'); } buildRptNav(); })
       .catch(function(e){ console.warn('NASS data not available:', e.message); });
   }
 }
@@ -10414,12 +10325,8 @@ function showRptContent(){
 }
 
 function buildRptNav(){
-  // Always show all 4 crops in nav; data may be absent for some
-  var ALL_COND_CROPS = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
-  var condData = _nassData ? (_nassData.crop_conditions || {}) : {};
-  // Merge: known crops first, then any extras from pipeline
-  var crops = ALL_COND_CROPS.slice();
-  Object.keys(condData).forEach(function(c){ if(crops.indexOf(c) < 0) crops.push(c); });
+  var crops = _nassData ? Object.keys(_nassData.crop_conditions || {}) : [];
+  if(!crops.length) crops = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
   if(crops.indexOf(_rptCrop) < 0) _rptCrop = crops[0];
   var h = '';
   var lastSection = '';
@@ -10462,12 +10369,13 @@ function setRptCrop(c, view){
 }
 
 function renderRptView(){
-  if(!_nassData && ['conditions','stocks','acreage','cattle','hogs'].indexOf(_rptView) >= 0) return;
+  if(!_nassData && ['conditions','progress','stocks','acreage','cattle','hogs'].indexOf(_rptView) >= 0) return;
   switch(_rptView){
     case 'energy': renderRptEnergy(); break;
     case 'sd': renderRptSD(); break;
     case 'aafc': renderRptAAFC(); break;
-    case 'conditions': renderRptScoreboard(); renderRptCondTable(); renderRptGEChart(); renderRptProgressTable(); renderRptProgressCharts(); break;
+    case 'conditions': renderRptScoreboard(); renderRptCondTable(); renderRptGEChart(); break;
+    case 'progress': renderRptProgressTable(); renderRptProgressCharts(); break;
     case 'stocks': renderRptStocks(); break;
     case 'acreage': renderRptAcreage(); break;
     case 'cattle': renderRptCattle(); break;
@@ -10490,20 +10398,11 @@ function rptLatestYear(rows){
 
 function renderRptScoreboard(){
   var cond = _nassData.crop_conditions || {};
-  // Always show all 4 expected crops; show placeholder if data missing
-  var ALL_CROPS = ['CORN','SOYBEANS','WINTER WHEAT','SPRING WHEAT'];
-  var crops = ALL_CROPS.filter(function(c){ return cond[c] !== undefined; });
-  if(!crops.length) crops = Object.keys(cond);
+  var crops = Object.keys(cond);
   var h = '';
   crops.forEach(function(c){
     var rows = cond[c] || [];
-    if(!rows.length){
-      h += '<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--border3);border-radius:4px;padding:12px 14px;opacity:0.5;">';
-      h += '<div style="font-size:12px;font-weight:900;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">' + c + '</div>';
-      h += '<div style="font-size:14px;color:var(--text3);font-weight:600;">No data yet this season</div>';
-      h += '</div>';
-      return;
-    }
+    if(!rows.length){ return; }
     var cy = rptLatestYear(rows);
     var cyRows = rows.filter(function(r){ return r.year === cy; });
     var pyRows = rows.filter(function(r){ return r.year === cy - 1; });
@@ -10565,282 +10464,116 @@ function renderRptCondTable(){
 function renderRptGEChart(){
   var cond = _nassData.crop_conditions || {};
   var rows = cond[_rptCrop] || [];
-  if(!rows.length){ return; }
-
-  // Winter wheat: group by crop year (Aug 1 anchor) so Oct 2025 - Jul 2026
-  // forms one continuous "2025-26" series, not split at Jan 1.
-  // Display label uses HARVEST year (cy+1) to match trade convention.
-  var isWinter = _rptCrop && _rptCrop.indexOf('WHEAT') >= 0;
-
-  function seriesYear(r){
-    if(!isWinter) return r.year;
-    var d = new Date(r.week_ending + 'T12:00:00');
-    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1;
-  }
-  function displayYear(sy){ return isWinter ? sy + 1 : sy; }
-
-  function xPos(we){
-    var d = new Date(we + 'T12:00:00');
-    if(isWinter){
-      var aug1 = new Date(d.getFullYear(), 7, 1);
-      if(d < aug1) aug1 = new Date(d.getFullYear()-1, 7, 1);
-      return Math.max(1, Math.round((d - aug1)/(7*24*3600*1000)) + 1);
-    }
-    var jan1 = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil((((d - jan1)/86400000) + jan1.getDay() + 1)/7);
-  }
-
-  var allSY = [];
-  rows.forEach(function(r){ var sy=seriesYear(r); if(allSY.indexOf(sy)<0) allSY.push(sy); });
-  allSY.sort(function(a,b){ return b-a; });
-  var cy = allSY[0];
-
-  function yearPts(sy){
-    return rows.filter(function(r){ return seriesYear(r)===sy; })
-      .sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); })
-      .map(function(r){ return {x:xPos(r.week_ending), y:rptGetGE(r)}; });
-  }
-
-  if(_rptGEChart){ _rptGEChart.destroy(); _rptGEChart=null; }
-  var wrap = document.getElementById('rpt-ge-chart').parentElement;
-  wrap.innerHTML = '<canvas id="rpt-ge-chart" style="display:block;width:100%;height:100%;"></canvas>';
+  var cy = rptLatestYear(rows);
+  var cyData = rows.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); });
+  var pyData = rows.filter(function(r){ return r.year === cy - 1; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); });
+  function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
+  var cyPts = cyData.map(function(r){ return {x: weekNum(r.week_ending), y: rptGetGE(r)}; });
+  var pyPts = pyData.map(function(r){ return {x: weekNum(r.week_ending), y: rptGetGE(r)}; });
   var ctx = document.getElementById('rpt-ge-chart');
+  if(_rptGEChart){ _rptGEChart.destroy(); }
   var isDark = document.body.classList.contains('dark');
-
-  var priorColors = isDark
-    ? ['rgba(245,166,35,0.60)','rgba(245,166,35,0.42)','rgba(245,166,35,0.28)','rgba(245,166,35,0.17)','rgba(245,166,35,0.09)']
-    : ['rgba(212,133,10,0.60)','rgba(212,133,10,0.42)','rgba(212,133,10,0.28)','rgba(212,133,10,0.17)','rgba(212,133,10,0.09)'];
-
-  var datasets = [{
-    label: String(displayYear(cy)), data: yearPts(cy),
-    borderColor: isDark ? '#f5a623' : '#D4850A',
-    borderWidth: 2.5, pointRadius: 2.5, fill:false, tension:0.3
-  }];
-
-  allSY.forEach(function(sy){
-    if(sy===cy) return;
-    var offset = cy - sy - 1;
-    if(offset < 0 || offset >= priorColors.length) return;
-    var pts = yearPts(sy);
-    if(!pts.length) return;
-    datasets.push({
-      label: String(displayYear(sy)), data: pts,
-      borderColor: priorColors[offset],
-      borderWidth: offset<2 ? 1.8 : 1.2,
-      borderDash:[5,3], pointRadius:0, fill:false, tension:0.3
-    });
-  });
-
-  var gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
-  var tc = isDark ? '#6a7a8a' : '#5a6878';
   _rptGEChart = new Chart(ctx, {
-    type:'line', data:{datasets:datasets},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      scales:{
-        x:{type:'linear', title:{display:true,text:isWinter?'Crop Week (Aug–Jul)':'Week #',color:tc}, ticks:{color:tc,stepSize:4}, grid:{color:gc}},
-        y:{title:{display:true,text:'% Good/Excellent',color:tc}, ticks:{color:tc}, grid:{color:gc}}
+    type: 'line',
+    data: { datasets: [
+      { label: String(cy), data: cyPts, borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
+      { label: String(cy-1), data: pyPts, borderColor: isDark ? 'rgba(245,166,35,0.35)' : 'rgba(212,133,10,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
+        y: { title: { display: true, text: '% Good/Excellent', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
       },
-      plugins:{legend:{labels:{color:tc, font:{family:"'Courier New',monospace",weight:'700',size:11}, boxWidth:24, padding:10}}}
+      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
     }
   });
 }
+
 function renderRptProgressTable(){
-  if(!_nassData) return;
   var prog = _nassData.crop_progress || {};
+  var cy = new Date().getFullYear();
   var cropProg = prog[_rptCrop] || {};
-  var isWinter = _rptCrop && _rptCrop.indexOf('WHEAT') >= 0;
-
-  // Collect all rows to find latest series year
-  var allRows = [];
-  Object.values(cropProg).forEach(function(arr){ allRows = allRows.concat(arr); });
-  if(!allRows.length){
-    document.getElementById('rpt-prog-title').textContent = _rptCrop + ' — PROGRESS';
-    document.getElementById('rpt-prog-tbl').innerHTML =
-      '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for ' + _rptCrop + ' yet this season</td></tr></tbody>';
-    return;
-  }
-
-  // Winter wheat: group Oct-Jul by crop year (Aug 1 anchor)
-  function seriesYear(r){
-    if(!isWinter) return r.year;
-    var d = new Date(r.week_ending + 'T12:00:00');
-    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear()-1;
-  }
-  // Display label: harvest year for winter wheat, calendar year for others
-  function displayYear(sy){ return isWinter ? sy+1 : sy; }
-
-  var cy = 0;
-  allRows.forEach(function(r){ var sy=seriesYear(r); if(sy>cy) cy=sy; });
-
-  // Prior-year match: 52 weeks back (364 days), fuzzy ±4 days
-  function findPY(pyRows, we){
-    var d = new Date(we + 'T12:00:00');
-    d.setDate(d.getDate()-364);
-    var best=null, bestDiff=Infinity;
-    pyRows.forEach(function(r){
-      var diff=Math.abs(new Date(r.week_ending)-d);
-      if(diff<bestDiff && diff<=4*86400000){ best=r; bestDiff=diff; }
-    });
-    return best;
-  }
-
-  // Show crop year in title
-  document.getElementById('rpt-prog-title').textContent =
-    _rptCrop + ' — PROGRESS · ' + displayYear(cy);
-
-  var stageKeys = Object.keys(cropProg).filter(function(s){ return s!=='OTHER'; }).sort();
-  var h = '<thead><tr>'
-    + '<th style="text-align:left;">Stage</th>'
-    + '<th style="color:var(--amber);">This Week</th>'
-    + '<th>Last Week</th>'
-    + '<th>Last Year</th>'
-    + '</tr></thead><tbody>';
-
-  var ri=0, shown=0;
+  // Find latest year across all stages
+  var allProgRows = [];
+  Object.values(cropProg).forEach(function(arr){ allProgRows = allProgRows.concat(arr); });
+  if(allProgRows.length) cy = rptLatestYear(allProgRows);
+  document.getElementById('rpt-prog-title').textContent = _rptCrop + ' — PROGRESS';
+  var stageKeys = Object.keys(cropProg).filter(function(s){ return s !== 'OTHER'; });
+  var h = '<thead><tr><th style="text-align:left;">Stage</th><th style="color:var(--amber);">This Week</th><th>Last Week</th><th>Last Year</th></tr></thead><tbody>';
+  var ri = 0;
   stageKeys.forEach(function(stage){
-    var data = cropProg[stage]||[];
-    var cyRows = data.filter(function(r){ return seriesYear(r)===cy; })
-                     .sort(function(a,b){ return b.week_ending.localeCompare(a.week_ending); });
-    var pyRows = data.filter(function(r){ return seriesYear(r)===cy-1; });
-    if(!cyRows.length) return;
-    var latest=cyRows[0], prev=cyRows.length>1?cyRows[1]:null;
-    var pyRow=findPY(pyRows, latest.week_ending);
-    h += '<tr'+(ri%2?' class="row-alt"':'')+'>'; 
-    h += '<td style="text-align:left;font-size:14px;font-weight:800;letter-spacing:.06em;">'+stage+'</td>';
-    h += '<td class="latest" style="font-size:16px;">'+latest.value+'%</td>';
-    h += '<td>'+(prev?prev.value+'%':'—')+'</td>';
-    h += '<td style="color:var(--text3);">'+(pyRow?pyRow.value+'%':'—')+'</td>';
+    var data = cropProg[stage];
+    var cyData = data.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return b.week_ending.localeCompare(a.week_ending); });
+    var pyData = data.filter(function(r){ return r.year === cy - 1; });
+    if(!cyData.length) return;
+    var latest = cyData[0];
+    var prev = cyData.length > 1 ? cyData[1] : null;
+    var pyWE = latest.week_ending.replace(String(cy), String(cy-1));
+    var pyMatch = pyData.filter(function(r){ return r.week_ending === pyWE; });
+    h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
+    h += '<td style="text-align:left;font-size:14px;font-weight:800;letter-spacing:.06em;">' + stage + '</td>';
+    h += '<td class="latest" style="font-size:16px;">' + latest.value + '%</td>';
+    h += '<td>' + (prev ? prev.value + '%' : '—') + '</td>';
+    h += '<td style="color:var(--text3);">' + (pyMatch.length ? pyMatch[0].value + '%' : '—') + '</td>';
     h += '</tr>';
-    ri++; shown++;
+    ri++;
   });
-  if(!shown) h += '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for '+_rptCrop+' yet this season</td></tr>';
+  if(!stageKeys.length) h += '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for ' + _rptCrop + ' yet this season</td></tr>';
   h += '</tbody>';
   document.getElementById('rpt-prog-tbl').innerHTML = h;
 }
 
 function renderRptProgressCharts(){
-  if(!_nassData) return;
   var prog = _nassData.crop_progress || {};
+  var isDark = document.body.classList.contains('dark');
   var cropProg = prog[_rptCrop] || {};
-  var isWinter = _rptCrop && _rptCrop.indexOf('WHEAT') >= 0;
-  var isDark   = document.body.classList.contains('dark');
+  var allProgRows = [];
+  Object.values(cropProg).forEach(function(arr){ allProgRows = allProgRows.concat(arr); });
+  var cy = allProgRows.length ? rptLatestYear(allProgRows) : new Date().getFullYear();
+  function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
+  var cropProg = prog[_rptCrop] || {};
 
-  function seriesYear(r){
-    if(!isWinter) return r.year;
-    var d = new Date(r.week_ending + 'T12:00:00');
-    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear()-1;
-  }
-  function displayYear(sy){ return isWinter ? sy+1 : sy; }
-
-  function xPos(we){
-    var d = new Date(we + 'T12:00:00');
-    if(isWinter){
-      var aug1 = new Date(d.getFullYear(),7,1);
-      if(d<aug1) aug1 = new Date(d.getFullYear()-1,7,1);
-      return Math.max(1, Math.round((d-aug1)/(7*24*3600*1000))+1);
-    }
-    var jan1 = new Date(d.getFullYear(),0,1);
-    return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);
-  }
-
-  var allRows = [];
-  Object.values(cropProg).forEach(function(arr){ allRows=allRows.concat(arr); });
-  var allSY = [];
-  allRows.forEach(function(r){ var sy=seriesYear(r); if(allSY.indexOf(sy)<0) allSY.push(sy); });
-  allSY.sort(function(a,b){ return b-a; });
-  var cy = allSY[0] || new Date().getFullYear();
-
-  function stagePts(stage, sy){
-    return (cropProg[stage]||[])
-      .filter(function(r){ return seriesYear(r)===sy; })
-      .sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); })
-      .map(function(r){ return {x:xPos(r.week_ending), y:r.value}; });
-  }
-
-  var gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
-  var tc = isDark ? '#6a7a8a' : '#5a6878';
-  var xLabel = isWinter ? 'Crop Week (Aug–Jul)' : 'Week #';
-
-  var plantPriorC = isDark
-    ? ['rgba(245,166,35,0.55)','rgba(245,166,35,0.35)','rgba(245,166,35,0.20)','rgba(245,166,35,0.12)']
-    : ['rgba(212,133,10,0.55)','rgba(212,133,10,0.35)','rgba(212,133,10,0.20)','rgba(212,133,10,0.12)'];
-  var harvPriorC = isDark
-    ? ['rgba(46,143,82,0.55)','rgba(46,143,82,0.35)','rgba(46,143,82,0.20)','rgba(46,143,82,0.12)']
-    : ['rgba(14,122,58,0.55)','rgba(14,122,58,0.35)','rgba(14,122,58,0.20)','rgba(14,122,58,0.12)'];
-
-  function buildDs(stage, curColor, priorColors, extraStage, extraColor){
-    var ds = [];
-    var curPts = stagePts(stage, cy);
-    if(curPts.length) ds.push({
-      label: String(displayYear(cy)), data: curPts,
-      borderColor: curColor, borderWidth:2.5, pointRadius:2.5, fill:false, tension:0.3
-    });
-    allSY.forEach(function(sy){
-      if(sy===cy) return;
-      var offset = cy-sy-1;
-      if(offset<0||offset>=priorColors.length) return;
-      var pts = stagePts(stage, sy);
-      if(!pts.length) return;
-      ds.push({
-        label: String(displayYear(sy)), data:pts,
-        borderColor:priorColors[offset],
-        borderWidth:offset<2?1.8:1.2,
-        borderDash:[5,3], pointRadius:0, fill:false, tension:0.3
-      });
-    });
-    // Optional second stage (e.g. EMERGED on planting chart, HEADED on harvest chart)
-    if(extraStage && extraColor){
-      var ePts = stagePts(extraStage, cy);
-      if(ePts.length) ds.push({
-        label: String(displayYear(cy))+' '+extraStage.charAt(0)+extraStage.slice(1).toLowerCase(),
-        data: ePts,
-        borderColor: extraColor, borderWidth:1.8, borderDash:[3,2],
-        pointRadius:0, fill:false, tension:0.3
-      });
-    }
-    return ds;
-  }
-
-  function makeOpts(yLabel){
-    return {
-      responsive:true, maintainAspectRatio:false,
-      scales:{
-        x:{type:'linear', title:{display:true,text:xLabel,color:tc}, ticks:{color:tc,stepSize:4}, grid:{color:gc}},
-        y:{min:0, max:100, title:{display:true,text:yLabel,color:tc}, ticks:{color:tc}, grid:{color:gc}}
+  // Planting chart
+  var plantData = cropProg['PLANTED'] || [];
+  var cyPlant = plantData.filter(function(r){ return r.year === cy; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
+  var pyPlant = plantData.filter(function(r){ return r.year === cy-1; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
+  var ctxP = document.getElementById('rpt-plant-chart');
+  if(_rptPlantChart) _rptPlantChart.destroy();
+  _rptPlantChart = new Chart(ctxP, {
+    type: 'line',
+    data: { datasets: [
+      { label: String(cy), data: cyPlant, borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
+      { label: String(cy-1), data: pyPlant, borderColor: isDark ? 'rgba(245,166,35,0.35)' : 'rgba(212,133,10,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
+        y: { min: 0, max: 100, title: { display: true, text: '% Planted', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
       },
-      plugins:{legend:{labels:{color:tc, font:{family:"'Courier New',monospace",weight:'700',size:11}, boxWidth:24, padding:10}}}
-    };
-  }
+      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
+    }
+  });
 
-  function freshCanvas(id){
-    if(id==='rpt-plant-chart'&&_rptPlantChart){_rptPlantChart.destroy();_rptPlantChart=null;}
-    if(id==='rpt-harv-chart' &&_rptHarvChart) {_rptHarvChart.destroy(); _rptHarvChart=null;}
-    var old=document.getElementById(id);
-    if(!old) return null;
-    old.parentElement.innerHTML='<canvas id="'+id+'" style="display:block;width:100%;height:280px;"></canvas>';
-    return document.getElementById(id);
-  }
-
-  // Planting pace (+ EMERGED for winter wheat)
-  var ctxP = freshCanvas('rpt-plant-chart');
-  if(ctxP){
-    var plantDs = buildDs('PLANTED',
-      isDark?'#f5a623':'#D4850A', plantPriorC,
-      isWinter?'EMERGED':null,
-      isDark?'rgba(91,156,240,0.7)':'rgba(58,106,170,0.7)');
-    if(plantDs.length) _rptPlantChart = new Chart(ctxP,{type:'line',data:{datasets:plantDs},options:makeOpts(isWinter?'% Planted / Emerged':'% Planted')});
-  }
-
-  // Harvest pace (+ HEADED for winter wheat)
-  var ctxH = freshCanvas('rpt-harv-chart');
-  if(ctxH){
-    var harvDs = buildDs('HARVESTED',
-      isDark?'#2e8f52':'#0E7A3A', harvPriorC,
-      isWinter?'HEADED':null,
-      isDark?'rgba(91,156,240,0.7)':'rgba(58,106,170,0.7)');
-    if(harvDs.length) _rptHarvChart = new Chart(ctxH,{type:'line',data:{datasets:harvDs},options:makeOpts(isWinter?'% Harvested / Headed':'% Harvested')});
-  }
+  // Harvest chart
+  var harvData = cropProg['HARVESTED'] || [];
+  var cyHarv = harvData.filter(function(r){ return r.year === cy; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
+  var pyHarv = harvData.filter(function(r){ return r.year === cy-1; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
+  var ctxH = document.getElementById('rpt-harv-chart');
+  if(_rptHarvChart) _rptHarvChart.destroy();
+  _rptHarvChart = new Chart(ctxH, {
+    type: 'line',
+    data: { datasets: [
+      { label: String(cy), data: cyHarv, borderColor: isDark ? '#2e8f52' : '#0E7A3A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
+      { label: String(cy-1), data: pyHarv, borderColor: isDark ? 'rgba(46,143,82,0.35)' : 'rgba(14,122,58,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
+        y: { min: 0, max: 100, title: { display: true, text: '% Harvested', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
+      },
+      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
+    }
+  });
 }
 
 function renderRptStocks(){
