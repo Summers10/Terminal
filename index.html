@@ -10491,14 +10491,14 @@ function renderRptScoreboard(){
   crops.forEach(function(c){
     var rows = cond[c] || [];
     if(!rows.length){
-      // Show placeholder card for crops with no data yet
       h += '<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--border3);border-radius:4px;padding:12px 14px;opacity:0.5;">';
       h += '<div style="font-size:12px;font-weight:900;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">' + c + '</div>';
       h += '<div style="font-size:14px;color:var(--text3);font-weight:600;">No data yet this season</div>';
       h += '</div>';
       return;
     }
-      var cyRows = rows.filter(function(r){ return r.year === cy; });
+    var cy = rptLatestYear(rows);
+    var cyRows = rows.filter(function(r){ return r.year === cy; });
     var pyRows = rows.filter(function(r){ return r.year === cy - 1; });
     var latest = cyRows.length ? cyRows[cyRows.length - 1] : null;
     var prev = cyRows.length > 1 ? cyRows[cyRows.length - 2] : null;
@@ -10558,7 +10558,6 @@ function renderRptCondTable(){
 function renderRptGEChart(){
   var cond = _nassData.crop_conditions || {};
   var rows = cond[_rptCrop] || [];
-  var cy = rptLatestYear(rows);
   // Crop-year week: weeks since Aug 1 of the crop-year start.
   // This gives a continuous 1-52 axis for any crop, including winter wheat
   // which spans two calendar years (Oct of yr N → Jul of yr N+1).
