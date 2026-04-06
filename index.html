@@ -10558,60 +10558,100 @@ function renderRptCondTable(){
 function renderRptGEChart(){
   var cond = _nassData.crop_conditions || {};
   var rows = cond[_rptCrop] || [];
-  // Crop-year week: weeks since Aug 1 of the crop-year start.
-  // This gives a continuous 1-52 axis for any crop, including winter wheat
-  // which spans two calendar years (Oct of yr N → Jul of yr N+1).
+  if(!rows.length){ return; }
+
+  var isWinterCrop = _rptCrop && _rptCrop.indexOf('WHEAT') >= 0;
+
+  // xPos: for winter crops use crop-week (weeks since Aug 1) to handle cross-year seasons
+  //        for all others use standard calendar week
+  function calWeek(we){
+    var d = new Date(we + 'T12:00:00');
+    var jan1 = new Date(d.getFullYear(), 0, 1);
+    return Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+  }
   function cropWeek(we){
     var d = new Date(we + 'T12:00:00');
-    // Aug 1 of the crop year that contains this date
     var aug1 = new Date(d.getFullYear(), 7, 1);
-    if(d < aug1) aug1 = new Date(d.getFullYear()-1, 7, 1);
-    return Math.max(1, Math.round((d - aug1) / (7*24*3600*1000)) + 1);
+    if(d < aug1) aug1 = new Date(d.getFullYear() - 1, 7, 1);
+    return Math.max(1, Math.round((d - aug1) / (7 * 24 * 3600 * 1000)) + 1);
   }
-  // For multi-year crops like winter wheat, the pipeline stores year as the
-  // CALENDAR year of the week_ending date. So Oct-Dec rows have year=N,
-  // Jan-Jul rows have year=N+1. We group by CROP year (Aug-Jul).
-  function cropYear(r){
+  function xPos(we){ return isWinterCrop ? cropWeek(we) : calWeek(we); }
+
+  // seriesYear: for winter crops group by crop year (Aug-Jul) so Oct 2024–Jul 2025 = 2024
+  //             for others use the NASS calendar year field directly
+  function seriesYear(r){
+    if(!isWinterCrop) return r.year;
     var d = new Date(r.week_ending + 'T12:00:00');
-    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear()-1;
+    return d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1;
   }
-  // Get all unique crop years in the data, newest first
-  var cropYears = [];
-  rows.forEach(function(r){ var cy2=cropYear(r); if(cropYears.indexOf(cy2)<0) cropYears.push(cy2); });
-  cropYears.sort(function(a,b){return b-a;});
-  var cy = cropYears[0] || new Date().getFullYear();
-  function yearPts(cropYr){ return rows.filter(function(r){ return cropYear(r)===cropYr; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); }).map(function(r){ return {x:cropWeek(r.week_ending),y:rptGetGE(r)}; }); }
-  // Replace canvas element entirely - prevents Chart.js height accumulation on commodity change
+
+  // Collect all unique series years, newest first
+  var allYears = [];
+  rows.forEach(function(r){
+    var sy = seriesYear(r);
+    if(allYears.indexOf(sy) < 0) allYears.push(sy);
+  });
+  allYears.sort(function(a, b){ return b - a; });
+  var cy = allYears[0];
+
+  function yearPts(yr){
+    return rows
+      .filter(function(r){ return seriesYear(r) === yr; })
+      .sort(function(a, b){ return a.week_ending.localeCompare(b.week_ending); })
+      .map(function(r){ return {x: xPos(r.week_ending), y: rptGetGE(r)}; });
+  }
+
+  // Replace canvas element entirely to prevent Chart.js height accumulation
   if(_rptGEChart){ _rptGEChart.destroy(); _rptGEChart = null; }
   var wrap = document.getElementById('rpt-ge-chart').parentElement;
   wrap.innerHTML = '<canvas id="rpt-ge-chart" style="display:block;width:100%;height:100%;"></canvas>';
   var ctx = document.getElementById('rpt-ge-chart');
   var isDark = document.body.classList.contains('dark');
-  // Current year = solid amber; prior years = progressively lighter
+
   var priorColors = isDark
-    ? ['rgba(245,166,35,0.60)','rgba(245,166,35,0.40)','rgba(245,166,35,0.26)','rgba(245,166,35,0.16)','rgba(245,166,35,0.10)']
-    : ['rgba(212,133,10,0.60)','rgba(212,133,10,0.40)','rgba(212,133,10,0.26)','rgba(212,133,10,0.16)','rgba(212,133,10,0.10)'];
+    ? ['rgba(245,166,35,0.60)','rgba(245,166,35,0.42)','rgba(245,166,35,0.28)','rgba(245,166,35,0.17)','rgba(245,166,35,0.09)']
+    : ['rgba(212,133,10,0.60)','rgba(212,133,10,0.42)','rgba(212,133,10,0.28)','rgba(212,133,10,0.17)','rgba(212,133,10,0.09)'];
+
   var datasets = [
-    { label: String(cy), data: yearPts(cy), borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2.5, fill: false, tension: 0.3 }
+    { label: String(cy), data: yearPts(cy),
+      borderColor: isDark ? '#f5a623' : '#D4850A',
+      borderWidth: 2.5, pointRadius: 2.5, fill: false, tension: 0.3 }
   ];
   [1,2,3,4,5].forEach(function(offset){
     var yr = cy - offset;
     var pts = yearPts(yr);
     if(!pts.length) return;
-    var bw = offset <= 2 ? 1.8 : 1.2;
-    datasets.push({ label: String(yr), data: pts, borderColor: priorColors[offset-1], borderWidth: bw, borderDash: [5,3], pointRadius: 0, fill: false, tension: 0.3 });
+    datasets.push({
+      label: String(yr), data: pts,
+      borderColor: priorColors[offset - 1],
+      borderWidth: offset <= 2 ? 1.8 : 1.2,
+      borderDash: [5, 3], pointRadius: 0, fill: false, tension: 0.3
+    });
   });
+
   var gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
   var tc = isDark ? '#6a7a8a' : '#5a6878';
+  var xLabel = isWinterCrop ? 'Crop Week (Aug–Jul)' : 'Week #';
+
   _rptGEChart = new Chart(ctx, {
     type: 'line',
     data: { datasets: datasets },
-    options: { responsive: true, maintainAspectRatio: false,
+    options: {
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { type: 'linear', title: { display: true, text: 'Crop Week (Aug–Jul)', color: tc }, ticks: { color: tc, stepSize: 4 }, grid: { color: gc } },
-        y: { title: { display: true, text: '% Good/Excellent', color: tc }, ticks: { color: tc }, grid: { color: gc } }
+        x: { type: 'linear',
+             title: { display: true, text: xLabel, color: tc },
+             ticks: { color: tc, stepSize: 4 },
+             grid: { color: gc } },
+        y: { title: { display: true, text: '% Good/Excellent', color: tc },
+             ticks: { color: tc },
+             grid: { color: gc } }
       },
-      plugins: { legend: { labels: { color: tc, font: { family: "'Courier New',monospace", weight: '700', size: 11 }, boxWidth: 24, padding: 10 } } }
+      plugins: {
+        legend: { labels: { color: tc,
+          font: { family: "'Courier New',monospace", weight: '700', size: 11 },
+          boxWidth: 24, padding: 10 } }
+      }
     }
   });
 }
