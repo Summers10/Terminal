@@ -112,39 +112,38 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <div class="info-panel" id="sum-info"><strong>SUMMARY</strong> — At-a-glance view of the terminal. Commodity Overview shows price, regression fair value prem/disc, S/U ratio, forward curve structure, and managed money positioning. Relativities shows spread percentiles and z-scores. Macro Snapshot shows live FRED data (load by visiting MACRO tab).</div>
 
-    <div style="display:grid;grid-template-columns:1fr 280px;gap:16px 16px;align-items:start;">
-    <!-- Row 1: Commodity Overview + Headlines -->
-    <div id="sum-panel-overview" class="panel" style="margin-bottom:0;">
-      <div class="panel-hdr">
-        <span class="panel-title">COMMODITY OVERVIEW</span>
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;">
+      <!-- Left column: two panels stacked -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div id="sum-panel-overview" class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr">
+            <span class="panel-title">COMMODITY OVERVIEW</span>
+          </div>
+          <div style="overflow-x:auto;border:1px solid var(--border);border-top:none;">
+            <table class="bal-table" id="sum-comm-tbl" style="table-layout:auto;"></table>
+          </div>
+        </div>
+        <div id="sum-panel-relativ" class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr">
+            <span class="panel-title">RELATIVITIES</span>
+            <span class="panel-sub">5yr Percentile &amp; Z-Score</span>
+          </div>
+          <div style="overflow-x:auto;border:1px solid var(--border);border-top:none;">
+            <table class="bal-table" id="sum-spread-tbl" style="table-layout:auto;"></table>
+          </div>
+        </div>
       </div>
-      <div style="overflow-x:auto;border:1px solid var(--border);border-top:none;">
-        <table class="bal-table" id="sum-comm-tbl" style="table-layout:auto;"></table>
+      <!-- Right column: single tall events panel spanning full height -->
+      <div id="sum-sidebar-events" style="border-top:3px solid var(--amber);border:1px solid var(--border);background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;position:sticky;top:0;">
+        <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);flex-shrink:0;">
+          <span style="font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);">UPCOMING</span>
+        </div>
+        <div id="sum-events-list" style="overflow-x:hidden;overflow-y:auto;flex:1;min-height:0;"></div>
       </div>
     </div>
-    <div id="sum-sidebar-macro" style="border-top:3px solid var(--amber);border:1px solid var(--border);background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;">
-      <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);flex-shrink:0;">
-        <span style="font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);">MACRO SNAPSHOT</span>
-      </div>
-      <div id="sum-macro-body" style="flex:1;min-height:0;overflow-y:auto;"></div>
-    </div>
-    <!-- Row 2: Relativities + Upcoming Events -->
-    <div id="sum-panel-relativ" class="panel" style="margin-bottom:0;">
-      <div class="panel-hdr">
-        <span class="panel-title">RELATIVITIES</span>
-        <span class="panel-sub">5yr Percentile &amp; Z-Score</span>
-      </div>
-      <div style="overflow-x:auto;border:1px solid var(--border);border-top:none;">
-        <table class="bal-table" id="sum-spread-tbl" style="table-layout:auto;"></table>
-      </div>
-    </div>
-    <div id="sum-sidebar-events" style="border-top:3px solid var(--amber);border:1px solid var(--border);border-radius:0 0 4px 4px;background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;">
-      <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);flex-shrink:0;">
-        <span style="font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);">UPCOMING</span>
-      </div>
-      <div id="sum-events-list" style="overflow-x:hidden;overflow-y:auto;flex:1;min-height:0;"></div>
-    </div>
-    </div>
+    <!-- Hidden elements kept for JS compatibility -->
+    <div id="sum-sidebar-macro" style="display:none;"><div id="sum-macro-body"></div></div>
+    <div id="sum-panel-overview-dummy" style="display:none;"></div>
     
 
   </div>
@@ -160,16 +159,36 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <div class="toolbar-sep"></div>
     <div class="ctrl-group">
       <select id="comm-sel" onchange="onCommChange()">
-        <option value="Wheat">Wheat</option>
-        <option value="Corn">Corn</option>
-        <option value="Soybeans">Soybeans</option>
-        <option value="Soybean Meal">Soybean Meal</option>
-        <option value="Soybean Oil">Soybean Oil</option>
-        <option value="Rapeseed/Canola" selected>Rapeseed/Canola</option>
-        <option value="Beef and Veal">Beef &amp; Veal</option>
-        <option value="Grains">Grains (Wheat+Corn)</option>
-        <option value="Oilseeds">Oilseeds (Soy+Canola)</option>
-        <option value="WheatByClass">Wheat by Class (US)</option>
+        <optgroup label="── GRAINS ──">
+          <option value="Wheat">Wheat</option>
+          <option value="Corn">Corn</option>
+          <option value="Grains">Grains (Wheat+Corn)</option>
+          <option value="WheatByClass">Wheat by Class (US)</option>
+        </optgroup>
+        <optgroup label="── OILSEEDS ──">
+          <option value="Soybeans">Soybeans</option>
+          <option value="Rapeseed/Canola">Rapeseed/Canola</option>
+          <option value="Sunflowerseed">Sunflowerseed</option>
+          <option value="Oilseeds">Oilseeds (Soy+Canola+Sun)</option>
+        </optgroup>
+        <optgroup label="── MEALS ──">
+          <option value="Soybean Meal">Soybean Meal</option>
+          <option value="Rapeseed Meal">Rapeseed Meal</option>
+          <option value="Sunflowerseed Meal">Sunflowerseed Meal</option>
+        </optgroup>
+        <optgroup label="── VEG OILS ──">
+          <option value="Soybean Oil">Soybean Oil</option>
+          <option value="Rapeseed Oil">Rapeseed Oil</option>
+          <option value="Sunflowerseed Oil">Sunflowerseed Oil</option>
+          <option value="Palm Oil">Palm Oil</option>
+          <option value="VegOils">Veg Oils (Soy+RS+Sun+Palm)</option>
+        </optgroup>
+        <optgroup label="── SOFTS ──">
+          <option value="Cotton">Cotton</option>
+        </optgroup>
+        <optgroup label="── LIVESTOCK ──">
+          <option value="Beef and Veal">Beef &amp; Veal</option>
+        </optgroup>
       </select>
     </div>
     <div class="ctrl-group">
@@ -1215,8 +1234,44 @@ function _parseCOT() {
     if (el2) el2.textContent = 'COT: API error (' + err.message + ')';
   }
 })();
-const EXPORTERS = {Wheat:["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],Corn:["United States","Brazil","Argentina","Ukraine"],Soybeans:["United States","Brazil","Argentina"],"Rapeseed/Canola":["Canada","Australia","European Union","Ukraine"],Cotton:["United States","Brazil","Australia","India"],"Beef and Veal":["United States","Australia","Brazil","Argentina"],"Soybean Meal":["Argentina","United States","Brazil","European Union"],"Soybean Oil":["Argentina","Brazil","United States","European Union"],Grains:["European Union","Russia","United States","Canada","Australia","Ukraine","Argentina","Brazil"],Oilseeds:["United States","Brazil","Argentina","Canada","Australia"]};
-const IMPORTERS = {Wheat:["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],Corn:["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],Soybeans:["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],"Rapeseed/Canola":["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],Cotton:["China","Vietnam","Bangladesh","Pakistan","Turkey","Indonesia","India"],"Beef and Veal":["United States","China","Japan","South Korea","European Union","Canada","United Kingdom"],"Soybean Meal":["European Union","Indonesia","Philippines","Vietnam","Thailand","Bangladesh","South Korea","Japan","Egypt"],"Soybean Oil":["China","India","Bangladesh","European Union","Pakistan","Algeria","Iran","Morocco"],Grains:["China","Egypt","European Union","Indonesia","Mexico","Japan","Algeria","Turkey","Brazil","Bangladesh","Philippines","South Korea"],Oilseeds:["China","European Union","Japan","Mexico","Bangladesh","Indonesia","Turkey"]};
+const EXPORTERS = {
+  Wheat:["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],
+  Corn:["United States","Brazil","Argentina","Ukraine"],
+  Soybeans:["United States","Brazil","Argentina"],
+  "Rapeseed/Canola":["Canada","Australia","European Union","Ukraine"],
+  Sunflowerseed:["Ukraine","Russia","European Union","Argentina","Turkey"],
+  "Soybean Meal":["Argentina","United States","Brazil","European Union"],
+  "Rapeseed Meal":["European Union","Canada","Ukraine","India"],
+  "Sunflowerseed Meal":["Ukraine","Russia","Argentina","European Union"],
+  "Soybean Oil":["Argentina","Brazil","United States","European Union"],
+  "Rapeseed Oil":["European Union","Canada","Ukraine","Australia"],
+  "Sunflowerseed Oil":["Ukraine","Russia","Argentina","European Union","Turkey"],
+  "Palm Oil":["Indonesia","Malaysia","Papua New Guinea","Colombia"],
+  Cotton:["United States","Brazil","Australia","India"],
+  "Beef and Veal":["United States","Australia","Brazil","Argentina"],
+  Grains:["European Union","Russia","United States","Canada","Australia","Ukraine","Argentina","Brazil"],
+  Oilseeds:["United States","Brazil","Argentina","Canada","Australia","Ukraine","Russia"],
+  VegOils:["Indonesia","Malaysia","Argentina","Ukraine","Russia","Brazil","European Union"]
+};
+const IMPORTERS = {
+  Wheat:["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],
+  Corn:["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
+  Soybeans:["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
+  "Rapeseed/Canola":["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
+  Sunflowerseed:["European Union","Turkey","China","Egypt","India","Bangladesh"],
+  "Soybean Meal":["European Union","Indonesia","Philippines","Vietnam","Thailand","Bangladesh","South Korea","Japan","Egypt"],
+  "Rapeseed Meal":["European Union","Vietnam","Indonesia","Thailand","South Korea","Japan"],
+  "Sunflowerseed Meal":["European Union","Turkey","Egypt","Iran","Israel"],
+  "Soybean Oil":["China","India","Bangladesh","European Union","Pakistan","Algeria","Iran","Morocco"],
+  "Rapeseed Oil":["China","India","Bangladesh","European Union","Pakistan","Sri Lanka","Myanmar"],
+  "Sunflowerseed Oil":["India","China","European Union","Turkey","Iran","Algeria","Egypt","Pakistan"],
+  "Palm Oil":["India","China","European Union","Pakistan","Bangladesh","Egypt","Nigeria","Kenya"],
+  Cotton:["China","Vietnam","Bangladesh","Pakistan","Turkey","Indonesia","India"],
+  "Beef and Veal":["United States","China","Japan","South Korea","European Union","Canada","United Kingdom"],
+  Grains:["China","Egypt","European Union","Indonesia","Mexico","Japan","Algeria","Turkey","Brazil","Bangladesh","Philippines","South Korea"],
+  Oilseeds:["China","European Union","Japan","Mexico","Bangladesh","Indonesia","Turkey"],
+  VegOils:["India","China","European Union","Pakistan","Bangladesh","Egypt","Nigeria","Algeria","Iran","Myanmar"]
+};
 const BU_PER_MT  = {Wheat:36.744,Soybeans:36.744,Corn:39.368,"Rapeseed/Canola":44.092};
 const YIELD_CONV = {Wheat:14.87,Soybeans:14.87,Corn:15.93,"Rapeseed/Canola":17.84};
 let currentComm = 'Rapeseed/Canola';
@@ -1613,12 +1668,7 @@ function renderMacroSnapshot(){
 }
 
 function syncSidebarHeights() {
-  var p1 = document.getElementById('sum-panel-overview');
-  var s1 = document.getElementById('sum-sidebar-macro');
-  var p2 = document.getElementById('sum-panel-relativ');
-  var s2 = document.getElementById('sum-sidebar-events');
-  if(p1 && s1) s1.style.maxHeight = p1.offsetHeight + 'px';
-  if(p2 && s2) s2.style.maxHeight = p2.offsetHeight + 'px';
+  // Events sidebar is now sticky and fills full right column — no height sync needed
 }
 
 
@@ -2074,7 +2124,9 @@ if(!PSD) return {};
 if(comm==='Grains'){
 return mergeComms(['Wheat','Corn']);
 } else if(comm==='Oilseeds'){
-return mergeComms(['Soybeans','Rapeseed/Canola']);
+return mergeComms(['Soybeans','Rapeseed/Canola','Sunflowerseed']);
+} else if(comm==='VegOils'){
+return mergeComms(['Soybean Oil','Rapeseed Oil','Sunflowerseed Oil','Palm Oil']);
 }
 // Try exact, then case-insensitive
 var d = PSD[comm]; if(d) return d;
@@ -2191,7 +2243,7 @@ const comm = currentComm;
 const commData = getPSDComm(comm);
 const years = getYears();
 const latestYear = years[years.length-1];
-const P1_EXTRA = {Wheat:['China'],Corn:['China'],Soybeans:['China'],'Rapeseed/Canola':['China'],Grains:['China'],Oilseeds:['China']};
+const P1_EXTRA = {Wheat:['China'],Corn:['China'],Soybeans:['China'],'Rapeseed/Canola':['China'],Sunflowerseed:['China'],Grains:['China'],Oilseeds:['China'],VegOils:['China'],'Palm Oil':['China'],'Rapeseed Oil':['China'],'Sunflowerseed Oil':['China']};
 const _rawOpts = (EXPORTERS[comm] || ['United States','Canada']).concat(P1_EXTRA[comm]||[]);
 // For Grains: collapse Russia+Ukraine into a 'Black Sea' virtual option
 const p2opts = (comm==='Grains') ? _rawOpts.filter(c=>c!=='Russia'&&c!=='Ukraine').concat(['Black Sea']) : _rawOpts;
