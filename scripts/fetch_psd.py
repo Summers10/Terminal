@@ -33,22 +33,24 @@ COMM_MAP = {
     "Canola": "Rapeseed/Canola",
     "Cotton": "Cotton",
     "Beef and Veal": "Beef and Veal", "Beef": "Beef and Veal",
-    "Rapeseed Meal": None, "Rapeseed Oil": None,
-    "Meal, Rapeseed": None, "Oil, Rapeseed": None,
+    # Oilseeds
+    "Sunflowerseed": "Sunflowerseed", "Oilseed, Sunflowerseed": "Sunflowerseed",
+    "Sunflowerseed Oil": "Sunflowerseed Oil", "Oil, Sunflowerseed": "Sunflowerseed Oil",
+    "Sunflowerseed Meal": "Sunflowerseed Meal", "Meal, Sunflowerseed": "Sunflowerseed Meal",
+    "Rapeseed Meal": "Rapeseed Meal", "Meal, Rapeseed": "Rapeseed Meal",
+    "Rapeseed Oil": "Rapeseed Oil", "Oil, Rapeseed": "Rapeseed Oil",
+    "Palm Oil": "Palm Oil", "Oil, Palm": "Palm Oil",
+    # Grains (discard)
     "Barley": None, "Sorghum": None, "Oats": None, "Rye": None,
     "Millet": None, "Mixed Grain": None, "Rice, Milled": None,
-    "Sunflowerseed": None, "Peanut": None, "Palm Kernel": None,
-    "Copra": None, "Cottonseed": None, "Palm Oil": None,
-    "Oilseed, Sunflowerseed": None, "Oilseed, Peanut": None,
-    "Oilseed, Cottonseed": None, "Oilseed, Copra": None,
-    "Oilseed, Palm Kernel": None,
-    "Meal, Sunflowerseed": None, "Meal, Peanut": None,
-    "Meal, Fish": None, "Meal, Cottonseed": None,
+    # Remaining oilseeds/oils (discard)
+    "Peanut": None, "Palm Kernel": None, "Copra": None, "Cottonseed": None,
+    "Oilseed, Peanut": None, "Oilseed, Cottonseed": None,
+    "Oilseed, Copra": None, "Oilseed, Palm Kernel": None,
+    "Meal, Peanut": None, "Meal, Fish": None, "Meal, Cottonseed": None,
     "Meal, Copra": None, "Meal, Palm Kernel": None,
-    "Oil, Sunflowerseed": None, "Oil, Peanut": None,
-    "Oil, Cottonseed": None, "Oil, Copra": None,
-    "Oil, Palm Kernel": None, "Oil, Olive": None, "Oil, Palm": None,
-    "Sunflowerseed Meal": None, "Sunflowerseed Oil": None,
+    "Oil, Peanut": None, "Oil, Cottonseed": None,
+    "Oil, Copra": None, "Oil, Palm Kernel": None, "Oil, Olive": None,
     "Cottonseed Meal": None, "Cottonseed Oil": None,
     "Fish Meal": None, "Coconut Oil": None,
     "Palm Kernel Meal": None, "Palm Kernel Oil": None,
@@ -246,4 +248,5 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
  
