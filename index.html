@@ -193,15 +193,15 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   <div id="sd-print-area" style="flex:1;min-width:0;"><div id="sd-page" style="flex:1;min-width:0;">
     <!-- Panel 1: US/Country (toggled) -->
     <div class="panel" id="p1-panel">
-      <div class="panel-hdr">
-        <div style="display:flex;align-items:baseline;gap:6px;">
-          <span class="panel-title" id="p1-title">UNITED STATES</span>
-          <span class="panel-sub">Full balance sheet</span>
-        </div>
-        <div class="panel-right">
-          <div class="p2-toggle" id="p1-toggle"></div>
+      <div class="panel-hdr" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;width:100%;gap:8px;">
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span class="panel-title" id="p1-title">UNITED STATES</span>
+            <span class="panel-sub">Full balance sheet</span>
+          </div>
           <span class="unit-badge" id="p1-unit">(1000 MT)</span>
         </div>
+        <div class="p2-toggle" id="p1-toggle"></div>
       </div>
       <table class="bal-table" id="p1-table"></table>
     </div>
