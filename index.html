@@ -112,7 +112,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <div class="info-panel" id="sum-info"><strong>SUMMARY</strong> — Aggregates key metrics from all pages. Price = latest nearby settlement. Prem/Disc = price vs regression fair value. S/U = current year stocks-to-use. Curve = forward curve structure. Exp Pace = cumulative exports vs last year. Spec %OI = managed money net as % of open interest.</div>
 
-    <div style="display:grid;grid-template-columns:1fr 280px;grid-template-rows:auto auto;gap:16px;align-items:start;">
+    <div style="display:grid;grid-template-columns:1fr 280px;grid-template-rows:auto auto;gap:16px;align-items:stretch;">
     <div id="sum-panel-overview" class="panel" style="margin-bottom:0;grid-column:1;grid-row:1;">
       <div class="panel-hdr">
         <span class="panel-title">COMMODITY OVERVIEW</span>
@@ -130,7 +130,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <table class="bal-table" id="sum-spread-tbl" style="table-layout:auto;"></table>
       </div>
     </div>
-    <div id="sum-sidebar-events" style="grid-column:2;grid-row:1 / span 2;border-top:3px solid var(--amber);border:1px solid var(--border);background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;min-height:400px;">
+    <div id="sum-sidebar-events" style="grid-column:2;grid-row:1 / span 2;border-top:3px solid var(--amber);border:1px solid var(--border);background:var(--bg1);overflow:hidden;display:flex;flex-direction:column;">
       <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);flex-shrink:0;">
         <span style="font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);">UPCOMING EVENTS</span>
       </div>
@@ -609,14 +609,14 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
 <div class="page" id="reports-page-wrap" style="background:var(--bg);min-height:100vh;">
   <div class="toolbar">
     <div class="brand">
-    <div class="brand-sub">USDA NASS · Weekly Reports Dashboard</div></div>
+    <div class="brand-sub" style="color:var(--text2);">FUNDAMENTALS</div></div>
     <div class="toolbar-sep"></div>
     <span id="rpt-asof" style="font-size:13px;color:var(--text3);letter-spacing:.06em;"></span>
     <span id="pipeline-freshness" style="font-size:11px;letter-spacing:.05em;display:flex;gap:12px;flex-wrap:wrap;"></span>
   </div>
   <div id="reports-page" style="max-width:1500px;margin:0 auto;padding:0 20px 40px;">
-    <div id="rpt-loading" style="padding:40px 0;text-align:center;color:var(--text3);font-size:14px;letter-spacing:.1em;">Loading NASS data...</div>
-    <div id="rpt-content" style="display:none;display:none;gap:0;">
+    <div id="rpt-loading" style="padding:40px 0;text-align:center;color:var(--amber);font-size:14px;letter-spacing:.1em;">LOADING FUNDAMENTALS...</div>
+    <div id="rpt-content" style="display:none;gap:0;">
       <!-- LEFT SIDEBAR (fixed, matches group-nav style) -->
       <div id="rpt-sidebar" style="position:fixed;top:78px;left:0;width:220px;height:calc(100vh - 78px);overflow-y:auto;border-right:1px solid var(--border);padding:8px 0 40px;background:var(--bg);z-index:89;">
         <div id="rpt-nav"></div>
@@ -721,7 +721,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <div class="brand-sub">Open-Meteo · Crop Weather Monitor<span id="wx-status" style="margin-left:12px;font-size:11px;"></span></div></div>
   </div>
   <div style="max-width:1440px;margin:0 auto;padding:0 20px 40px;">
-    <div id="wx-content" style="padding-top:14px;"><div style="color:var(--text3);padding:20px;">Loading weather data...</div></div>
+    <div id="wx-content" style="padding-top:14px;"><div style="color:var(--amber);padding:20px;font-size:14px;letter-spacing:.08em;">LOADING WEATHER DATA...</div></div>
   </div>
 </div>
 <div class="page" id="spreads-page-wrap" style="background:var(--bg);min-height:100vh;">
@@ -747,7 +747,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
   <div class="toolbar">
     <div class="brand">
       
-      <div class="brand-sub">Macro Dashboard · Rates, Curve, Inflation, Credit, Labor</div>
+      <div class="brand-sub" style="color:var(--text2);">MACRO DASHBOARD</div>
     </div>
     <div class="toolbar-sep"></div>
     <span id="fredStatus" style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text3)"></span>
@@ -1463,18 +1463,12 @@ function renderSummaryPage(){
 }
 
 function syncSidebarHeights() {
-  var p1 = document.getElementById('sum-panel-overview');
-  var s1 = document.getElementById('sum-sidebar-news');
-  var p2 = document.getElementById('sum-panel-relativ');
-  var s2 = document.getElementById('sum-sidebar-events');
-  if(p1 && s1) s1.style.maxHeight = p1.offsetHeight + 'px';
-  if(p2 && s2) s2.style.maxHeight = p2.offsetHeight + 'px';
+  // Events panel now uses CSS grid stretch — no manual height sync needed
 }
 
 // ============================================================
 
 // ============================================================
-var _newsFetched = false;
 
 function showFundamentals(){
 try {
@@ -1484,9 +1478,16 @@ try {
   var topBtns = document.querySelectorAll('#topnav .nav-tab');
   if(topBtns[1]) topBtns[1].classList.add('active');
   var rp = document.getElementById('reports-page-wrap');
-  if(rp) rp.classList.add('active');
+  if(rp){ rp.classList.add('active'); rp.style.display='block'; }
   window.scrollTo(0,0);
-  if(!reportsInited) initReports();
+  try{ if(!reportsInited) initReports(); }
+  catch(e){ 
+    console.error('initReports error:',e);
+    var rl=document.getElementById('rpt-loading');
+    if(rl) rl.innerHTML='<div style="color:var(--amber);padding:40px;font-size:14px;letter-spacing:.08em;">Error loading: '+e.message+'</div>';
+    var rc=document.getElementById('rpt-content');
+    if(rc) rc.style.display='flex';
+  }
 } catch(e){ console.error('showFundamentals error:', e); }
 }
 
@@ -1521,7 +1522,7 @@ if(t==='reg' && !regInited){initRegression();}
 if(t==='aafc' && !aafcInited){initAafc();}
 if(t==='gsw' && !gswInited){initGsw();}
 if(t==='spreads' && !spreadsInited){initSpreads();}
-if(t==='wx' && !wxInited){initWx();}else if(t==='wx' && wxInited){setTimeout(function(){renderWxDetail();},80);}
+if(t==='wx'){var wp=document.getElementById('wx-page-wrap');if(wp){wp.style.display='block';} if(!wxInited){try{initWx();}catch(e){console.error('initWx:',e);var wc=document.getElementById('wx-content');if(wc)wc.innerHTML='<div style="color:var(--amber);padding:40px;">Weather error: '+e.message+'</div>';}}else{setTimeout(function(){try{renderWxDetail();}catch(e){}},80);}}
 if(t==='sum'){try{renderSummaryPage();}catch(e){}}
 } catch(e) { console.error('switchTab error:', e); }
 }
@@ -1604,8 +1605,9 @@ if (topMap[group] !== undefined && topBtns[topMap[group]]) topBtns[topMap[group]
 showGroupNav(group, defaultTab);
 // Handle macro/cal (single page-wrap with internal views)
 if (group === 'macro') {
-  document.getElementById('macro-page-wrap').classList.add('active');
-  if(!macroInited){initMacro();}
+  var mw=document.getElementById('macro-page-wrap');
+  if(mw){mw.classList.add('active');mw.style.display='block';}
+  try{ if(!macroInited){initMacro();} } catch(e){ console.error('initMacro:',e); var g=document.getElementById('fredDashGrid'); if(g) g.innerHTML='<div style="color:var(--amber);padding:40px;letter-spacing:.08em;">FRED error: '+e.message+'</div>'; }
   setTimeout(function(){
     Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} });
     drawYieldCurveSnapshot();
@@ -5963,6 +5965,7 @@ document.querySelectorAll('.sp-card').forEach(c => c.classList.toggle('selected'
 renderSpreadDetail();
 }
 function renderSpreads(){
+if(!SPREAD_DATA || !SPREAD_DATA.spreads){ var sb2=document.getElementById('sp-scoreboard'); if(sb2) sb2.innerHTML='<div style="color:var(--amber);padding:40px;letter-spacing:.08em;">LOADING SPREADS DATA...</div>'; return; }
 const D = SPREAD_DATA.spreads;
 const sb = document.getElementById('sp-scoreboard');
 const first = D[SP_ORDER[0]];
