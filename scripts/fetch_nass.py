@@ -331,7 +331,7 @@ def fetch_wheat_by_class():
         "agg_level_desc":     "NATIONAL",
         "domain_desc":        "TOTAL",
         "unit_desc":          "1000 BU",
-        "year__GE":           str(CURRENT_YEAR - 15),
+        "year__GE":           str(CURRENT_YEAR - 7),
     })
  
     print(f"  Got {len(records)} wheat S&D records from NASS")
@@ -416,5 +416,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
  
