@@ -540,72 +540,6 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
      AAFC FIELD CROPS OUTLOOK PAGE
 ════════════════════════════════════════════════ -->
 
-<!--  ═══════ CARRY / FORWARD CURVE PAGE ═══════  -->
-<div class="page" id="carry-page-wrap" style="background:var(--bg);min-height:100vh;">
-<div style="max-width:1440px;margin:0 auto;padding:0 20px 40px;">
-
-  <!-- Rate inputs -->
-  <div style="display:flex;align-items:center;gap:16px;padding:10px 0 14px;flex-wrap:wrap;">
-    <span style="font-size:12px;font-weight:900;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;">CARRY ANALYSIS</span>
-    <span id="carry-asof" style="font-size:12px;color:var(--amber);letter-spacing:.06em;font-weight:700;"></span>
-    <span style="flex:1"></span>
-    <span style="font-size:12px;font-weight:700;color:var(--text3);">USD (SOFR):</span>
-    <input id="carry-sofr" type="number" step="0.01" value="4.30" style="width:65px;text-align:right;font-family:inherit;font-size:14px;font-weight:700;color:var(--amber);background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:3px 6px;" onchange="renderCarry()">
-    <span style="font-size:12px;font-weight:700;color:var(--text3);">%</span>
-    <span style="font-size:12px;font-weight:700;color:var(--text3);margin-left:8px;">CAD (CORRA):</span>
-    <input id="carry-corra" type="number" step="0.01" value="3.50" style="width:65px;text-align:right;font-family:inherit;font-size:14px;font-weight:700;color:var(--amber);background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:3px 6px;" onchange="renderCarry()">
-    <span style="font-size:12px;font-weight:700;color:var(--text3);">%</span>
-  </div>
-
-  <!-- Commodity selector -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;" id="carry-comm-btns"></div>
-
-  <!-- Forward curve chart -->
-  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;margin-bottom:14px;overflow:hidden;">
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 16px 8px;border-bottom:1px solid var(--border);background:var(--bg1);">
-      <span id="carry-chart-title" style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);text-transform:uppercase;">FORWARD CURVE</span>
-      <span id="carry-chart-sub" style="font-size:12px;font-weight:700;color:var(--text3);"></span>
-      <span style="flex:1"></span>
-      <span style="font-size:11px;font-weight:700;color:var(--text3);display:flex;gap:12px;">
-        <span style="display:flex;align-items:center;gap:4px;"><span style="width:14px;height:3px;background:var(--amber);border-radius:2px;display:inline-block;"></span>Market</span>
-        <span style="display:flex;align-items:center;gap:4px;"><span style="width:14px;height:3px;background:var(--green);border-radius:2px;display:inline-block;"></span>Full Carry</span>
-      </span>
-    </div>
-    <div style="padding:14px 16px;">
-      <canvas id="carry-curve-canvas" style="display:block;width:100%;height:300px;background:var(--bg);"></canvas>
-    </div>
-  </div>
-
-  <!-- Spread table + summary -->
-  <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;">
-    <!-- Calendar spreads table -->
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
-      <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);">
-        <span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);text-transform:uppercase;">CALENDAR SPREADS</span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="sp-stats-tbl" id="carry-spread-tbl" style="margin:0;"></table>
-      </div>
-    </div>
-
-    <!-- Summary panel -->
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
-      <div style="padding:9px 14px;background:var(--bg1);border-bottom:1px solid var(--border2);">
-        <span style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);text-transform:uppercase;">CURVE STRUCTURE</span>
-      </div>
-      <div id="carry-summary" style="padding:12px 14px;"></div>
-    </div>
-  </div>
-
-  <!-- Storage cost editor (collapsible) -->
-  <details style="margin-top:14px;">
-    <summary style="font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.08em;cursor:pointer;padding:6px 0;">EDIT STORAGE COSTS</summary>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;padding:8px 0;" id="carry-storage-inputs"></div>
-  </details>
-
-</div>
-</div>
-
 <!-- ════════════════════════════════════════════════
      EIA ENERGY STORAGE PAGE
 ════════════════════════════════════════════════ -->
@@ -679,28 +613,6 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
   </div>
 </div>
-<div class="page" id="aafc-page-wrap" style="background:var(--bg);min-height:100vh;">
-  <div class="toolbar">
-    <div class="brand">
-      
-      <div class="brand-sub">Statistics Canada — Supply &amp; Disposition of Canadian Principal Field Crops · <span id="aafc-report-date-label"></span></div>
-    </div>
-    <button class="info-btn" id="aafc-info-btn" onclick="toggleInfo('aafc')" title="About this page">i</button>
-  </div>
-  <div class="info-panel" id="aafc-info"><strong>STATSCAN S&D</strong> — Statistics Canada supply & disposition for Canadian field crops (table 32-10-0013-01). Quarterly cumulative data (Aug–Jul crop year) for wheat, durum, canola, barley, oats, flax, lentils, peas, and others. Shows current YTD quarter vs same quarter prior year and prior quarter. Pipeline updates automatically.</div>
-  <div id="aafc-page">
-    <div style="padding:4px 0 0;"><span id="statscan-freshness" style="font-size:11px;letter-spacing:.05em;"></span></div>
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;flex-wrap:wrap;">
-      <div class="bu-toggle" style="flex-shrink:0;">
-        <button class="bu-btn active" id="aafc-view-annual" onclick="setAafcView('annual')">ANNUAL</button>
-        <button class="bu-btn" id="aafc-view-quarterly" onclick="setAafcView('quarterly')">QUARTERLY</button>
-      </div>
-      <div class="aafc-toolbar" id="aafc-crop-btns" style="padding:0;background:none;border:none;"></div>
-    </div>
-    <div id="aafc-content"></div>
-  </div>
-</div>
-
 <!-- NASS REPORTS -->
 <div class="page" id="reports-page-wrap" style="background:var(--bg);min-height:100vh;">
   <div class="toolbar">
@@ -726,77 +638,6 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
         <!-- USDA S&D view -->
         <div class="rpt-view" id="rpt-v-sd" style="display:none;">
           <div id="rpt-sd-content"></div>
-        </div>
-        <!-- AAFC view -->
-        <div class="rpt-view" id="rpt-v-aafc" style="display:none;">
-          <div id="rpt-aafc-content"></div>
-        </div>
-        <!-- Conditions view -->
-        <div class="rpt-view" id="rpt-v-conditions">
-          <div id="rpt-cond-score" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-hdr"><div class="panel-title" id="rpt-cond-title">CROP CONDITIONS</div></div>
-              <div style="overflow-x:auto;"><table class="bal-table" id="rpt-cond-tbl"></table></div>
-            </div>
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-hdr"><div class="panel-title">GOOD / EXCELLENT %</div></div>
-              <div style="padding:14px 16px;"><canvas id="rpt-ge-chart" class="chart-canvas" style="height:300px;"></canvas></div>
-            </div>
-          </div>
-        </div>
-        <!-- Progress view -->
-        <div class="rpt-view" id="rpt-v-progress" style="display:none;">
-          <div class="panel">
-            <div class="panel-hdr"><div class="panel-title" id="rpt-prog-title">CROP PROGRESS</div></div>
-            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-prog-tbl"></table></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-hdr"><div class="panel-title">PLANTING PACE</div></div>
-              <div style="padding:14px 16px;"><canvas id="rpt-plant-chart" class="chart-canvas" style="height:280px;"></canvas></div>
-            </div>
-            <div class="panel" style="margin-bottom:0;">
-              <div class="panel-hdr"><div class="panel-title">HARVEST PACE</div></div>
-              <div style="padding:14px 16px;"><canvas id="rpt-harv-chart" class="chart-canvas" style="height:280px;"></canvas></div>
-            </div>
-          </div>
-        </div>
-        <!-- Grain Stocks view -->
-        <div class="rpt-view" id="rpt-v-stocks" style="display:none;">
-          <div id="rpt-stocks-stamp"></div>
-          <div class="panel">
-            <div class="panel-hdr"><div class="panel-title">GRAIN STOCKS — QUARTERLY</div></div>
-            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-stocks-tbl"></table></div>
-          </div>
-        </div>
-        <!-- Acreage view -->
-        <div class="rpt-view" id="rpt-v-acreage" style="display:none;">
-          <div id="rpt-acre-stamp"></div>
-          <div class="panel">
-            <div class="panel-hdr"><div class="panel-title">ACREAGE & PLANTINGS</div></div>
-            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-acre-tbl"></table></div>
-          </div>
-        </div>
-        <!-- Cattle view -->
-        <div class="rpt-view" id="rpt-v-cattle" style="display:none;">
-          <div id="rpt-cattle-stamp"></div>
-          <div class="panel">
-            <div class="panel-hdr"><div class="panel-title">CATTLE ON FEED</div></div>
-            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-cattle-tbl"></table></div>
-          </div>
-        </div>
-        <!-- Hogs view -->
-        <div class="rpt-view" id="rpt-v-hogs" style="display:none;">
-          <div id="rpt-hogs-stamp"></div>
-          <div class="panel">
-            <div class="panel-hdr"><div class="panel-title">HOGS & PIGS INVENTORY</div></div>
-            <div style="overflow-x:auto;"><table class="bal-table" id="rpt-hogs-tbl"></table></div>
-          </div>
-        </div>
-        <!-- WASDE view -->
-        <div class="rpt-view" id="rpt-v-wasde" style="display:none;">
-          <div id="rpt-wasde-content" style="padding:10px 0;text-align:center;color:var(--text3);font-size:14px;letter-spacing:.08em;">Click to view the full WASDE S&D dashboard</div>
         </div>
         <!-- Exports view -->
         <div class="rpt-view" id="rpt-v-exports" style="display:none;">
@@ -1682,7 +1523,7 @@ window.scrollTo(0,0);
 // Highlight correct top nav
 var topBtns = document.querySelectorAll('#topnav .nav-tab');
 var topMap = {'sum':0,'fund':1,'analysis':2,'macro':3,'wx':4,'cal':5};
-var fundPages = ['energy','sd','exp','aafc','gsw','reports'];
+var fundPages = ['energy','sd','exp','gsw','reports'];
 var analysisPages = ['cot','spreads','reg','cash'];
 var topIdx = topMap[t];
 if (topIdx === undefined) {
@@ -1700,7 +1541,6 @@ if(t==='cot' && !cotInited){initCot();}
 // macro now handled via switchGroup
 if(t==='reg' && !regInited){initRegression();}
 if(t==='cash' && !cashInited){initCash();}
-if(t==='aafc' && !aafcInited){initAafc();}
 if(t==='gsw' && !gswInited){initGsw();}
 if(t==='spreads' && !spreadsInited){initSpreads();}
 if(t==='wx' && !wxInited){initWx();}else if(t==='wx' && wxInited){setTimeout(function(){renderWxDetail();},80);}
@@ -1771,7 +1611,6 @@ function groupNavClick(group, tab){
     if(tab==='cot' && !cotInited){initCot();}
     if(tab==='reg' && !regInited){initRegression();}
     if(tab==='spreads' && !spreadsInited){initSpreads();}
-    if(tab==='carry' && !carryInited){initCarry();}
   }
 }
 
@@ -1810,7 +1649,6 @@ window.scrollTo(0,0);
 if(defaultTab==='cot' && !cotInited){initCot();}
 if(defaultTab==='reg' && !regInited){initRegression();}
 if(defaultTab==='spreads' && !spreadsInited){initSpreads();}
-if(defaultTab==='carry' && !carryInited){initCarry();}
 } catch(e) { console.error('switchGroup error:', e); }
 }
 
@@ -1854,12 +1692,10 @@ if(tab==='cot' && !cotInited){initCot();}
 
 if(tab==='reg' && !regInited){initRegression();}
 
-if(tab==='aafc' && !aafcInited){initAafc();}
 if(tab==='gsw' && !gswInited){initGsw();}
 if(tab==='reports' && !reportsInited){initReports();}
 if(tab==='wx' && !wxInited){initWx();}else if(tab==='wx' && wxInited){setTimeout(function(){renderWxDetail();},80);}
 if(tab==='spreads' && !spreadsInited){initSpreads();}
-if(tab==='carry' && !carryInited){initCarry();}
 } catch(e) { console.error('switchSubTab error:', e); }
 }
 const _WBC_MAP={bs:"Beginning stocks",im:"Import",pr:"Production",su:"Supply",fu:"Food use",so:"Seed & other",fw:"Feed waste",dt:"Domestic total",ex:"Export",td:"Total demand",es:"Ending stocks"};
@@ -2415,6 +2251,27 @@ function niceTicks(dataMax, nTarget){
   var ticks = [];
   for(var v = 0; v <= niceMax + step * 1e-9; v += step) ticks.push(v);
   return {max: niceMax, step: step, ticks: ticks};
+}
+function niceTicksRange(dataMin, dataMax, nTarget){
+  var n = nTarget || 5;
+  if(!isFinite(dataMin) || !isFinite(dataMax) || dataMax <= dataMin){
+    return {min:0, max:1, step:0.25, ticks:[0,0.25,0.5,0.75,1]};
+  }
+  var rawStep = (dataMax - dataMin) / n;
+  var mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  var norm = rawStep / mag;
+  var niceNorm;
+  if(norm < 1.5) niceNorm = 1;
+  else if(norm < 3) niceNorm = 2;
+  else if(norm < 4) niceNorm = 2.5;
+  else if(norm < 7) niceNorm = 5;
+  else niceNorm = 10;
+  var step = niceNorm * mag;
+  var niceMin = Math.floor(dataMin / step) * step;
+  var niceMax = Math.ceil(dataMax / step) * step;
+  var ticks = [];
+  for(var v = niceMin; v <= niceMax + step * 1e-9; v += step) ticks.push(v);
+  return {min: niceMin, max: niceMax, step: step, ticks: ticks};
 }
 function fmtTick(v){
   if(v === 0) return '0';
@@ -3639,22 +3496,22 @@ function drawCotSectionChart(cat){
   function drawPanel(yOffset,ph,vals,title,longColor,shortColor,netColor){
     const {longVals,shortVals,netVals}=vals;
     const allVals=[...longVals,...shortVals,...netVals];
-    let yMax=Math.max(...allVals,0),yMin=Math.min(...allVals,0);
-    const yPad=(yMax-yMin)*0.13; yMax+=yPad; yMin-=yPad;
+    let rawMax=Math.max(...allVals,0),rawMin=Math.min(...allVals,0);
+    const ntS=niceTicksRange(rawMin,rawMax,5);
+    const yMin=ntS.min, yMax=ntS.max;
     const yRange=yMax-yMin||1;
     const pw=W-PAD.left-PAD.right;
     const innerH=ph-PAD.top-PAD.bottom;
     const xP=i=>PAD.left+(i/Math.max(n-1,1))*pw;
     const yP=v=>yOffset+PAD.top+(1-(v-yMin)/yRange)*innerH;
     // Grid
-    const ticks=5;
-    for(let i=0;i<=ticks;i++){
-      const v=yMin+(yMax-yMin)*i/ticks;
+    for(let i=0;i<ntS.ticks.length;i++){
+      const v=ntS.ticks[i];
       const y=yP(v);
       ctx.beginPath(); ctx.strokeStyle=gridCol; ctx.lineWidth=1;
       ctx.setLineDash([4,4]); ctx.moveTo(PAD.left,y); ctx.lineTo(W-PAD.right,y); ctx.stroke();
       ctx.setLineDash([]);
-      const lbl=Math.abs(v)>=1000?(v/1000).toFixed(1)+'K':v.toFixed(isPct?1:0);
+      const lbl=isPct?v.toFixed(1)+'%':fmtTick(v);
       ctx.fillStyle=textCol; ctx.font=`700 11px ${CHART_FONT}`; ctx.textAlign='right';
       ctx.fillText(lbl,W-4,y+4);
     }
@@ -3778,10 +3635,10 @@ ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,p2[0],p2[1]);
 function drawPanel(yOffset, ph, vals, title, longColor, shortColor, netColor){
 const {longVals, shortVals, netVals} = vals;
 const allVals = [...longVals, ...shortVals, ...netVals];
-let yMax = Math.max(...allVals, 0);
-let yMin = Math.min(...allVals, 0);
-const yPad = (yMax - yMin) * 0.13;
-yMax += yPad; yMin -= yPad;
+let rawMax = Math.max(...allVals, 0);
+let rawMin = Math.min(...allVals, 0);
+const ntM = niceTicksRange(rawMin, rawMax, 5);
+const yMin = ntM.min, yMax = ntM.max;
 const yRange = yMax - yMin || 1;
 const pw = W - PAD.left - PAD.right;
 const innerH = ph - PAD.top - PAD.bottom;
@@ -3789,13 +3646,13 @@ const xP = i => PAD.left + (i / Math.max(n-1,1)) * pw;
 const yP = v => yOffset + PAD.top + innerH - ((v - yMin) / yRange) * innerH;
 const y0 = yP(0);
 ctx.font = tickFont;
-for(let i=0;i<=4;i++){
-const v = yMin + (yRange/4)*i;
+for(let i=0;i<ntM.ticks.length;i++){
+const v = ntM.ticks[i];
 const py = yP(v);
 ctx.strokeStyle = gridCol;
 ctx.lineWidth = 0.6;
 ctx.beginPath(); ctx.moveTo(PAD.left, py); ctx.lineTo(PAD.left+pw, py); ctx.stroke();
-const lbl = isPct ? v.toFixed(1)+'%' : (Math.abs(v)>=1000 ? (v/1000).toFixed(1)+'K' : Math.round(v).toString());
+const lbl = isPct ? v.toFixed(1)+'%' : fmtTick(v);
 ctx.fillStyle = textCol;
 ctx.textAlign = 'left';
 ctx.fillText(lbl, PAD.left+pw+5, py+4);
@@ -3919,17 +3776,18 @@ const maxOI = Math.max(...oiVals);
 const minOI = Math.min(...oiVals);
 const oiRange = (maxOI - minOI) || 1;
 const oiPad = oiRange * 0.12;
-const yMin = minOI - oiPad;
-const yMax = maxOI + oiPad;
+const ntO = niceTicksRange(minOI - oiPad, maxOI + oiPad, 5);
+const yMin = ntO.min;
+const yMax = ntO.max;
 const yRange = yMax - yMin;
 const yP = v => PAD.top + ph - ((v - yMin) / yRange) * ph;
 const barW = Math.max(1, pw / n - 0.5);
-for(let i=0;i<=4;i++){
-const v = yMin + (yRange/4)*i;
+for(let i=0;i<ntO.ticks.length;i++){
+const v = ntO.ticks[i];
 const py = yP(v);
 ctx.strokeStyle = gridC; ctx.lineWidth = 0.6;
 ctx.beginPath(); ctx.moveTo(PAD.left,py); ctx.lineTo(PAD.left+pw,py); ctx.stroke();
-const lbl = Math.abs(v)>=1e6 ? (v/1e6).toFixed(2)+'M' : Math.abs(v)>=1e3 ? (v/1e3).toFixed(0)+'K' : Math.round(v).toString();
+const lbl = fmtTick(v);
 ctx.fillStyle = textC; ctx.font = '600 12px '+CHART_FONT; ctx.textAlign = 'left';
 ctx.fillText(lbl, PAD.left+pw+5, py+4);
 }
@@ -3990,8 +3848,9 @@ const pMin = Math.min(...pVals);
 const pMax = Math.max(...pVals);
 const pRange = (pMax - pMin) || 1;
 const pPad = pRange * 0.12;
-const pyMin = pMin - pPad;
-const pyMax = pMax + pPad;
+const ntP = niceTicksRange(pMin - pPad, pMax + pPad, 5);
+const pyMin = ntP.min;
+const pyMax = ntP.max;
 const pyRange = pyMax - pyMin;
 const pYP = v => PAD.top + ph - ((v - pyMin) / pyRange) * ph;
 ctx.strokeStyle = priceC; ctx.lineWidth = 2; ctx.lineJoin='round';
@@ -4002,11 +3861,11 @@ const py = pYP(pricePts[j].p);
 if(j===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
 }
 ctx.stroke();
-for(let i=0;i<=4;i++){
-const v = pyMin + (pyRange/4)*i;
+for(let i=0;i<ntP.ticks.length;i++){
+const v = ntP.ticks[i];
 const py = pYP(v);
 ctx.fillStyle = priceC; ctx.font = '700 12px '+CHART_FONT; ctx.textAlign = 'right';
-ctx.fillText(v.toFixed(0), PAD.left-4, py+4);
+ctx.fillText(fmtTick(v), PAD.left-4, py+4);
 }
 ctx.fillStyle = priceC; ctx.font = '700 12px '+CHART_FONT; ctx.textAlign='right';
 ctx.fillText('PRICE', PAD.left-4, PAD.top-8);
@@ -6409,255 +6268,6 @@ html += `<tr class="${alt?'energy-alt':''}">
 }
 html += '</tbody>';
 el.innerHTML = html;
-}
-var AAFC_DATA = null;
-let aafcInited = false;
-let aafcCrop = 'ALL';
-let aafcView = 'annual';
-function setAafcView(v){
-  aafcView = v;
-  var a = document.getElementById('aafc-view-annual');
-  var q = document.getElementById('aafc-view-quarterly');
-  if(a){ a.classList.toggle('active', v==='annual'); }
-  if(q){ q.classList.toggle('active', v==='quarterly'); }
-  if(v === 'quarterly' && aafcCrop === 'ALL' && AAFC_DATA){
-    var crops = Object.keys(AAFC_DATA.crops);
-    if(crops.length){ aafcCrop = crops[0]; }
-    document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
-      var label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
-      b.classList.toggle('active', label === aafcCrop);
-    });
-  }
-  renderAafc();
-}
-function initAafc(){
-aafcInited = true;
-if(!AAFC_DATA || !AAFC_DATA.crops){
-  var ap = document.getElementById('aafc-page');
-  if(ap) ap.innerHTML = '<div style="padding:40px;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;margin-bottom:12px;">LOADING STATSCAN DATA...</div><div style="font-size:13px;color:var(--text3);">Waiting for data/statscan_sd.json</div></div>';
-  return;
-}
-const btns = document.getElementById('aafc-crop-btns');
-const crops = Object.keys(AAFC_DATA.crops);
-const allBtn = `<button class="aafc-crop-btn aafc-all-btn${aafcCrop==='ALL'?' active':''}" onclick="setAafcCrop('ALL')">ALL CROPS</button>`;
-btns.innerHTML = allBtn + crops.map(c =>
-`<button class="aafc-crop-btn${c===aafcCrop?' active':''}" onclick="setAafcCrop('${c}')">${c}</button>`
-).join('') + `<span class="aafc-report-date">STATSCAN · ${AAFC_DATA.report_date.toUpperCase()}</span>`;
-renderAafc();
-}
-function setAafcCrop(c){
-aafcCrop = c;
-document.querySelectorAll('.aafc-crop-btn').forEach(b=>{
-const label = b.classList.contains('aafc-all-btn') ? 'ALL' : b.textContent;
-b.classList.toggle('active', label===c);
-});
-if(aafcView === 'quarterly' && c === 'ALL'){ aafcView='annual'; var a=document.getElementById('aafc-view-annual'); var q=document.getElementById('aafc-view-quarterly'); if(a)a.classList.add('active'); if(q)q.classList.remove('active'); }
-renderAafc();
-}
-function renderAafcQuarterly(){
-  if(!AAFC_DATA) return;
-  var cd = AAFC_DATA.crops[aafcCrop];
-  if(!cd){ document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);">Select a specific crop to view quarterly comparison.</div>'; return; }
-  var quarterly = cd.quarterly || [];
-  if(!quarterly.length){
-    document.getElementById('aafc-content').innerHTML = '<div style="padding:20px;color:var(--text3);"><strong style="color:var(--amber);">No quarterly data.</strong> Deploy updated fetch_statscan.py and trigger the workflow.</div>';
-    return;
-  }
-  var currQ  = quarterly[0];
-  var prevQ  = quarterly.length > 1 ? quarterly[1] : null;
-  var samePY = quarterly.filter(function(q){ return q.quarter === currQ.quarter && q.crop_year !== currQ.crop_year; }).slice(0,2);
-  var currCY  = AAFC_DATA.current_crop_year || currQ.crop_year;
-  var currQCode = AAFC_DATA.current_quarter || currQ.quarter;
-  var currQL    = AAFC_DATA.current_quarter_label || currQ.quarter_label;
-  var fmt = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toLocaleString(); };
-  var fmtY = function(v){ return (v===null||v===undefined) ? '—' : Number(v).toFixed(2); };
-  function delta(a,b){ if(a===null||b===null||a===undefined||b===undefined) return {str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5) return {str:'—',cls:''}; var s=(d>=0?'+':'')+Math.round(d).toLocaleString(); return {str:s, cls:d>0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'}; }
-  var isFullYear = (currQ.quarter === 'Q4');
-  var h = '';
-  h += freshStamp('STATSCAN', _pipelineDates['STATSCAN'], currCY+' '+currQCode);
-  h += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">';
-  h += '<strong style="color:var(--amber);letter-spacing:.08em;">QUARTERLY COMPARISON — '+aafcCrop.toUpperCase()+'</strong><br>';
-  h += 'Crop year: <strong>Aug 1 – Jul 31</strong> &nbsp;|&nbsp; Current: <strong>'+currCY+' '+currQCode+' ('+currQL+')</strong> ';
-  if(isFullYear) h += '— <em>Q4 = full-year actual</em>'; else h += '— <em>cumulative YTD, not a full-year estimate</em>';
-  h += '<br>Columns compare the same quarter across seasons. All volumes in 000 tonnes unless noted.';
-  h += '</div>';
-  var items = [
-    {key:'prod',    label:'Production',          fmt:fmt},
-    {key:'supply',  label:'Total Supply',        fmt:fmt},
-    {key:'exports', label:'Exports',             fmt:fmt},
-    {key:'dom',     label:'Dom. Use',            fmt:fmt},
-    {key:'stocks',  label:'Ending Stocks',       fmt:fmt},
-    {key:'area_s',  label:'Seeded Area (000 ha)',fmt:fmt},
-    {key:'area_h',  label:'Harv. Area (000 ha)', fmt:fmt},
-    {key:'yield',   label:'Yield (t/ha)',         fmt:fmtY},
-  ];
-  function colHead(q){ return q.crop_year+' '+q.quarter+'<br><span style="font-size:10px;font-weight:600;color:var(--text3);">'+q.quarter_label+'</span>'; }
-  h += '<div style="overflow-x:auto;"><table class="bal-table" style="table-layout:auto;min-width:600px;">';
-  h += '<thead><tr>';
-  h += '<th style="text-align:left;width:180px;font-size:13px;">ITEM</th>';
-  h += '<th class="latest">'+colHead(currQ)+'</th>';
-  if(prevQ){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">QoQ Δ</th>'; h += '<th>'+colHead(prevQ)+'</th>'; }
-  samePY.forEach(function(q){ h += '<th style="width:70px;font-size:11px;color:var(--text3);">YoY Δ</th>'; h += '<th>'+colHead(q)+'</th>'; });
-  h += '</tr></thead><tbody>';
-  items.forEach(function(item, ri){
-    var cv=currQ[item.key], pv=prevQ?prevQ[item.key]:null;
-    var qod=delta(cv,pv);
-    var alt=ri%2?' class="row-alt"':'';
-    h += '<tr'+alt+'>';
-    h += '<td style="text-align:left;font-weight:700;">'+item.label+'</td>';
-    h += '<td class="latest">'+item.fmt(cv)+'</td>';
-    if(prevQ){ h += '<td style="font-size:13px;'+qod.cls+'">'+qod.str+'</td><td>'+item.fmt(pv)+'</td>'; }
-    samePY.forEach(function(q){ var yv=q[item.key]; var yod=delta(cv,yv); h += '<td style="font-size:13px;'+yod.cls+'">'+yod.str+'</td><td>'+item.fmt(yv)+'</td>'; });
-    h += '</tr>';
-  });
-  function su(r){ if(!r) return null; var d=(r.dom||0)+(r.exports||0); return d>0?((r.stocks/d)*100):null; }
-  var sc=su(currQ),sp=su(prevQ); var spy=samePY.map(su);
-  var fsu=function(v){return v===null?'—':v.toFixed(0)+'%';};
-  function sud(a,b){if(a===null||b===null)return{str:'—',cls:''}; var d=a-b; if(Math.abs(d)<0.5)return{str:'—',cls:''}; return{str:(d>=0?'+':'')+d.toFixed(0)+'pp',cls:d<0?'color:var(--green);font-weight:700':'color:var(--red);font-weight:700'};}
-  var alt2=items.length%2?' class="row-alt"':'';
-  h += '<tr'+alt2+'><td style="text-align:left;font-weight:700;font-style:italic;">S/U Ratio</td><td class="latest">'+fsu(sc)+'</td>';
-  if(prevQ){ var qd2=sud(sc,sp); h += '<td style="font-size:13px;'+qd2.cls+'">'+qd2.str+'</td><td>'+fsu(sp)+'</td>'; }
-  spy.forEach(function(s){ var yd=sud(sc,s); h += '<td style="font-size:13px;'+yd.cls+'">'+yd.str+'</td><td>'+fsu(s)+'</td>'; });
-  h += '</tr>';
-  h += '</tbody></table></div>';
-  h += '<div style="font-size:12px;color:var(--text3);margin-top:12px;font-style:italic;line-height:1.6;">Quarterly figures are <strong>cumulative YTD</strong> from Aug 1. Q4 = full crop-year actual. StatsCan does not publish mid-year full-year estimates. Switch to <strong>ANNUAL</strong> view for historical S&D balance sheets.</div>';
-  document.getElementById('aafc-content').innerHTML = h;
-}
-function renderAafcAll(){
-const crops = Object.keys(AAFC_DATA.crops);
-var allYears = {};
-crops.forEach(function(c){ AAFC_DATA.crops[c].rows.forEach(function(r){ allYears[r.year]=1; }); });
-const years = Object.keys(allYears).sort();
-const curYr = years.length ? years[years.length - 1] : '';
-const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
-const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
-function dc(a,b){ if(a==null||b==null) return ''; return a>b?'aafc-up':a<b?'aafc-dn':''; }
-let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
-html += '<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--text2);">'
-  + '<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>'
-  + 'The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. '
-  + 'YoY change coloring is suppressed on the YTD row to avoid misleading comparisons. All volumes in 000 tonnes unless noted.'
-  + '</div>';
-// Render each crop as its own balance sheet (same format as individual view)
-crops.forEach(cropName => {
-const cd = AAFC_DATA.crops[cropName];
-const rows = cd.rows;
-if(!rows.length) return;
-const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
-html += '<div style="margin-bottom:22px;">';
-html += '<div style="font-size:14px;font-weight:900;letter-spacing:.10em;color:var(--amber);padding:8px 14px;background:var(--section-bg);border-top:2px solid var(--amber);border-bottom:1px solid var(--border2);cursor:pointer;" onclick="setAafcCrop(\''+cropName+'\')">'+cropName.toUpperCase()+' <span style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.04em;">▸ detail</span></div>';
-html += '<table class="aafc-all-tbl"><thead><tr>';
-html += '<th style="text-align:left;width:110px;">YEAR</th>';
-html += '<th>PROD.</th><th>SUPPLY</th><th>EXPORTS</th>';
-if(showFood) html += '<th>FOOD</th>';
-html += '<th>DOM. USE</th><th>STOCKS</th><th>S/U %</th>';
-html += '<th>YIELD<br><span style="font-weight:400;font-size:10px;">t/ha</span></th>';
-html += '</tr></thead><tbody>';
-rows.forEach((r, i) => {
-  const prev = i > 0 ? rows[i-1] : null;
-  const isCur = r.year === curYr;
-  const denom = (r.dom||0) + (r.exports||0);
-  const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
-  const yrLbl = isCur ? r.year+' <span style="font-size:10px;font-weight:900;color:var(--amber);letter-spacing:.04em;">YTD</span>' : r.year;
-  const cls = isCur ? ' style="background:var(--row-alt);"' : (i%2?' style="background:var(--row-alt);"':'');
-  // Suppress YoY coloring on the current (YTD) row — partial-year data is not comparable
-  const dcFn = isCur ? (()=>'') : dc;
-  html += '<tr'+(isCur?' style="background:var(--row-latest);"':cls)+'>';
-  html += '<td style="'+(isCur?'color:var(--amber);font-weight:800;':'')+'">'+yrLbl+'</td>';
-  html += '<td class="'+dcFn(r.prod,prev?prev.prod:null)+'">'+fmt(r.prod)+'</td>';
-  html += '<td>'+fmt(r.supply)+'</td>';
-  html += '<td class="'+dcFn(r.exports,prev?prev.exports:null)+'">'+fmt(r.exports)+'</td>';
-  if(showFood) html += '<td>'+fmt(r.food)+'</td>';
-  html += '<td>'+fmt(r.dom)+'</td>';
-  html += '<td class="'+dcFn(r.stocks,prev?prev.stocks:null)+'" style="font-weight:800;">'+fmt(r.stocks)+'</td>';
-  html += '<td style="font-weight:700;">'+su+'</td>';
-  html += '<td>'+fmtY(r.yield)+'</td>';
-  html += '</tr>';
-});
-html += '</tbody></table></div>';
-});
-html += '<div class="aafc-notes">'+(AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>'<div>• '+n+'</div>').join('') : '')+'</div>';
-document.getElementById('aafc-content').innerHTML = html;
-}
-function renderAafc(){
-if(AAFC_DATA && AAFC_DATA.report_date){
-const el = document.getElementById('aafc-report-date-label');
-if(el) el.textContent = AAFC_DATA.report_date;
-}
-if(aafcView === 'quarterly'){ renderAafcQuarterly(); return; }
-if(aafcCrop === 'ALL'){ renderAafcAll(); return; }
-const cd = AAFC_DATA.crops[aafcCrop];
-if(!cd){ document.getElementById('aafc-content').innerHTML=''; return; }
-const rows = cd.rows;
-const curYr = rows.length ? rows[rows.length - 1].year : '';
-const isPulse = !rows[0].price || rows[0].food===null;
-const hasPrice = rows.some(r=>r.price);
-const showFood = rows.some(r=>r.food!==null && r.food!==undefined);
-const fmt = v => (v===null||v===undefined||v==='') ? '—' : Number(v).toLocaleString();
-const fmtY = v => (v===null||v===undefined) ? '—' : Number(v).toFixed(2);
-function deltaClass(cur, prev){
-if(cur===null||prev===null||cur===undefined||prev===undefined) return '';
-return cur>prev ? 'aafc-up' : cur<prev ? 'aafc-dn' : '';
-}
-// Check if area/yield data exists (may be null for current partial year)
-const hasAreaData = rows.some(r=>r.area_s!=null||r.area_h!=null);
-const showArea = hasAreaData;
-// Count area group span: seeded + harv + yield = 3, or 0 if suppressed
-const areaSpan = showArea ? 3 : 0;
-let html = freshStamp('STATSCAN', _pipelineDates['STATSCAN'], curYr);
-html += `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--amber);padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:var(--text2);">`
-  + `<strong style="color:var(--amber);letter-spacing:.08em;">CROP YEAR: AUG 1 – JUL 31</strong><br>`
-  + `The current year row is <strong>year-to-date (YTD)</strong> as of the last Statistics Canada quarterly release — it is <em>not</em> a full-year estimate. `
-  + `YoY change coloring is suppressed on the YTD row to avoid misleading comparisons.`
-  + `</div>`;
-html += `<div class="aafc-price-label">${cd.price_label}</div>`;
-html += `<div class="aafc-sd-wrap"><table class="aafc-tbl"><thead>`;
-html += `<tr class="aafc-group">
-<th rowspan="2" style="text-align:left;border-right:1px solid var(--border2);">CROP YEAR</th>
-${showArea?`<th colspan="3" class="span-area" style="border-left:1px solid var(--border2);">AREA (000 ha)</th>`:''}
-<th colspan="3" class="span-supply" style="border-left:1px solid var(--border2);">SUPPLY (000 t)</th>
-<th colspan="${showFood?4:3}" class="span-demand" style="border-left:1px solid var(--border2);">DEMAND (000 t)</th>
-<th colspan="2" style="border-left:1px solid var(--border2);">BALANCE</th>
-${hasPrice?'<th style="border-left:1px solid var(--border2);">PRICE</th>':''}
-</tr>`;
-html += `<tr class="aafc-cols">
-${showArea?`<th style="border-left:1px solid var(--border2);">SEEDED</th><th>HARV.</th><th class="span-area">YIELD t/ha</th>`:''}
-<th style="border-left:1px solid var(--border2);">PROD.</th><th>IMPORTS</th><th class="span-supply">TOTAL</th>
-<th style="border-left:1px solid var(--border2);">EXPORTS</th>
-${showFood?'<th>FOOD/IND</th>':''}
-<th>FEED/WSTE</th><th class="span-demand">DOM. USE</th>
-<th style="border-left:1px solid var(--border2);">STOCKS</th>
-<th>S/U %</th>
-${hasPrice?`<th style="border-left:1px solid var(--border2);">$/t</th>`:''}
-</tr></thead><tbody>`;
-rows.forEach((r, i) => {
-const prev = i > 0 ? rows[i-1] : null;
-const isCur = r.year === curYr;
-const rowCls = isCur ? 'aafc-cur' : '';
-const denom = (r.dom||0) + (r.exports||0); const su = denom > 0 ? ((r.stocks/denom)*100).toFixed(0)+'%' : '—';
-// Suppress YoY delta coloring on current (YTD) row — partial year is not comparable to prior full year
-const dc2 = isCur ? (()=>'') : deltaClass;
-const yrCell = isCur
-  ? `${r.year} <span style="font-size:10px;font-weight:900;letter-spacing:.04em;color:var(--amber);">YTD</span>`
-  : r.year;
-html += `<tr class="${rowCls}">
-<td>${yrCell}</td>
-${showArea?`<td style="border-left:1px solid var(--border2);">${fmt(r.area_s)}</td><td>${fmt(r.area_h)}</td><td class="${prev?dc2(r.yield,prev.yield):''}">${fmtY(r.yield)}</td>`:''}
-<td style="border-left:1px solid var(--border2);">${fmt(r.prod)}</td>
-<td>${fmt(r.imports)}</td>
-<td class="${prev?dc2(r.supply,prev.supply):''}">${fmt(r.supply)}</td>
-<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.exports,prev.exports):''}">${fmt(r.exports)}</td>
-${showFood?`<td>${fmt(r.food)}</td>`:''}
-<td>${fmt(r.feed)}</td>
-<td class="${prev?dc2(r.dom,prev.dom):''}">${fmt(r.dom)}</td>
-<td style="border-left:1px solid var(--border2);" class="${prev?dc2(r.stocks,prev.stocks):''}">${fmt(r.stocks)}</td>
-<td>${su}</td>
-${hasPrice?`<td class="aafc-price" style="border-left:1px solid var(--border2);">$${fmt(r.price)}</td>`:''}
-</tr>`;
-});
-html += `</tbody></table></div>`;
-html += `<div class="aafc-notes">${AAFC_DATA.notes && AAFC_DATA.notes.map ? AAFC_DATA.notes.map(n=>`<div>• ${n}</div>`).join('') : ''}</div>`;
-document.getElementById('aafc-content').innerHTML = html;
 }
 onCommChange();
 setTimeout(()=>{
@@ -10323,247 +9933,6 @@ var chartReady = false;
 </script>
 
 <script>
-// ══════════════════════════════════════
-//  CARRY / FORWARD CURVE MODULE
-// ══════════════════════════════════════
-const _CARRY_DATA={"ZC":{"name":"Corn","sym":"ZC","unit":"¢/bu","exchange":"CBOT","ccy":"USD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":461.6,"label":"MAY26","nearby":true},{"month":7,"year":2026,"price":473.2,"label":"JUL26","nearby":false},{"month":9,"year":2026,"price":476.0,"label":"SEP26","nearby":false},{"month":12,"year":2026,"price":490.0,"label":"DEC26","nearby":false},{"month":3,"year":2027,"price":500.4,"label":"MAR27","nearby":false},{"month":5,"year":2027,"price":506.6,"label":"MAY27","nearby":false}],"storage_cost":8.0,"storage_unit":"¢/bu/mo"},"ZW":{"name":"SRW Wheat","sym":"ZW","unit":"¢/bu","exchange":"CBOT","ccy":"USD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":605.4,"label":"MAY26","nearby":true},{"month":7,"year":2026,"price":616.4,"label":"JUL26","nearby":false},{"month":9,"year":2026,"price":629.4,"label":"SEP26","nearby":false},{"month":12,"year":2026,"price":646.2,"label":"DEC26","nearby":false},{"month":3,"year":2027,"price":659.2,"label":"MAR27","nearby":false},{"month":5,"year":2027,"price":664.2,"label":"MAY27","nearby":false}],"storage_cost":8.0,"storage_unit":"¢/bu/mo"},"MWE":{"name":"HRS Wheat","sym":"MWE","unit":"$/bu","exchange":"MGEX","ccy":"USD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":6.4825,"label":"MAY26","nearby":true},{"month":7,"year":2026,"price":6.6225,"label":"JUL26","nearby":false},{"month":9,"year":2026,"price":6.7775,"label":"SEP26","nearby":false},{"month":12,"year":2026,"price":6.8975,"label":"DEC26","nearby":false},{"month":3,"year":2027,"price":6.9725,"label":"MAR27","nearby":false}],"storage_cost":0.08,"storage_unit":"$/bu/mo"},"ZS":{"name":"Soybeans","sym":"ZS","unit":"¢/bu","exchange":"CBOT","ccy":"USD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":1159.4,"label":"MAY26","nearby":true},{"month":7,"year":2026,"price":1175.4,"label":"JUL26","nearby":false},{"month":8,"year":2026,"price":1170.6,"label":"AUG26","nearby":false},{"month":9,"year":2026,"price":1144.6,"label":"SEP26","nearby":false},{"month":11,"year":2026,"price":1144.2,"label":"NOV26","nearby":false},{"month":1,"year":2027,"price":1155.4,"label":"JAN27","nearby":false}],"storage_cost":8.0,"storage_unit":"¢/bu/mo"},"ZL":{"name":"Soy Oil","sym":"ZL","unit":"¢/lb","exchange":"CBOT","ccy":"USD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":67.22,"label":"MAY26","nearby":true},{"month":7,"year":2026,"price":67.25,"label":"JUL26","nearby":false},{"month":8,"year":2026,"price":66.48,"label":"AUG26","nearby":false},{"month":9,"year":2026,"price":65.56,"label":"SEP26","nearby":false},{"month":10,"year":2026,"price":64.63,"label":"OCT26","nearby":false},{"month":12,"year":2026,"price":64.06,"label":"DEC26","nearby":false}],"storage_cost":0.05,"storage_unit":"¢/lb/mo"},"RS":{"name":"Canola","sym":"RS","unit":"C$/MT","exchange":"ICE","ccy":"CAD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":720.5,"label":"MAY26","nearby":true},{"month":7,"year":2026,"price":733.3,"label":"JUL26","nearby":false},{"month":11,"year":2026,"price":727.9,"label":"NOV26","nearby":false},{"month":1,"year":2027,"price":734.5,"label":"JAN27","nearby":false},{"month":3,"year":2027,"price":739.4,"label":"MAR27","nearby":false},{"month":5,"year":2027,"price":740.5,"label":"MAY27","nearby":false},{"month":7,"year":2027,"price":740.4,"label":"JUL27","nearby":false}],"storage_cost":4.5,"storage_unit":"C$/MT/mo"},"CL":{"name":"WTI Crude","sym":"CL","unit":"$/bbl","exchange":"NYMEX","ccy":"USD","as_of":"2026-03-27","contracts":[{"month":5,"year":2026,"price":101.18,"label":"MAY26","nearby":true},{"month":6,"year":2026,"price":95.44,"label":"JUN26","nearby":false},{"month":7,"year":2026,"price":90.73,"label":"JUL26","nearby":false},{"month":8,"year":2026,"price":86.82,"label":"AUG26","nearby":false},{"month":12,"year":2026,"price":77.39,"label":"DEC26","nearby":false}],"storage_cost":0.5,"storage_unit":"$/bbl/mo"}};
-
-let carrySelected = 'ZC';
-let carryChart = null;
-let carryInited = false;
-
-function initCarry() {
-  if (carryInited) return;
-  carryInited = true;
-  
-  // Build commodity buttons
-  const btnWrap = document.getElementById('carry-comm-btns');
-  const order = ['ZC','ZW','MWE','ZS','ZL','RS','CL'];
-  order.forEach(sym => {
-    const d = _CARRY_DATA[sym];
-    if (!d) return;
-    const b = document.createElement('button');
-    b.className = 'sp-card';
-    b.style.cssText = 'padding:6px 14px;cursor:pointer;border-radius:3px;min-width:0;';
-    b.id = 'carry-btn-' + sym;
-    b.innerHTML = '<div style="font-size:11px;font-weight:900;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);">' + d.name + '</div>' +
-      '<div style="font-size:14px;font-weight:800;color:var(--text);margin-top:2px;">' + d.contracts[0].price.toFixed(2) + ' <span style="font-size:11px;color:var(--text3);">' + d.unit + '</span></div>';
-    b.onclick = function(){ carrySelected = sym; renderCarry(); };
-    btnWrap.appendChild(b);
-  });
-  
-  // Build storage inputs
-  const stWrap = document.getElementById('carry-storage-inputs');
-  order.forEach(sym => {
-    const d = _CARRY_DATA[sym];
-    if (!d) return;
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:4px;';
-    div.innerHTML = '<span style="font-size:12px;font-weight:700;color:var(--text2);min-width:70px;">' + d.name + ':</span>' +
-      '<input id="carry-st-' + sym + '" type="number" step="0.01" value="' + d.storage_cost + '" style="width:60px;text-align:right;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);background:var(--bg3);border:1px solid var(--border2);border-radius:3px;padding:2px 5px;" onchange="renderCarry()">' +
-      '<span style="font-size:11px;color:var(--text3);">' + d.storage_unit + '</span>';
-    stWrap.appendChild(div);
-  });
-
-  // Fetch live SOFR from existing FRED data if available
-  if (typeof fredData !== 'undefined' && fredData['SOFR'] && fredData['SOFR'].length > 0) {
-    const sofrVal = parseFloat(fredData['SOFR'][0].v);
-    if (!isNaN(sofrVal)) document.getElementById('carry-sofr').value = sofrVal.toFixed(2);
-  }
-  
-  // Fetch CORRA from Bank of Canada
-  fetchCORRA();
-  
-  renderCarry();
-}
-
-async function fetchCORRA() {
-  try {
-    const r = await fetch('https://www.bankofcanada.ca/valet/observations/AVG.INTWO/json?recent=5');
-    const j = await r.json();
-    const obs = j.observations;
-    if (obs && obs.length > 0) {
-      // Find most recent non-null value
-      for (let i = obs.length - 1; i >= 0; i--) {
-        const v = parseFloat(obs[i]['AVG.INTWO'].v);
-        if (!isNaN(v)) {
-          document.getElementById('carry-corra').value = v.toFixed(2);
-          renderCarry();
-          break;
-        }
-      }
-    }
-  } catch(e) {
-    console.warn('CORRA fetch failed:', e);
-  }
-}
-
-function renderCarry() {
-  const sym = carrySelected;
-  const d = _CARRY_DATA[sym];
-  if (!d) return;
-  
-  const rate = parseFloat(document.getElementById(d.ccy === 'CAD' ? 'carry-corra' : 'carry-sofr').value) / 100;
-  const stInput = document.getElementById('carry-st-' + sym);
-  const storageCost = stInput ? parseFloat(stInput.value) : d.storage_cost;
-  
-  // Highlight selected button
-  document.querySelectorAll('#carry-comm-btns .sp-card').forEach(b => {
-    b.style.borderColor = b.id === 'carry-btn-' + sym ? 'var(--amber)' : 'var(--border)';
-    b.style.borderWidth = b.id === 'carry-btn-' + sym ? '2px' : '1px';
-  });
-  
-  document.getElementById('carry-asof').textContent = 'As of ' + d.as_of;
-  document.getElementById('carry-chart-title').textContent = d.name.toUpperCase() + ' FORWARD CURVE';
-  document.getElementById('carry-chart-sub').textContent = d.unit + ' · ' + d.exchange;
-  
-  const contracts = d.contracts;
-  const front = contracts[0];
-  
-  // Calculate full carry for each deferred month
-  // Days between contract months (approximate using month difference)
-  const monthDiff = (c) => {
-    return (c.year - front.year) * 12 + (c.month - front.month);
-  };
-  
-  const labels = contracts.map(c => c.label);
-  const marketPrices = contracts.map(c => c.price);
-  const fullCarryPrices = contracts.map(c => {
-    const months = monthDiff(c);
-    if (months <= 0) return c.price;
-    const interest = front.price * (rate / 12) * months;
-    const storage = storageCost * months;
-    return Math.round((front.price + interest + storage) * 10000) / 10000;
-  });
-  
-  // Draw chart
-  const ctx = document.getElementById('carry-curve-canvas');
-  if (carryChart) carryChart.destroy();
-  
-  const isDark = document.body.classList.contains('dark');
-  const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
-  const textColor = isDark ? '#8a9aaa' : '#4a5868';
-  
-  carryChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Market',
-          data: marketPrices,
-          borderColor: '#f5a623',
-          backgroundColor: 'rgba(245,166,35,0.1)',
-          borderWidth: 2.5,
-          pointRadius: 5,
-          pointBackgroundColor: '#f5a623',
-          fill: false,
-          tension: 0.1,
-        },
-        {
-          label: 'Full Carry',
-          data: fullCarryPrices,
-          borderColor: '#2e8f52',
-          borderWidth: 2,
-          borderDash: [6, 3],
-          pointRadius: 4,
-          pointBackgroundColor: '#2e8f52',
-          pointBorderColor: '#2e8f52',
-          fill: false,
-          tension: 0.1,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx2) {
-              return ctx2.dataset.label + ': ' + ctx2.parsed.y.toFixed(2);
-            }
-          }
-        }
-      },
-      scales: {
-        x: { ticks: { color: textColor, font: { family: "'Courier New',monospace", weight: 700, size: 12 } }, grid: { color: gridColor } },
-        y: { ticks: { color: textColor, font: { family: "'Courier New',monospace", weight: 600, size: 12 } }, grid: { color: gridColor } }
-      }
-    }
-  });
-  
-  // Build spread table
-  let thtml = '<thead><tr><th style="text-align:left">Spread</th><th>Market</th><th>Full Carry</th><th>% of FC</th><th>Ann. Carry %</th><th>Structure</th></tr></thead><tbody>';
-  
-  for (let i = 0; i < contracts.length - 1; i++) {
-    const near = contracts[i];
-    const far = contracts[i + 1];
-    const months = monthDiff(far) - monthDiff(near);
-    if (months <= 0) continue;
-    
-    const mktSpread = far.price - near.price;
-    const fcInterest = near.price * (rate / 12) * months;
-    const fcStorage = storageCost * months;
-    const fcSpread = fcInterest + fcStorage;
-    const pctFC = fcSpread !== 0 ? (mktSpread / fcSpread * 100) : 0;
-    const annCarry = near.price !== 0 ? (mktSpread / near.price) * (12 / months) * 100 : 0;
-    
-    let structure = 'Flat';
-    let structClass = '';
-    if (mktSpread > fcSpread * 0.9) { structure = 'Full Carry'; structClass = 'sp-up'; }
-    else if (mktSpread > fcSpread * 0.5) { structure = 'Commercial'; structClass = ''; }
-    else if (mktSpread > 0) { structure = 'Weak Carry'; structClass = 'sp-dn'; }
-    else { structure = 'INVERSE'; structClass = 'sp-dn'; }
-    
-    const spreadLabel = near.label + ' / ' + far.label;
-    const alt = i % 2 === 1 ? ' style="background:var(--row-alt)"' : '';
-    
-    thtml += '<tr' + alt + '>' +
-      '<td style="text-align:left;font-weight:700;">' + spreadLabel + '</td>' +
-      '<td class="' + (mktSpread >= 0 ? 'sp-up' : 'sp-dn') + '">' + (mktSpread >= 0 ? '+' : '') + mktSpread.toFixed(2) + '</td>' +
-      '<td>' + fcSpread.toFixed(2) + '</td>' +
-      '<td class="' + (pctFC > 90 ? 'sp-up' : pctFC < 0 ? 'sp-dn' : '') + '">' + pctFC.toFixed(0) + '%</td>' +
-      '<td>' + annCarry.toFixed(1) + '%</td>' +
-      '<td class="' + structClass + '" style="font-weight:800;letter-spacing:.06em;">' + structure + '</td>' +
-      '</tr>';
-  }
-  thtml += '</tbody>';
-  document.getElementById('carry-spread-tbl').innerHTML = thtml;
-  
-  // Summary panel
-  const totalMonths = monthDiff(contracts[contracts.length - 1]);
-  const totalMktSpread = contracts[contracts.length - 1].price - front.price;
-  const totalFCSpread = front.price * (rate / 12) * totalMonths + storageCost * totalMonths;
-  const totalPctFC = totalFCSpread !== 0 ? (totalMktSpread / totalFCSpread * 100) : 0;
-  const annRollYield = front.price !== 0 && totalMonths > 0 ? (totalMktSpread / front.price) * (12 / totalMonths) * 100 : 0;
-  
-  // Count inversions
-  let inversions = 0;
-  for (let i = 0; i < contracts.length - 1; i++) {
-    if (contracts[i + 1].price < contracts[i].price) inversions++;
-  }
-  
-  const curveShape = inversions === 0 ? 'CONTANGO' : 
-    inversions === contracts.length - 1 ? 'BACKWARDATION' : 'MIXED';
-  const shapeColor = curveShape === 'CONTANGO' ? 'var(--green)' : 
-    curveShape === 'BACKWARDATION' ? 'var(--red)' : 'var(--amber)';
-  
-  let shtml = '';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">Curve Shape</span><span style="font-size:14px;font-weight:900;color:' + shapeColor + ';letter-spacing:.08em;">' + curveShape + '</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">Front → Back</span><span style="font-size:14px;font-weight:800;color:var(--text);">' + front.label + ' → ' + contracts[contracts.length-1].label + '</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">Total Spread</span><span style="font-size:14px;font-weight:800;color:' + (totalMktSpread >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + (totalMktSpread >= 0 ? '+' : '') + totalMktSpread.toFixed(2) + '</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">Full Carry Theo</span><span style="font-size:14px;font-weight:800;color:var(--text);">+' + totalFCSpread.toFixed(2) + '</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">% of Full Carry</span><span style="font-size:14px;font-weight:900;color:' + (totalPctFC > 80 ? 'var(--green)' : totalPctFC < 0 ? 'var(--red)' : 'var(--amber)') + ';">' + totalPctFC.toFixed(0) + '%</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">Ann. Roll Yield</span><span style="font-size:14px;font-weight:800;color:' + (annRollYield >= 0 ? 'var(--green)' : 'var(--red)') + ';">' + (annRollYield >= 0 ? '+' : '') + annRollYield.toFixed(1) + '%</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;font-weight:700;color:var(--text2);">Inversions</span><span style="font-size:14px;font-weight:800;color:' + (inversions > 0 ? 'var(--red)' : 'var(--text)') + ';">' + inversions + ' of ' + (contracts.length - 1) + '</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="font-size:13px;font-weight:700;color:var(--text2);">Financing Rate</span><span style="font-size:14px;font-weight:800;color:var(--amber);">' + (rate * 100).toFixed(2) + '% ' + (d.ccy === 'CAD' ? 'CORRA' : 'SOFR') + '</span></div>';
-  shtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="font-size:13px;font-weight:700;color:var(--text2);">Storage</span><span style="font-size:14px;font-weight:800;color:var(--text);">' + storageCost.toFixed(2) + ' ' + d.storage_unit + '</span></div>';
-  
-  document.getElementById('carry-summary').innerHTML = shtml;
-}
-
 // ═══════════════════════════════════════════════════════════════
 // REPORTS TAB (NASS QuickStats data) — sidebar navigation
 // ═══════════════════════════════════════════════════════════════
@@ -10642,18 +10011,9 @@ function setRptCrop(c, view){
 }
 
 function renderRptView(){
-  if(!_nassData && ['conditions','progress','stocks','acreage','cattle','hogs'].indexOf(_rptView) >= 0) return;
   switch(_rptView){
     case 'energy': renderRptEnergy(); break;
     case 'sd': renderRptSD(); break;
-    case 'aafc': renderRptAAFC(); break;
-    case 'conditions': renderRptScoreboard(); renderRptCondTable(); renderRptGEChart(); break;
-    case 'progress': renderRptProgressTable(); renderRptProgressCharts(); break;
-    case 'stocks': renderRptStocks(); break;
-    case 'acreage': renderRptAcreage(); break;
-    case 'cattle': renderRptCattle(); break;
-    case 'hogs': renderRptHogs(); break;
-    case 'wasde': renderRptWasde(); break;
     case 'exports': renderRptExportsLink(); break;
     case 'gsw': renderRptGswLink(); break;
   }
@@ -10667,466 +10027,6 @@ function rptLatestYear(rows){
   rows.forEach(function(r){ years[r.year] = true; });
   var yrs = Object.keys(years).map(Number).sort();
   return yrs.length ? yrs[yrs.length - 1] : new Date().getFullYear();
-}
-
-function renderRptScoreboard(){
-  var cond = _nassData.crop_conditions || {};
-  var crops = Object.keys(cond);
-  var h = '';
-  crops.forEach(function(c){
-    var rows = cond[c] || [];
-    if(!rows.length){ return; }
-    var cy = rptLatestYear(rows);
-    var cyRows = rows.filter(function(r){ return r.year === cy; });
-    var pyRows = rows.filter(function(r){ return r.year === cy - 1; });
-    var latest = cyRows.length ? cyRows[cyRows.length - 1] : null;
-    var prev = cyRows.length > 1 ? cyRows[cyRows.length - 2] : null;
-    if(!latest){ return; }
-    var ge = rptGetGE(latest);
-    var wkChg = prev ? ge - rptGetGE(prev) : 0;
-    var pyWE = latest.week_ending.replace(String(cy), String(cy-1));
-    var pyMatch = pyRows.filter(function(r){ return r.week_ending === pyWE; });
-    var yrChg = pyMatch.length ? ge - rptGetGE(pyMatch[0]) : null;
-    var wkCol = wkChg > 0 ? 'var(--green)' : wkChg < 0 ? 'var(--red)' : 'var(--text3)';
-    var yrCol = yrChg !== null ? (yrChg > 0 ? 'var(--green)' : yrChg < 0 ? 'var(--red)' : 'var(--text3)') : 'var(--text3)';
-    var sel = c === _rptCrop ? 'border-color:var(--amber);' : '';
-    h += '<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:4px;padding:12px 14px;cursor:pointer;' + sel + '" onclick="setRptCrop(\'' + c + '\',\'conditions\')">';
-    h += '<div style="font-size:12px;font-weight:900;letter-spacing:.10em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + c + '</div>';
-    h += '<div style="font-size:22px;font-weight:900;color:var(--amber);line-height:1.1;">' + ge + '<span style="font-size:12px;color:var(--text3);font-weight:700;margin-left:3px;">% G/E</span></div>';
-    h += '<div style="font-size:12px;margin-top:5px;">';
-    h += '<span style="color:' + wkCol + ';font-weight:700;">' + (wkChg >= 0 ? '+' : '') + wkChg + ' wk</span>';
-    if(yrChg !== null) h += '<span style="color:' + yrCol + ';font-weight:700;margin-left:8px;">' + (yrChg >= 0 ? '+' : '') + yrChg + ' yr</span>';
-    h += '</div></div>';
-  });
-  var el = document.getElementById('rpt-cond-score');
-  el.style.gridTemplateColumns = 'repeat(' + Math.min(crops.length, 4) + ',1fr)';
-  el.innerHTML = h;
-}
-
-function renderRptCondTable(){
-  var cond = _nassData.crop_conditions || {};
-  var rows = cond[_rptCrop] || [];
-  var cy = rptLatestYear(rows);
-  var cyRows = rows.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return b.week_ending.localeCompare(a.week_ending); });
-  var pyRows = rows.filter(function(r){ return r.year === cy - 1; });
-  document.getElementById('rpt-cond-title').textContent = _rptCrop + ' — CONDITIONS';
-  var h = '<thead><tr><th style="text-align:left;">Week Ending</th><th>V.Poor</th><th>Poor</th><th>Fair</th><th>Good</th><th>Excl</th><th style="color:var(--amber);">G/E%</th><th>Δ Wk</th><th>Last Yr</th></tr></thead><tbody>';
-  var shown = cyRows.slice(0, 15);
-  shown.forEach(function(r, i){
-    var ge = rptGetGE(r);
-    var prevGE = (i + 1 < cyRows.length) ? rptGetGE(cyRows[i + 1]) : null;
-    var dWk = prevGE !== null ? ge - prevGE : '';
-    var pyWE = r.week_ending.replace(String(cy), String(cy - 1));
-    var pyMatch = pyRows.filter(function(p){ return p.week_ending === pyWE; });
-    var pyGE = pyMatch.length ? rptGetGE(pyMatch[0]) : '';
-    var dWkStr = dWk !== '' ? ((dWk >= 0 ? '+' : '') + dWk) : '—';
-    var dWkCol = dWk > 0 ? 'class="up"' : dWk < 0 ? 'class="dn"' : '';
-    h += '<tr' + (i % 2 ? ' class="row-alt"' : '') + '>';
-    h += '<td style="text-align:left;font-size:13px;">' + r.week_ending + '</td>';
-    h += '<td>' + (r.vp || 0) + '</td><td>' + (r.p || 0) + '</td><td>' + (r.f || 0) + '</td>';
-    h += '<td>' + (r.g || 0) + '</td><td>' + (r.e || 0) + '</td>';
-    h += '<td class="latest" style="font-size:16px;">' + ge + '</td>';
-    h += '<td ' + dWkCol + '>' + dWkStr + '</td>';
-    h += '<td style="color:var(--text3);">' + (pyGE !== '' ? pyGE : '—') + '</td>';
-    h += '</tr>';
-  });
-  h += '</tbody>';
-  document.getElementById('rpt-cond-tbl').innerHTML = h;
-}
-
-function renderRptGEChart(){
-  var cond = _nassData.crop_conditions || {};
-  var rows = cond[_rptCrop] || [];
-  var cy = rptLatestYear(rows);
-  var cyData = rows.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); });
-  var pyData = rows.filter(function(r){ return r.year === cy - 1; }).sort(function(a,b){ return a.week_ending.localeCompare(b.week_ending); });
-  function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
-  var cyPts = cyData.map(function(r){ return {x: weekNum(r.week_ending), y: rptGetGE(r)}; });
-  var pyPts = pyData.map(function(r){ return {x: weekNum(r.week_ending), y: rptGetGE(r)}; });
-  var ctx = document.getElementById('rpt-ge-chart');
-  if(_rptGEChart){ _rptGEChart.destroy(); }
-  var isDark = document.body.classList.contains('dark');
-  _rptGEChart = new Chart(ctx, {
-    type: 'line',
-    data: { datasets: [
-      { label: String(cy), data: cyPts, borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
-      { label: String(cy-1), data: pyPts, borderColor: isDark ? 'rgba(245,166,35,0.35)' : 'rgba(212,133,10,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
-    ] },
-    options: { responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-        y: { title: { display: true, text: '% Good/Excellent', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
-      },
-      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
-    }
-  });
-}
-
-function renderRptProgressTable(){
-  var prog = _nassData.crop_progress || {};
-  var cy = new Date().getFullYear();
-  var cropProg = prog[_rptCrop] || {};
-  // Find latest year across all stages
-  var allProgRows = [];
-  Object.values(cropProg).forEach(function(arr){ allProgRows = allProgRows.concat(arr); });
-  if(allProgRows.length) cy = rptLatestYear(allProgRows);
-  document.getElementById('rpt-prog-title').textContent = _rptCrop + ' — PROGRESS';
-  var stageKeys = Object.keys(cropProg).filter(function(s){ return s !== 'OTHER'; });
-  var h = '<thead><tr><th style="text-align:left;">Stage</th><th style="color:var(--amber);">This Week</th><th>Last Week</th><th>Last Year</th></tr></thead><tbody>';
-  var ri = 0;
-  stageKeys.forEach(function(stage){
-    var data = cropProg[stage];
-    var cyData = data.filter(function(r){ return r.year === cy; }).sort(function(a,b){ return b.week_ending.localeCompare(a.week_ending); });
-    var pyData = data.filter(function(r){ return r.year === cy - 1; });
-    if(!cyData.length) return;
-    var latest = cyData[0];
-    var prev = cyData.length > 1 ? cyData[1] : null;
-    var pyWE = latest.week_ending.replace(String(cy), String(cy-1));
-    var pyMatch = pyData.filter(function(r){ return r.week_ending === pyWE; });
-    h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
-    h += '<td style="text-align:left;font-size:14px;font-weight:800;letter-spacing:.06em;">' + stage + '</td>';
-    h += '<td class="latest" style="font-size:16px;">' + latest.value + '%</td>';
-    h += '<td>' + (prev ? prev.value + '%' : '—') + '</td>';
-    h += '<td style="color:var(--text3);">' + (pyMatch.length ? pyMatch[0].value + '%' : '—') + '</td>';
-    h += '</tr>';
-    ri++;
-  });
-  if(!stageKeys.length) h += '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No progress data for ' + _rptCrop + ' yet this season</td></tr>';
-  h += '</tbody>';
-  document.getElementById('rpt-prog-tbl').innerHTML = h;
-}
-
-function renderRptProgressCharts(){
-  var prog = _nassData.crop_progress || {};
-  var isDark = document.body.classList.contains('dark');
-  var cropProg = prog[_rptCrop] || {};
-  var allProgRows = [];
-  Object.values(cropProg).forEach(function(arr){ allProgRows = allProgRows.concat(arr); });
-  var cy = allProgRows.length ? rptLatestYear(allProgRows) : new Date().getFullYear();
-  function weekNum(we){ var d = new Date(we + 'T12:00:00'); var jan1 = new Date(d.getFullYear(),0,1); return Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7); }
-  var cropProg = prog[_rptCrop] || {};
-
-  // Planting chart
-  var plantData = cropProg['PLANTED'] || [];
-  var cyPlant = plantData.filter(function(r){ return r.year === cy; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var pyPlant = plantData.filter(function(r){ return r.year === cy-1; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var ctxP = document.getElementById('rpt-plant-chart');
-  if(_rptPlantChart) _rptPlantChart.destroy();
-  _rptPlantChart = new Chart(ctxP, {
-    type: 'line',
-    data: { datasets: [
-      { label: String(cy), data: cyPlant, borderColor: isDark ? '#f5a623' : '#D4850A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
-      { label: String(cy-1), data: pyPlant, borderColor: isDark ? 'rgba(245,166,35,0.35)' : 'rgba(212,133,10,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
-    ] },
-    options: { responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-        y: { min: 0, max: 100, title: { display: true, text: '% Planted', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
-      },
-      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
-    }
-  });
-
-  // Harvest chart
-  var harvData = cropProg['HARVESTED'] || [];
-  var cyHarv = harvData.filter(function(r){ return r.year === cy; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var pyHarv = harvData.filter(function(r){ return r.year === cy-1; }).map(function(r){ return {x: weekNum(r.week_ending), y: r.value}; });
-  var ctxH = document.getElementById('rpt-harv-chart');
-  if(_rptHarvChart) _rptHarvChart.destroy();
-  _rptHarvChart = new Chart(ctxH, {
-    type: 'line',
-    data: { datasets: [
-      { label: String(cy), data: cyHarv, borderColor: isDark ? '#2e8f52' : '#0E7A3A', borderWidth: 2.5, pointRadius: 2, fill: false, tension: 0.3 },
-      { label: String(cy-1), data: pyHarv, borderColor: isDark ? 'rgba(46,143,82,0.35)' : 'rgba(14,122,58,0.35)', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0.3 }
-    ] },
-    options: { responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'linear', title: { display: true, text: 'Week #', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878', stepSize: 4 }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } },
-        y: { min: 0, max: 100, title: { display: true, text: '% Harvested', color: isDark ? '#7a8a9a' : '#5a6878' }, ticks: { color: isDark ? '#7a8a9a' : '#5a6878' }, grid: { color: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } }
-      },
-      plugins: { legend: { labels: { color: isDark ? '#7a8a9a' : '#5a6878', font: { family: "'Courier New',monospace", weight: '700', size: 11 } } } }
-    }
-  });
-}
-
-function renderRptStocks(){
-  var stocks = _nassData.grain_stocks || {};
-  function fN(v,d){ if(v==null) return '—'; return v.toFixed(d!==undefined?d:3).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
-  var crops = ['CORN','SOYBEANS','WHEAT'];
-  var rows = [];
-  crops.forEach(function(crop){
-    var data = stocks[crop] || [];
-    if(!data.length) return;
-    var latest = data[data.length - 1];
-    var ya = data.filter(function(d){ return d.ref_period === latest.ref_period && d.year === latest.year - 1; });
-    var yaVal = ya.length ? ya[0].mil_bu : null;
-    rows.push({crop: crop.charAt(0) + crop.slice(1).toLowerCase(), latest: latest, yaVal: yaVal});
-  });
-  if(!rows.length){ document.getElementById('rpt-stocks-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No grain stocks data</td></tr></tbody>'; return; }
-  var ref = rows[0].latest;
-  var stampEl = document.getElementById('rpt-stocks-stamp');
-  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], ref.ref_period + ' ' + ref.year);
-  var h = '';
-  h += '<div class="panel" style="margin-bottom:18px;">';
-  h += '<div class="panel-hdr"><div class="panel-title">USDA Quarterly Stocks</div>';
-  h += '<div class="panel-sub" style="font-size:13px;color:var(--text3);">' + ref.ref_period + ' ' + ref.year + ' · Billion Bushels</div></div>';
-  h += '<table class="bal-table" style="table-layout:auto;">';
-  h += '<thead><tr><th style="width:140px;"></th>';
-  h += '<th class="latest" style="width:120px;">' + ref.ref_period + ' ' + ref.year + '</th>';
-  h += '<th style="width:120px;">' + ref.ref_period + ' ' + (ref.year - 1) + '</th>';
-  h += '<th style="width:100px;">Change</th>';
-  h += '</tr></thead><tbody>';
-  rows.forEach(function(r, i){
-    var cur = r.latest.mil_bu / 1000;
-    var prev = r.yaVal !== null ? r.yaVal / 1000 : null;
-    var chg = (cur != null && prev != null) ? cur - prev : null;
-    var chgStr = '—', chgCls = '';
-    if(chg != null){
-      chgStr = (chg >= 0 ? '+' : '') + fN(chg, 3);
-      chgCls = chg > 0.001 ? 'color:var(--green);' : chg < -0.001 ? 'color:var(--red);' : '';
-    }
-    h += '<tr' + (i % 2 ? ' class="row-alt"' : '') + '>';
-    h += '<td style="font-size:15px;font-weight:700;">' + r.crop + '</td>';
-    h += '<td class="latest">' + fN(cur, 3) + '</td>';
-    h += '<td>' + (prev != null ? fN(prev, 3) : '—') + '</td>';
-    h += '<td style="' + chgCls + 'font-weight:700;">' + chgStr + '</td>';
-    h += '</tr>';
-  });
-  h += '</tbody></table></div>';
-  document.getElementById('rpt-stocks-tbl').innerHTML = h;
-}
-
-function renderRptAcreage(){
-  var acre = _nassData.acreage || {};
-  function fN(v,d){ if(v==null) return '—'; return v.toFixed(d!==undefined?d:1).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
-  var crops = ['CORN','SOYBEANS','WHEAT','COTTON','BARLEY','OATS'];
-  var rows = [];
-  var latestYear = 0;
-  crops.forEach(function(crop){
-    var data = acre[crop] || [];
-    if(!data.length) return;
-    var latest = data[data.length - 1];
-    if(latest.year > latestYear) latestYear = latest.year;
-    var prev = data.filter(function(d){ return d.year === latest.year - 1; });
-    var prevVal = prev.length ? prev[prev.length - 1].mil_acres : null;
-    rows.push({crop: crop.charAt(0) + crop.slice(1).toLowerCase(), cur: latest.mil_acres, prev: prevVal, year: latest.year, ref: latest.ref_period});
-  });
-  if(!rows.length){ document.getElementById('rpt-acre-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No acreage data</td></tr></tbody>'; return; }
-  var stampEl = document.getElementById('rpt-acre-stamp');
-  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], latestYear + ' Prospective Plantings');
-  var h = '';
-  h += '<div class="panel" style="margin-bottom:18px;">';
-  h += '<div class="panel-hdr"><div class="panel-title">U.S. Planted Acreage</div>';
-  h += '<div class="panel-sub" style="font-size:13px;color:var(--text3);">Million Acres</div></div>';
-  h += '<table class="bal-table" style="table-layout:auto;">';
-  h += '<thead><tr><th style="width:140px;"></th>';
-  h += '<th class="latest" style="width:120px;">' + latestYear + '</th>';
-  h += '<th style="width:120px;">' + (latestYear - 1) + '</th>';
-  h += '<th style="width:100px;">Change</th>';
-  h += '</tr></thead><tbody>';
-  rows.forEach(function(r, i){
-    var chg = (r.cur != null && r.prev != null) ? r.cur - r.prev : null;
-    var chgStr = '—', chgCls = '';
-    if(chg != null){
-      chgStr = (chg >= 0 ? '+' : '') + fN(chg, 1);
-      chgCls = chg > 0.05 ? 'color:var(--green);' : chg < -0.05 ? 'color:var(--red);' : '';
-    }
-    h += '<tr' + (i % 2 ? ' class="row-alt"' : '') + '>';
-    h += '<td style="font-size:15px;font-weight:700;">' + r.crop + '</td>';
-    h += '<td class="latest">' + fN(r.cur, 1) + '</td>';
-    h += '<td>' + (r.prev != null ? fN(r.prev, 1) : '—') + '</td>';
-    h += '<td style="' + chgCls + 'font-weight:700;">' + chgStr + '</td>';
-    h += '</tr>';
-  });
-  h += '</tbody></table></div>';
-  document.getElementById('rpt-acre-tbl').innerHTML = h;
-}
-
-function renderRptCattle(){
-  var cattle = (_nassData && _nassData.cattle) || [];
-  if(!cattle.length){ document.getElementById('rpt-cattle-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No cattle data available</td></tr></tbody>'; return; }
-  var latest = cattle[cattle.length-1];
-  var stampEl = document.getElementById('rpt-cattle-stamp');
-  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], latest.ref_period + ' ' + latest.year);
-  var h = '<thead><tr><th style="text-align:left;">Period</th><th>Category</th><th style="color:var(--amber);">Thou. Head</th><th>Year</th></tr></thead><tbody>';
-  var ri = 0;
-  cattle.slice(-20).reverse().forEach(function(r){
-    h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
-    h += '<td style="text-align:left;font-size:13px;">' + r.ref_period + '</td>';
-    h += '<td style="font-size:13px;font-weight:700;color:var(--text2);">' + r.category + '</td>';
-    h += '<td class="latest">' + (r.thou_head ? r.thou_head.toLocaleString() : '—') + '</td>';
-    h += '<td style="font-size:13px;">' + r.year + '</td>';
-    h += '</tr>';
-    ri++;
-  });
-  h += '</tbody>';
-  document.getElementById('rpt-cattle-tbl').innerHTML = h;
-}
-
-function renderRptHogs(){
-  var hogs = (_nassData && _nassData.hogs) || [];
-  if(!hogs.length){ document.getElementById('rpt-hogs-tbl').innerHTML = '<tbody><tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">No hogs data available</td></tr></tbody>'; return; }
-  var latest = hogs[hogs.length-1];
-  var stampEl = document.getElementById('rpt-hogs-stamp');
-  if(stampEl) stampEl.innerHTML = freshStamp('USDA NASS', _pipelineDates['NASS'], latest.ref_period + ' ' + latest.year);
-  var h = '<thead><tr><th style="text-align:left;">Period</th><th>Class</th><th style="color:var(--amber);">Thou. Head</th><th>Year</th></tr></thead><tbody>';
-  var ri = 0;
-  hogs.slice(-20).reverse().forEach(function(r){
-    h += '<tr' + (ri % 2 ? ' class="row-alt"' : '') + '>';
-    h += '<td style="text-align:left;font-size:13px;">' + r.ref_period + '</td>';
-    h += '<td style="font-size:13px;font-weight:700;color:var(--text2);">' + (r['class'] || '') + '</td>';
-    h += '<td class="latest">' + (r.thou_head ? r.thou_head.toLocaleString() : '—') + '</td>';
-    h += '<td style="font-size:13px;">' + r.year + '</td>';
-    h += '</tr>';
-    ri++;
-  });
-  h += '</tbody>';
-  document.getElementById('rpt-hogs-tbl').innerHTML = h;
-}
-
-function renderRptWasde(){
-  var el = document.getElementById('rpt-wasde-content');
-  if(!PSD){
-    el.innerHTML = '<div style="padding:40px 0;text-align:center;"><div style="font-size:16px;font-weight:900;color:var(--amber);letter-spacing:.12em;">LOADING S&D DATA...</div></div>';
-    return;
-  }
-  var BU_PER_MT = {Corn:39.368, Soybeans:36.744, Wheat:36.744};
-  function toMMT(v){ return v ? v/1000 : null; }
-  function toMilBu(v,comm){ return v && BU_PER_MT[comm] ? v * BU_PER_MT[comm] / 1000 : null; }
-  function fN(v,dec){
-    if(v==null || v===0) return '—';
-    if(dec===0) return Math.round(v).toLocaleString();
-    return v.toFixed(dec!==undefined?dec:1).replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  }
-  function getYears(comm, country){
-    var cd = PSD[comm] && PSD[comm][country];
-    if(!cd) return [null,null];
-    var yrs = Object.keys(cd).sort();
-    return [yrs[yrs.length-1]||null, yrs[yrs.length-2]||null];
-  }
-  function getVal(comm, country, yr, attr){
-    if(!yr || !PSD[comm] || !PSD[comm][country] || !PSD[comm][country][yr]) return null;
-    return PSD[comm][country][yr][attr] || null;
-  }
-  var refYrs = getYears('Corn','United States');
-  var cy = refYrs[0], py = refYrs[1];
-  if(!cy){ el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data available</div>'; return; }
-  var prevWasde = PSD._prev_wasde || {};
-  var hasPrevWasde = Object.keys(prevWasde).length > 0;
-  function getPrevWasde(comm, country, yr, attr){
-    var key = comm+'|'+country+'|'+yr+'|'+attr;
-    return prevWasde[key] || null;
-  }
-  function buildCombinedTable(catTitle, groups){
-    // groups: [{title, unit, rows, convertFn, dec}]
-    var h = '<div style="margin-bottom:28px;">';
-    h += '<div style="font-size:16px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);padding:20px 0 10px;border-bottom:3px solid var(--amber);margin-bottom:0;">'+catTitle+'</div>';
-    h += '<table class="bal-table" style="table-layout:auto;border-top:none;">';
-    h += '<thead><tr><th style="width:160px;"></th>';
-    h += '<th class="latest" style="width:110px;">'+cy+'</th>';
-    if(hasPrevWasde){
-    h += '<th style="width:100px;color:var(--text3);font-size:12px;">Prev WASDE</th>';
-    h += '<th style="width:70px;font-size:12px;">MoM</th>';
-    }
-    h += '<th style="width:110px;">'+(py||'')+'</th>';
-    h += '<th style="width:80px;">YoY Δ</th>';
-    h += '</tr></thead><tbody>';
-    var rowIdx = 0;
-    groups.forEach(function(g){
-      // Sub-section header row
-      h += '<tr><td colspan="'+(hasPrevWasde?6:4)+'" style="background:var(--section-bg);color:var(--text3);font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:7px 10px;border-top:2px solid var(--border2);">'+g.title;
-      if(g.unit) h += ' <span style="font-weight:600;letter-spacing:.04em;font-style:italic;margin-left:8px;">'+g.unit+'</span>';
-      h += '</td></tr>';
-      g.rows.forEach(function(r){
-        var curRaw = getVal(r.comm, r.country, cy, r.attr);
-        var prevRaw = getVal(r.comm, r.country, py, r.attr);
-        var prevWRaw = getPrevWasde(r.comm, r.country, cy, r.attr);
-        var cur = g.convertFn(curRaw, r.comm);
-        var prev = g.convertFn(prevRaw, r.comm);
-        var prevW = g.convertFn(prevWRaw, r.comm);
-        var chg = (cur!=null && prev!=null) ? cur - prev : null;
-        var momChg = (cur!=null && prevW!=null) ? cur - prevW : null;
-        var chgStr = '—', chgCls = '';
-        if(chg!=null){
-          chgStr = (chg >= 0 ? '+' : '') + fN(chg, g.dec);
-          chgCls = chg > 0.05 ? 'color:var(--green);' : chg < -0.05 ? 'color:var(--red);' : '';
-        }
-        var momStr = '—', momCls = '';
-        if(momChg!=null && Math.abs(momChg) > 0.01){
-          momStr = (momChg >= 0 ? '+' : '') + fN(momChg, g.dec);
-          momCls = momChg > 0.05 ? 'color:var(--green);' : momChg < -0.05 ? 'color:var(--red);' : '';
-        }
-        var alt = rowIdx%2 ? ' class="row-alt"' : '';
-        h += '<tr'+alt+'>';
-        h += '<td style="font-size:15px;font-weight:700;">'+r.label+'</td>';
-        h += '<td class="latest">'+fN(cur, g.dec)+'</td>';
-        if(hasPrevWasde){
-          h += '<td style="color:var(--text3);">'+fN(prevW, g.dec)+'</td>';
-          h += '<td style="'+momCls+'font-weight:700;font-size:13px;">'+momStr+'</td>';
-        }
-        h += '<td>'+fN(prev, g.dec)+'</td>';
-        h += '<td style="'+chgCls+'font-weight:700;">'+chgStr+'</td>';
-        h += '</tr>';
-        rowIdx++;
-      });
-    });
-    h += '</tbody></table></div>';
-    return h;
-  }
-  var h = '';
-  h += freshStamp('USDA PSD', _pipelineDates['USDA PSD'], cy + ' WASDE');
-
-  h += buildCombinedTable('ENDING STOCKS', [
-    {title:'U.S. Ending Stocks', unit:'Million Bushels', rows:[
-      {comm:'Corn',country:'United States',attr:'Ending Stocks',label:'Corn'},
-      {comm:'Soybeans',country:'United States',attr:'Ending Stocks',label:'Soybeans'},
-      {comm:'Wheat',country:'United States',attr:'Ending Stocks',label:'Wheat'},
-    ], convertFn:toMilBu, dec:0},
-    {title:'World Ending Stocks', unit:'MMT', rows:[
-      {comm:'Corn',country:'World',attr:'Ending Stocks',label:'Corn'},
-      {comm:'Soybeans',country:'World',attr:'Ending Stocks',label:'Soybeans'},
-      {comm:'Wheat',country:'World',attr:'Ending Stocks',label:'Wheat'},
-    ], convertFn:toMMT, dec:1},
-  ]);
-
-  h += buildCombinedTable('PRODUCTION', [
-    {title:'U.S. Production', unit:'Million Bushels', rows:[
-      {comm:'Corn',country:'United States',attr:'Production',label:'Corn'},
-      {comm:'Soybeans',country:'United States',attr:'Production',label:'Soybeans'},
-      {comm:'Wheat',country:'United States',attr:'Production',label:'Wheat'},
-    ], convertFn:toMilBu, dec:0},
-    {title:'Brazil', unit:'MMT', rows:[
-      {comm:'Corn',country:'Brazil',attr:'Production',label:'Corn'},
-      {comm:'Soybeans',country:'Brazil',attr:'Production',label:'Soybeans'},
-    ], convertFn:toMMT, dec:1},
-    {title:'Argentina', unit:'MMT', rows:[
-      {comm:'Corn',country:'Argentina',attr:'Production',label:'Corn'},
-      {comm:'Soybeans',country:'Argentina',attr:'Production',label:'Soybeans'},
-    ], convertFn:toMMT, dec:1},
-    {title:'World Production', unit:'MMT', rows:[
-      {comm:'Corn',country:'World',attr:'Production',label:'Corn'},
-      {comm:'Soybeans',country:'World',attr:'Production',label:'Soybeans'},
-      {comm:'Wheat',country:'World',attr:'Production',label:'Wheat'},
-      {comm:'Rapeseed/Canola',country:'World',attr:'Production',label:'Rapeseed/Canola'},
-    ], convertFn:toMMT, dec:1},
-  ]);
-
-  h += buildCombinedTable('KEY EXPORTERS', [
-    {title:'Wheat', unit:'MMT · Production', rows:[
-      {comm:'Wheat',country:'Russia',attr:'Production',label:'Russia'},
-      {comm:'Wheat',country:'European Union',attr:'Production',label:'EU'},
-      {comm:'Wheat',country:'Canada',attr:'Production',label:'Canada'},
-      {comm:'Wheat',country:'Australia',attr:'Production',label:'Australia'},
-      {comm:'Wheat',country:'Ukraine',attr:'Production',label:'Ukraine'},
-    ], convertFn:toMMT, dec:1},
-    {title:'Rapeseed/Canola', unit:'MMT · Production', rows:[
-      {comm:'Rapeseed/Canola',country:'Canada',attr:'Production',label:'Canada'},
-      {comm:'Rapeseed/Canola',country:'European Union',attr:'Production',label:'EU'},
-      {comm:'Rapeseed/Canola',country:'Australia',attr:'Production',label:'Australia'},
-    ], convertFn:toMMT, dec:1},
-  ]);
-  if(!h) h = '<div style="padding:40px;text-align:center;color:var(--text3);">No WASDE data. PSD has: '+Object.keys(PSD).join(', ')+'</div>';
-  el.innerHTML = h;
 }
 
 function renderRptExportsLink(){
@@ -11171,14 +10071,7 @@ function renderRptSD(){
   renderSD();
 }
 
-function renderRptAAFC(){
-  var c = document.getElementById('rpt-aafc-content');
-  var p = document.getElementById('aafc-page-wrap');
-  if(p && c && !c.hasChildNodes()){
-    while(p.firstChild) c.appendChild(p.firstChild);
-  }
-  if(!aafcInited) initAafc();
-}
+
 </script>
 
 </body>
