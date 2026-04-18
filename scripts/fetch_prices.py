@@ -23,19 +23,44 @@ SPREADS_FILE = DATA_DIR / "spreads_data.json"
  
 # ---------------------------------------------------------------------------
 # Commodity config: marketing year start month (1=Jan) and unit label
+# Non-agricultural commodities (metals, softs, meats, energy) use Jan-Dec.
+# Grains/oilseeds use their traditional marketing years.
 # ---------------------------------------------------------------------------
 SYMBOLS = {
-    'ZC': {'name':'Corn',         'unit':'¢/bu',     'exchange':'CBOT', 'my_start':9,  'my':'Sep–Aug', 'ticker':'ZC=F'},
-    'ZW': {'name':'Wheat SRW',    'unit':'¢/bu',     'exchange':'CBOT', 'my_start':6,  'my':'Jun–May', 'ticker':'ZW=F'},
-    'KE': {'name':'Wheat HRW',    'unit':'¢/bu',     'exchange':'KCBT', 'my_start':6,  'my':'Jun–May', 'ticker':'KE=F'},
-    'ZS': {'name':'Soybeans',     'unit':'¢/bu',     'exchange':'CBOT', 'my_start':9,  'my':'Sep–Aug', 'ticker':'ZS=F'},
-    'ZM': {'name':'Soybean Meal', 'unit':'$/ton',    'exchange':'CBOT', 'my_start':10, 'my':'Oct–Sep', 'ticker':'ZM=F'},
-    'ZL': {'name':'Soybean Oil',  'unit':'¢/lb',     'exchange':'CBOT', 'my_start':10, 'my':'Oct–Sep', 'ticker':'ZL=F'},
-    'RS': {'name':'Canola',       'unit':'C$/MT',    'exchange':'ICE',  'my_start':8,  'my':'Aug–Jul', 'ticker':'RS=F'},
-    'CL': {'name':'WTI Crude',    'unit':'$/bbl',    'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'CL=F'},
-    'HO': {'name':'Heating Oil',  'unit':'¢/gal',    'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'HO=F'},
-    'RB': {'name':'RBOB Gasoline','unit':'¢/gal',    'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'RB=F'},
-    'NG': {'name':'Natural Gas',  'unit':'$/MMBtu',  'exchange':'NYMEX','my_start':4,  'my':'Apr–Mar', 'ticker':'NG=F'},
+    # Grains & Oilseeds
+    'ZC': {'name':'Corn',          'unit':'¢/bu',     'exchange':'CBOT', 'my_start':9,  'my':'Sep–Aug', 'ticker':'ZC=F'},
+    'ZW': {'name':'Wheat SRW',     'unit':'¢/bu',     'exchange':'CBOT', 'my_start':6,  'my':'Jun–May', 'ticker':'ZW=F'},
+    'KE': {'name':'Wheat HRW',     'unit':'¢/bu',     'exchange':'KCBT', 'my_start':6,  'my':'Jun–May', 'ticker':'KE=F'},
+    'MW': {'name':'Wheat HRS',     'unit':'¢/bu',     'exchange':'MGEX', 'my_start':6,  'my':'Jun–May', 'ticker':'MW=F'},
+    'ZO': {'name':'Oats',          'unit':'¢/bu',     'exchange':'CBOT', 'my_start':7,  'my':'Jul–Jun', 'ticker':'ZO=F'},
+    'ZS': {'name':'Soybeans',      'unit':'¢/bu',     'exchange':'CBOT', 'my_start':9,  'my':'Sep–Aug', 'ticker':'ZS=F'},
+    'ZM': {'name':'Soybean Meal',  'unit':'$/ton',    'exchange':'CBOT', 'my_start':10, 'my':'Oct–Sep', 'ticker':'ZM=F'},
+    'ZL': {'name':'Soybean Oil',   'unit':'¢/lb',     'exchange':'CBOT', 'my_start':10, 'my':'Oct–Sep', 'ticker':'ZL=F'},
+    'RS': {'name':'Canola',        'unit':'C$/MT',    'exchange':'ICE',  'my_start':8,  'my':'Aug–Jul', 'ticker':'RS=F'},
+ 
+    # Energy
+    'CL': {'name':'WTI Crude',     'unit':'$/bbl',    'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'CL=F'},
+    'HO': {'name':'Heating Oil',   'unit':'¢/gal',    'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'HO=F'},
+    'RB': {'name':'RBOB Gasoline', 'unit':'¢/gal',    'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'RB=F'},
+    'NG': {'name':'Natural Gas',   'unit':'$/MMBtu',  'exchange':'NYMEX','my_start':4,  'my':'Apr–Mar', 'ticker':'NG=F'},
+ 
+    # Softs
+    'CT': {'name':'Cotton',        'unit':'¢/lb',     'exchange':'ICE',  'my_start':8,  'my':'Aug–Jul', 'ticker':'CT=F'},
+    'CC': {'name':'Cocoa',         'unit':'$/MT',     'exchange':'ICE',  'my_start':10, 'my':'Oct–Sep', 'ticker':'CC=F'},
+    'SB': {'name':'Sugar #11',     'unit':'¢/lb',     'exchange':'ICE',  'my_start':10, 'my':'Oct–Sep', 'ticker':'SB=F'},
+    'KC': {'name':'Coffee',        'unit':'¢/lb',     'exchange':'ICE',  'my_start':10, 'my':'Oct–Sep', 'ticker':'KC=F'},
+ 
+    # Livestock
+    'LH': {'name':'Lean Hogs',     'unit':'¢/lb',     'exchange':'CME',  'my_start':1,  'my':'Jan–Dec', 'ticker':'HE=F'},
+    'LC': {'name':'Live Cattle',   'unit':'¢/lb',     'exchange':'CME',  'my_start':1,  'my':'Jan–Dec', 'ticker':'LE=F'},
+    'FC': {'name':'Feeder Cattle', 'unit':'¢/lb',     'exchange':'CME',  'my_start':1,  'my':'Jan–Dec', 'ticker':'GF=F'},
+ 
+    # Metals
+    'GC': {'name':'Gold',          'unit':'$/oz',     'exchange':'COMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'GC=F'},
+    'SI': {'name':'Silver',        'unit':'$/oz',     'exchange':'COMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'SI=F'},
+    'HG': {'name':'Copper',        'unit':'$/lb',     'exchange':'COMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'HG=F'},
+    'PL': {'name':'Platinum',      'unit':'$/oz',     'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'PL=F'},
+    'PA': {'name':'Palladium',     'unit':'$/oz',     'exchange':'NYMEX','my_start':1,  'my':'Jan–Dec', 'ticker':'PA=F'},
 }
  
 # Spread-only (not in seasonal charts but needed for spreads_data)
@@ -165,7 +190,7 @@ def update_spreads(raw, spread_data, date_str):
     """Update spreads_data.json with latest prices."""
     if not spread_data:
         return spread_data
-    
+ 
     # Get latest prices
     px = {}
     for sym, cfg in SYMBOLS.items():
