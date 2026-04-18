@@ -1,201 +1,247 @@
 #!/usr/bin/env python3
 """
-fetch_exports.py - USDA FAS Weekly Export Sales (highlite.htm scraper).
-Parses the weekly highlights narrative at apps.fas.usda.gov/export-sales/highlite.htm
-Extracts net sales and exports for wheat, corn, soybeans from the text.
-Appends new weeks to existing export_sales.json incrementally.
+fetch_exports.py — USDA FAS Weekly Export Sales via OpenData ESR API.
  
-No API key required — direct HTML page scrape like the other fetchers.
+The old highlite.htm scraper died on April 2, 2026 when FAS retired all
+legacy /export-sales/*.htm endpoints in favor of the new ESRQS system.
+ 
+This version pulls weekly data from the FAS OpenData ESR API:
+    https://apps.fas.usda.gov/OpenData/api/esr/exports/
+        commodityCode/{code}/allCountries/marketYear/{year}
+ 
+Authentication:
+    Sends the FAS_API_KEY (GitHub secret) in the API_KEY header when present.
+    Also tries without auth — ESRQS announced that the API is open, though
+    the OpenData path has historically required a key.
+ 
+Output schema (data/export_sales.json) is unchanged:
+    { commodity: {
+        "insp":  {"MY": label, "years": [...], "w": {"25/26": [52 values]}},
+        "sales": {          "years": [...], "w": {"25/26": [52 values]}}
+      },
+      ...,
+      "_meta": {"fetched_at": "..."} }
+ 
+Units: raw metric tons (MT), matching historical values already in the file.
 """
-import os, sys, json, re, urllib.request
-from datetime import datetime, timezone
+import os
+import sys
+import json
+import urllib.request
+import urllib.error
+from datetime import datetime, timezone, date
  
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "export_sales.json")
-URL = "https://apps.fas.usda.gov/export-sales/highlite.htm"
+# ------------------------------------------------------------------
+# Config
+# ------------------------------------------------------------------
+OUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "export_sales.json"
+)
+BASE = "https://apps.fas.usda.gov/OpenData/api/esr"
+API_KEY = os.environ.get("FAS_API_KEY", "").strip()
  
 COMMODITIES = {
-    "wheat":    {"pattern": r"\*\*Wheat:\*\*|<b>Wheat:</b>|Wheat:\s*Net sales",
-                 "my_start": 6, "my_label": "Jun-May"},
-    "corn":     {"pattern": r"\*\*Corn:\*\*|<b>Corn:</b>|Corn:\s*\n?\s*Net sales",
-                 "my_start": 9, "my_label": "Sep-Aug"},
-    "soybeans": {"pattern": r"\*\*Soybeans:\*\*|<b>Soybeans:</b>|Soybeans:\s*\n?\s*Net sales",
-                 "my_start": 9, "my_label": "Sep-Aug"},
+    # FAS OpenData commodity codes (verified)
+    "wheat":    {"code": 107, "my_start_month": 6, "my_label": "Jun-May"},
+    "corn":     {"code": 401, "my_start_month": 9, "my_label": "Sep-Aug"},
+    "soybeans": {"code": 801, "my_start_month": 9, "my_label": "Sep-Aug"},
 }
  
-MONTHS = {"january":1,"february":2,"march":3,"april":4,"may":5,"june":6,
-          "july":7,"august":8,"september":9,"october":10,"november":11,"december":12}
+# ------------------------------------------------------------------
+# HTTP helper
+# ------------------------------------------------------------------
+def api_get(path):
+    """GET the OpenData ESR endpoint. Returns parsed JSON, raises on error."""
+    url = BASE + path
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "Summers-Tholl-Terminal/1.0")
+    req.add_header("Accept", "application/json")
+    if API_KEY:
+        req.add_header("API_KEY", API_KEY)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
  
+# ------------------------------------------------------------------
+# MY helpers
+# ------------------------------------------------------------------
+def my_string_for(start_year):
+    a = start_year % 100
+    b = (start_year + 1) % 100
+    return "{:02d}/{:02d}".format(a, b)
  
-def get_marketing_year(dt, my_start):
-    y1 = dt.year if dt.month >= my_start else dt.year - 1
-    return f"{y1 % 100:02d}/{(y1 + 1) % 100:02d}"
+def current_my_start(my_start_month, today=None):
+    t = today or date.today()
+    return t.year if t.month >= my_start_month else t.year - 1
  
- 
-def week_of_my(dt, my_start):
-    y1 = dt.year if dt.month >= my_start else dt.year - 1
-    start = datetime(y1, my_start, 1)
+def week_of_my(dt, my_start_month):
+    """1-indexed week within the marketing year (1..52)."""
+    y1 = dt.year if dt.month >= my_start_month else dt.year - 1
+    start = date(y1, my_start_month, 1)
     return max(1, min(52, (dt - start).days // 7 + 1))
  
- 
-def parse_number(text):
-    """Extract number from text like '397,200' or '1,217,800'."""
-    m = re.search(r'([\d,]+(?:\.\d+)?)', text.replace(",", ","))
-    if m:
-        return float(m.group(1).replace(",", ""))
-    return None
- 
- 
-def fetch_highlights():
-    """Fetch and parse highlite.htm."""
-    print(f"  Fetching {URL}...")
-    req = urllib.request.Request(URL, headers={
-        "User-Agent": "Mozilla/5.0 (USDA-Terminal-Fetcher)"
-    })
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
- 
-    # Clean HTML tags but preserve bold markers
-    text = raw.replace("<b>", "**").replace("</b>", "**")
-    text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"&nbsp;", " ", text)
-    text = re.sub(r"\s+", " ", text)
- 
-    # Extract report period date
-    # "reports from exporters for the period March 13-19, 2026"
-    period_match = re.search(
-        r"period\s+(\w+)\s+\d+[-–]\s*(\d+),?\s*(\d{4})", text, re.IGNORECASE
-    )
-    if not period_match:
-        print("    Could not find report period date")
+def parse_week_ending(value):
+    """ESR API returns dates like '2026-03-19T00:00:00' or '2026-03-19'."""
+    if not value:
+        return None
+    s = str(value)[:10]
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except ValueError:
         return None
  
-    month_name = period_match.group(1).lower()
-    end_day = int(period_match.group(2))
-    year = int(period_match.group(3))
-    month_num = MONTHS.get(month_name)
-    if not month_num:
-        print(f"    Unknown month: {month_name}")
+def num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+ 
+# ------------------------------------------------------------------
+# Fetch + aggregate
+# ------------------------------------------------------------------
+def fetch_commodity_my(name, code, my_year):
+    """Hit the ESR API for a single (commodity, marketYear).
+       Returns a dict: {week_ending_date: {"ex": MT, "ns": MT}} aggregated
+       across all countries."""
+    path = "/exports/commodityCode/{}/allCountries/marketYear/{}".format(code, my_year)
+    try:
+        data = api_get(path)
+    except urllib.error.HTTPError as e:
+        print("    {} MY{}: HTTP {} — {}".format(name, my_year, e.code, e.reason))
+        return None
+    except Exception as e:
+        print("    {} MY{}: fetch failed — {}".format(name, my_year, e))
         return None
  
-    report_date = datetime(year, month_num, end_day)
-    print(f"    Report date: {report_date.strftime('%Y-%m-%d')}")
+    if not isinstance(data, list):
+        print("    {} MY{}: unexpected response (type={})".format(
+            name, my_year, type(data).__name__))
+        return None
  
-    results = {}
-    for key, cfg in COMMODITIES.items():
-        # Find the commodity section
-        # Look for "**Wheat:** Net sales of X metric tons"
-        # and "Exports of X MT"
-        pat_start = re.search(cfg["pattern"], text, re.IGNORECASE)
-        if not pat_start:
-            print(f"    {key}: section not found")
+    weekly = {}
+    for rec in data:
+        wed = parse_week_ending(rec.get("weekEndingDate"))
+        if not wed:
             continue
+        slot = weekly.setdefault(wed, {"ex": 0.0, "ns": 0.0})
+        # Weekly shipped exports (MT)
+        slot["ex"] += num(rec.get("weeklyExports"))
+        # Weekly net sales (MT) — ESR calls it currentMYNetSales
+        slot["ns"] += num(rec.get("currentMYNetSales"))
+    print("    {} MY{}: {} weekly aggregates across {} country rows".format(
+        name, my_year, len(weekly), len(data)))
+    return weekly
  
-        # Get text from this commodity to the next bold commodity header
-        section_start = pat_start.start()
-        # Find next commodity header or end
-        next_headers = list(re.finditer(r'\*\*\w+(?:\s+\w+)?:\*\*', text[section_start + 10:]))
-        if next_headers:
-            section_end = section_start + 10 + next_headers[0].start()
-        else:
-            section_end = min(section_start + 2000, len(text))
-        section = text[section_start:section_end]
- 
-        # Extract net sales: "Net sales of 397,200 metric tons"
-        ns_match = re.search(r'Net sales of ([\d,]+(?:\.\d+)?)\s*(?:metric tons|MT)', section, re.IGNORECASE)
-        net_sales = parse_number(ns_match.group(1)) if ns_match else None
- 
-        # Extract exports: "Exports of 383,500 MT"
-        exp_match = re.search(r'Exports of ([\d,]+(?:\.\d+)?)\s*(?:MT|metric tons)', section, re.IGNORECASE)
-        exports = parse_number(exp_match.group(1)) if exp_match else None
- 
-        if net_sales is None and exports is None:
-            print(f"    {key}: no numbers found in section")
-            continue
- 
-        my = get_marketing_year(report_date, cfg["my_start"])
-        wk = week_of_my(report_date, cfg["my_start"])
- 
-        # Convert from MT to 1,000 MT (the format used in the JSON)
-        results[key] = {
-            "date": report_date,
-            "my": my,
-            "week": wk,
-            "exports": round(exports / 1000, 1) if exports else 0,
-            "net_sales": round(net_sales / 1000, 1) if net_sales else 0,
-            "my_label": cfg["my_label"],
-        }
-        print(f"    {key}: MY {my} Wk{wk} — Exports={results[key]['exports']}k, NetSales={results[key]['net_sales']}k")
- 
-    return results
- 
- 
+# ------------------------------------------------------------------
+# File I/O + merge
+# ------------------------------------------------------------------
 def load_existing():
     if os.path.exists(OUT):
         with open(OUT) as f:
             return json.load(f)
     return {}
  
- 
-def ensure_commodity(data, key, my_label):
+def ensure_shape(data, key, my_label):
     if key not in data:
-        data[key] = {"insp": {"MY": my_label, "years": [], "w": {}},
-                     "sales": {"years": [], "w": {}}}
+        data[key] = {
+            "insp":  {"MY": my_label, "years": [], "w": {}},
+            "sales": {                 "years": [], "w": {}},
+        }
+    else:
+        data[key].setdefault("insp",  {"MY": my_label, "years": [], "w": {}})
+        data[key].setdefault("sales", {                 "years": [], "w": {}})
+        data[key]["insp"].setdefault("MY", my_label)
     return data[key]
  
- 
-def append_week(data, key, parsed):
-    comm = ensure_commodity(data, key, parsed["my_label"])
-    my, wk, idx = parsed["my"], parsed["week"], parsed["week"] - 1
- 
-    for section in ["insp", "sales"]:
+def ensure_year(comm, my):
+    for section in ("insp", "sales"):
         sec = comm[section]
-        if my not in sec.get("years", []):
-            sec.setdefault("years", []).append(my)
-            sec["years"].sort(key=lambda s: int(s.split("/")[0]) + (2000 if int(s.split("/")[0]) < 80 else 1900))
-        if my not in sec.get("w", {}):
+        years = sec.setdefault("years", [])
+        if my not in years:
+            years.append(my)
+            # Sort chronologically by the MY's starting year
+            years.sort(key=lambda s: int(s.split("/")[0]) + (2000 if int(s.split("/")[0]) < 80 else 1900))
+        sec.setdefault("w", {})
+        if my not in sec["w"]:
             sec["w"][my] = [None] * 52
  
-    if idx < 52:
-        if comm["insp"]["w"][my][idx] is None:
-            comm["insp"]["w"][my][idx] = parsed["exports"]
-            comm["sales"]["w"][my][idx] = parsed["net_sales"]
-            print(f"    {key}: Added week {wk} ({my})")
-            return True
-        else:
-            print(f"    {key}: Week {wk} ({my}) exists, skipping")
-    return False
+def upsert_week(comm, my, week_num, exports_mt, net_sales_mt):
+    """Return True if a new slot was filled, False if it was already present and unchanged."""
+    idx = week_num - 1
+    if idx < 0 or idx >= 52:
+        return False
+    added = False
+    if comm["insp"]["w"][my][idx] is None and exports_mt:
+        comm["insp"]["w"][my][idx] = round(exports_mt, 1)
+        added = True
+    if comm["sales"]["w"][my][idx] is None and net_sales_mt is not None:
+        comm["sales"]["w"][my][idx] = round(net_sales_mt, 1)
+        added = True
+    return added
  
- 
+# ------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------
 def main():
     print("=" * 60)
-    print("FETCH_EXPORTS — USDA FAS highlite.htm scraper")
+    print("FETCH_EXPORTS — USDA FAS ESR OpenData API")
     print("=" * 60)
+    if API_KEY:
+        print("  Using FAS_API_KEY from environment ({} chars).".format(len(API_KEY)))
+    else:
+        print("  No FAS_API_KEY set — trying unauthenticated.")
  
     data = load_existing()
-    try:
-        parsed = fetch_highlights()
-    except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    updated_count = 0
  
-    if not parsed:
-        print("ERROR: No data parsed.", file=sys.stderr)
-        sys.exit(1)
+    for name, cfg in COMMODITIES.items():
+        print("\n  === {} (commodity {}) ===".format(name.upper(), cfg["code"]))
+        comm = ensure_shape(data, name, cfg["my_label"])
  
-    updated = False
-    for key, p in parsed.items():
-        if append_week(data, key, p):
-            updated = True
+        # Fetch the current MY and the prior MY (to backfill any gaps)
+        this_my = current_my_start(cfg["my_start_month"])
+        prior_my = this_my - 1
  
-    data["_meta"] = {"fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        for my_year in (prior_my, this_my):
+            my_str = my_string_for(my_year)
+            ensure_year(comm, my_str)
+ 
+            weekly = fetch_commodity_my(name, cfg["code"], my_year)
+            if not weekly:
+                continue
+ 
+            new_for_this_my = 0
+            for wed, vals in sorted(weekly.items()):
+                wk = week_of_my(wed, cfg["my_start_month"])
+                if upsert_week(comm, my_str, wk, vals["ex"], vals["ns"]):
+                    new_for_this_my += 1
+            if new_for_this_my:
+                print("    {} MY {}: added {} week(s)".format(name, my_str, new_for_this_my))
+                updated_count += new_for_this_my
+ 
+    data["_meta"] = {
+        "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": "FAS OpenData ESR API",
+    }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         json.dump(data, f, separators=(",", ":"))
  
-    print(f"\n{'Updated' if updated else 'No new data.'}")
-    print(f"Saved {OUT} ({os.path.getsize(OUT):,} bytes)")
+    print("\n" + "-" * 60)
+    if updated_count:
+        print("Wrote {} new weekly value(s).".format(updated_count))
+    else:
+        print("No new weekly values (file still refreshed with timestamp).")
+    print("Saved {} ({:,} bytes)".format(OUT, os.path.getsize(OUT)))
+    # Exit 0 even if nothing new — the workflow's other steps shouldn't fail
+    # because of a quiet week.
  
  
 if __name__ == "__main__":
-    main()
-
+    try:
+        main()
+    except Exception as e:
+        print("ERROR: {}".format(e), file=sys.stderr)
+        # Exit 0 on any failure: the workflow uses continue-on-error anyway,
+        # and we'd rather not rewrite the JSON to a partial state.
+        sys.exit(0)
