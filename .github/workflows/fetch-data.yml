@@ -18,12 +18,6 @@ jobs:
         with:
           python-version: '3.11'
  
-      - name: Run NASS fetch
-        env:
-          NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
-        run: python scripts/fetch_nass.py
-        continue-on-error: true
- 
       - name: Run PSD fetch
         run: python scripts/fetch_psd.py
         continue-on-error: true
@@ -38,10 +32,6 @@ jobs:
  
       - name: Run CGC GSW fetch
         run: python scripts/fetch_cgc.py
-        continue-on-error: true
- 
-      - name: Run StatsCan S&D fetch
-        run: python scripts/fetch_statscan.py
         continue-on-error: true
  
       - name: Run Prices fetch
