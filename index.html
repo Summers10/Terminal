@@ -171,7 +171,6 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     <button class="sd-nav-hdr active" data-comm="Grains" onclick="setSdComm(this)">GRAINS</button>
     <button class="sd-nav-btn" data-comm="Wheat" onclick="setSdComm(this)">Wheat</button>
     <button class="sd-nav-btn" data-comm="Corn" onclick="setSdComm(this)">Corn</button>
-    <button class="sd-nav-btn" data-comm="WheatByClass" onclick="setSdComm(this)">Wheat by Class</button>
     <button class="sd-nav-hdr" data-comm="Oilseeds" onclick="setSdComm(this)">OILSEEDS</button>
     <button class="sd-nav-btn" data-comm="Soybeans" onclick="setSdComm(this)">Soybeans</button>
     <button class="sd-nav-btn" data-comm="Rapeseed/Canola" onclick="setSdComm(this)">Canola</button>
@@ -1065,16 +1064,7 @@ function buildPSD(){if(!_PSD_RAW)return;var o={};for(var c in _PSD_RAW){o[c]={};
   console.log('GSW loaded from pipeline:',Object.keys(d).join(', '));showDataFreshness('gsw-freshness',d._meta&&d._meta.fetched_at,'CGC GSW');
 }).catch(function(e){console.warn('GSW fetch failed:',e.message);});})();
 
-// Load AAFC data from StatsCan pipeline (historical actuals, fully automated)
-(function(){fetch('data/statscan_sd.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
-  AAFC_DATA=d;
-  console.log('AAFC loaded from StatsCan:',Object.keys(d.crops||{}).join(', '));showDataFreshness('statscan-freshness',d._meta&&d._meta.fetched_at,'STATSCAN');
-}).catch(function(e){
-  // Fallback: try aafc_forecasts.json if available
-  fetch('data/aafc_forecasts.json').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(d){
-    AAFC_DATA=d; console.log('AAFC loaded from forecasts JSON');
-  }).catch(function(){console.warn('AAFC: no data available');});
-});})();
+// StatsCan / AAFC fetches removed — orphaned page, no UI entry point
 
 const _COT_KEYS = ["date","oi","pm_net","pm_l","pm_s","mm_net","mm_l","mm_s"];
 let _COT_RAW = {};
@@ -1875,32 +1865,7 @@ if(tab==='carry' && !carryInited){initCarry();}
 const _WBC_MAP={bs:"Beginning stocks",im:"Import",pr:"Production",su:"Supply",fu:"Food use",so:"Seed & other",fw:"Feed waste",dt:"Domestic total",ex:"Export",td:"Total demand",es:"Ending stocks"};
 const _WBC_RAW={};
 const WHEAT_BY_CLASS=(function(){const o={};for(const[yr,classes]of Object.entries(_WBC_RAW)){o[yr]={};for(const[cls,m]of Object.entries(classes)){o[yr][cls]={};for(const[k,v]of Object.entries(m))o[yr][cls][_WBC_MAP[k]||k]=v;}}return o})();
-// Merge live NASS wheat_by_class data over the hardcoded blob on load
-(function(){
-  fetch('data/nass_reports.json?v=' + Date.now())
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if(!d || !d.wheat_by_class) return;
-      var wbc = d.wheat_by_class;
-      // NASS returns internal keys (bs, pr, im, su, Food, Seed, Residual, Domestic, Exports, Total use, es)
-      // Map them to display keys via _WBC_MAP, same as the static blob
-      Object.keys(wbc).forEach(function(yr){
-        WHEAT_BY_CLASS[yr] = WHEAT_BY_CLASS[yr] || {};
-        Object.keys(wbc[yr]).forEach(function(cls){
-          WHEAT_BY_CLASS[yr][cls] = WHEAT_BY_CLASS[yr][cls] || {};
-          Object.keys(wbc[yr][cls]).forEach(function(k){
-            var displayKey = _WBC_MAP[k] || k;
-            WHEAT_BY_CLASS[yr][cls][displayKey] = wbc[yr][cls][k];
-          });
-        });
-      });
-      // Re-render if currently viewing wheat by class
-      if(typeof currentComm !== 'undefined' && currentComm === 'WheatByClass'){
-        try { renderWheatByClass(); } catch(e){}
-      }
-    })
-    .catch(function(){});
-})();
+// NASS wheat_by_class merge removed — sidebar button removed
 const WBC_CLASSES = ['HRW','HRS','SRW','WW','DUR'];
 const WBC_LABELS = {HRW:'Hard Red Winter',HRS:'Hard Red Spring',SRW:'Soft Red Winter',WW:'White Wheat',DUR:'Durum'};
 const WBC_ROWS = [{type:'section',label:'SUPPLY'},
@@ -10568,34 +10533,22 @@ function renderCarry() {
 var reportsInited = false;
 var _nassData = null;
 var _rptCrop = 'CORN';
-var _rptView = 'conditions';
+var _rptView = 'sd';
 var _rptGEChart = null;
 var _rptPlantChart = null;
 var _rptHarvChart = null;
 
 var RPT_VIEWS = [
-  {id:'energy',     label:'Energy',           section:'BALANCE SHEETS'},
-  {id:'sd',         label:'USDA (S&D)',       section:null},
-  {id:'conditions', label:'Crop Conditions',  section:'WEEKLY REPORTS'},
-  {id:'progress',   label:'Crop Progress',    section:null},
-  {id:'exports',    label:'Export Sales',     section:null},
-  {id:'gsw',        label:'Grain Stats Weekly', section:null},
-  {id:'stocks',     label:'Grain Stocks',     section:'QUARTERLY'},
-  {id:'acreage',    label:'Acreage & Plantings', section:'ANNUAL'},
-
-  {id:'wasde',      label:'WASDE (S&D)',      section:'MONTHLY'}
+  {id:'energy',     label:'Energy',             section:'BALANCE SHEETS'},
+  {id:'sd',         label:'USDA (S&D)',         section:null},
+  {id:'exports',    label:'Export Sales',       section:'WEEKLY REPORTS'},
+  {id:'gsw',        label:'Grain Stats Weekly', section:null}
 ];
 
 function initReports(){
   reportsInited = true;
-  // Always show content immediately (Energy/USDA/AAFC don't need NASS)
+  // Energy / USDA S&D / Export Sales / Grain Stats Weekly — none need NASS
   showRptContent();
-  if(!_nassData){
-    fetch('data/nass_reports.json')
-      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){ _nassData = d; if(_nassData.fetched){ document.getElementById('rpt-asof').textContent = 'Data: ' + _nassData.fetched.slice(0,10); showDataFreshness(null, _nassData.fetched, 'NASS'); } buildRptNav(); })
-      .catch(function(e){ console.warn('NASS data not available:', e.message); });
-  }
 }
 
 function showRptContent(){
