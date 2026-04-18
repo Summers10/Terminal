@@ -3584,7 +3584,20 @@ const canvas = document.getElementById('cot-chart-canvas');
 const oiCv = document.getElementById('cot-oi-canvas'); if(oiCv) oiCv.style.display='';
 const isDark = document.body.classList.contains('dark');
 const rect = canvas.parentElement.getBoundingClientRect();
-const W = (rect.width > 50 ? rect.width : canvas.parentElement.offsetWidth) || 900;
+let W = (rect.width > 50 ? rect.width : canvas.parentElement.offsetWidth) || 900;
+// If we measured a suspiciously small width, schedule a redraw on next frame when layout settles
+if(W < 400 && !canvas._cotRetried){
+  canvas._cotRetried = true;
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ canvas._cotRetried = false; drawCotChart(); }); });
+}
+// Attach a one-time ResizeObserver so the chart redraws when the panel gains/loses space
+if(!canvas._cotRO && typeof ResizeObserver !== 'undefined'){
+  canvas._cotRO = new ResizeObserver(function(){
+    clearTimeout(canvas._cotROTimer);
+    canvas._cotROTimer = setTimeout(function(){ drawCotChart(); }, 80);
+  });
+  canvas._cotRO.observe(canvas.parentElement);
+}
 const PANEL_H = 410;
 const GAP = 26;
 const H = PANEL_H * 2 + GAP;
@@ -3767,7 +3780,7 @@ const barBC = isDark ? 'rgba(91,156,240,0.7)' : 'rgba(58,106,170,0.6)';
 const priceC = isDark ? '#f5a623' : '#D4850A';
 ctx.fillStyle = bg;
 ctx.fillRect(0,0,W,H);
-const PAD = {top:26, right:68, bottom:28, left:14};
+const PAD = {top:26, right:68, bottom:28, left:60};
 const pw = W - PAD.left - PAD.right;
 const ph = H - PAD.top - PAD.bottom;
 const n = rows.length;
@@ -3809,7 +3822,7 @@ ctx.setLineDash([]);
 ctx.fillStyle = isDark ? 'rgba(245,166,35,0.55)' : 'rgba(212,133,10,0.5)'; ctx.font = '700 12px '+CHART_FONT; ctx.textAlign = 'left';
 ctx.fillText('MAX OI', PAD.left+6, pyMax-5);
 let hasPriceOverlay = false;
-const COT_PRICE_SYM = {'Wheat SRW':'ZW','Wheat HRW':'KE','Wheat HRS':null,'Corn':'ZC','Soybeans':'ZS','Soy Oil':'ZL','Soy Meal':'ZM','Canola':'RS','WTI Crude':'CL','RBOB Gas':'RB','ULSD':'HO','Nat Gas':'NG','Cotton':null,'Lean Hogs':null,'Live Cattle':null,'Feeder Cattle':null,'Cocoa':null,'Sugar #11':null,'Coffee':null,'Gold':null,'Silver':null,'Copper':null,'Platinum':null,'Palladium':null,'Oats':null};
+const COT_PRICE_SYM = {'Wheat SRW':'ZW','Wheat HRW':'KE','Wheat HRS':'MW','Corn':'ZC','Oats':'ZO','Soybeans':'ZS','Soy Oil':'ZL','Soy Meal':'ZM','Canola':'RS','WTI Crude':'CL','RBOB Gas':'RB','ULSD':'HO','Nat Gas':'NG','Cotton':'CT','Lean Hogs':'LH','Live Cattle':'LC','Feeder Cattle':'FC','Cocoa':'CC','Sugar #11':'SB','Coffee':'KC','Gold':'GC','Silver':'SI','Copper':'HG','Platinum':'PL','Palladium':'PA'};
 const priceSym = cotChartMarket ? COT_PRICE_SYM[cotChartMarket] : null;
 const priceData = priceSym && typeof SEASONAL_PRICES !== 'undefined' ? SEASONAL_PRICES[priceSym] : null;
 if(priceData && priceData.data){
