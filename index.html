@@ -8297,17 +8297,17 @@ const FRED_SERIES = {
     {id:"DFII10",l:"10Y Real",c:"#6366f1",lim:252}]},
   fed:{title:"FED POLICY RATES",sub:"Fed Funds & SOFR",s:[
     {id:"DFF",l:"Fed Funds",c:"#C4302B",lim:252},{id:"SOFR",l:"SOFR",c:"#D4850A",lim:252}]},
-  credit:{title:"CREDIT SPREADS",sub:"Option-adjusted spread (%)",dual:true,s:[
-    {id:"BAMLH0A0HYM2",l:"HY OAS",c:"#b83838",lim:252,yAxis:'y'},{id:"BAMLC0A4CBBB",l:"BBB OAS",c:"#8b5cf6",lim:252,yAxis:'y1'}]},
+  credit:{title:"CREDIT SPREADS",sub:"HY OAS, BBB OAS, and the HY−IG risk premium (%)",s:[
+    {id:"BAMLH0A0HYM2",l:"HY OAS",c:"#b83838",lim:252},
+    {id:"BAMLC0A4CBBB",l:"BBB OAS",c:"#8b5cf6",lim:252},
+    {id:"HY_IG",l:"HY−IG",c:"#f5a623",lim:252,computed:{from:["BAMLH0A0HYM2","BAMLC0A4CBBB"],op:"subtract"}}]},
   labor:{title:"LABOR MARKET",sub:"Unemployment & claims",dual:true,s:[
     {id:"UNRATE",l:"Unemp %",c:"#5b9cf0",lim:24,yAxis:'y'},{id:"ICSA",l:"Claims",c:"#40c8b0",lim:104,yAxis:'y1'}]},
   cpi:{title:"CPI & PCE INFLATION",sub:"Year-over-year % change",s:[
     {id:"CPIAUCSL",l:"CPI YoY %",c:"#C4302B",lim:60,extra:"&units=pc1"},
     {id:"PCEPI",l:"PCE YoY %",c:"#8b5cf6",lim:60,extra:"&units=pc1"}]},
-  liquidity:{title:"M2 MONEY SUPPLY",sub:"Year-over-year % change",s:[
-    {id:"M2SL",l:"M2 YoY %",c:"#5b9cf0",lim:60,extra:"&units=pc1"}]},
-  fedbs:{title:"FED BALANCE SHEET",sub:"Year-over-year % change",s:[
-    {id:"WALCL",l:"Fed B/S YoY %",c:"#D4850A",lim:104,extra:"&units=pc1"}]},
+  liquidity:{title:"LIQUIDITY & FED BALANCE SHEET",sub:"Trillions USD",dual:true,s:[
+    {id:"M2SL",l:"M2",c:"#5b9cf0",lim:60,yAxis:'y'},{id:"WALCL",l:"Fed B/S",c:"#D4850A",lim:104,yAxis:'y1'}]},
   ism:{title:"INDUSTRIAL PRODUCTION",sub:"Manufacturing index · monthly",s:[
     {id:"INDPRO",l:"Ind. Prod.",c:"#40c8b0",lim:60}]}
 };
@@ -8523,22 +8523,24 @@ async function refreshFred() {
   if (st) { st.textContent = 'Loading FRED data...'; st.style.color = 'var(--text3)'; }
   var allSeries = [];
   Object.values(FRED_SERIES).forEach(function(grp) { grp.s.forEach(function(s) { allSeries.push(s); }); });
+  var fetchSeries = allSeries.filter(function(s){ return !s.computed; });
   // Try pipeline JSON first (avoids CORS)
   try {
     var resp = await fetch('data/fred_data.json');
     if (resp.ok) {
       var jsonData = await resp.json();
       var ok = 0;
-      allSeries.forEach(function(s) {
+      fetchSeries.forEach(function(s) {
         if (jsonData[s.id] && jsonData[s.id].length) { fredData[s.id] = jsonData[s.id]; ok++; updateFredMetric(s); }
       });
       if (ok > 0) {
+        computeDerivedSeries();
         console.log('FRED loaded from pipeline JSON:', ok, 'series');
         if(jsonData._meta && jsonData._meta.fetched_at) showDataFreshness(null, jsonData._meta.fetched_at, 'FRED');
         updateFredCharts();
         setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
         if (lb) lb.style.display = 'none';
-        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, ok + '/' + allSeries.length + ' series');
+        if (st) st.innerHTML = freshStamp('FRED', jsonData._meta && jsonData._meta.fetched_at, ok + '/' + fetchSeries.length + ' series');
         return;
       }
     }
@@ -8546,18 +8548,45 @@ async function refreshFred() {
   // Fallback: live API
   if (!fredApiKey) { if(lb) lb.style.display='none'; return; }
   var ok = 0, fail = 0;
-  for (var i = 0; i < allSeries.length; i++) {
-    var s = allSeries[i];
-    if (lp) lp.style.width = ((i + 1) / allSeries.length * 100) + '%';
+  for (var i = 0; i < fetchSeries.length; i++) {
+    var s = fetchSeries[i];
+    if (lp) lp.style.width = ((i + 1) / fetchSeries.length * 100) + '%';
     try {
       var data = await fredFetch(s.id, s.lim, s.extra);
       if (data && data.length > 0) { fredData[s.id] = data; ok++; updateFredMetric(s); } else { fail++; }
     } catch(e) { fail++; }
   }
+  computeDerivedSeries();
   updateFredCharts();
   setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
   if (lb) lb.style.display = 'none';
-  if (st) { st.textContent = '\u2713 ' + ok + '/' + allSeries.length + ' FRED series'; st.style.color = ok > 0 ? 'var(--green)' : 'var(--red)'; }
+  if (st) { st.textContent = '\u2713 ' + ok + '/' + fetchSeries.length + ' FRED series'; st.style.color = ok > 0 ? 'var(--green)' : 'var(--red)'; }
+}
+
+function computeDerivedSeries() {
+  // Populate any series marked { computed: {from:[id1,id2], op:'subtract'|'add'} }
+  // from existing fetched data, and update their metric tiles.
+  Object.values(FRED_SERIES).forEach(function(grp) {
+    grp.s.forEach(function(s) {
+      if (!s.computed) return;
+      var srcs = (s.computed.from || []).map(function(id){ return fredData[id]; });
+      if (srcs.some(function(d){ return !d || !d.length; })) return;
+      // Build date→value maps
+      var maps = srcs.map(function(arr){ var m={}; arr.forEach(function(p){ m[p.d]=p.v; }); return m; });
+      // Use intersection of dates from first source (newest-first convention)
+      var out = [];
+      srcs[0].forEach(function(p){
+        var vals = maps.map(function(m){ return m[p.d]; });
+        if (vals.some(function(v){ return v===undefined || v===null || isNaN(v); })) return;
+        var v;
+        if (s.computed.op === 'subtract')   v = vals[0] - vals[1];
+        else if (s.computed.op === 'add')   v = vals.reduce(function(a,b){return a+b;}, 0);
+        else return;
+        out.push({ d: p.d, v: v });
+      });
+      if (out.length) { fredData[s.id] = out; updateFredMetric(s); }
+    });
+  });
 }
 
 function updateFredMetric(s) {
@@ -8621,8 +8650,7 @@ function buildFredDashboard() {
     {k:'labor', title:'LABOR MARKET', sub:'Unemployment rate & initial claims'},
     {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'},
     {k:'cpi', title:'CPI & PCE INFLATION', sub:'Year-over-year % change'},
-    {k:'liquidity', title:'M2 MONEY SUPPLY', sub:'Year-over-year % change'},
-    {k:'fedbs', title:'FED BALANCE SHEET', sub:'Year-over-year % change'},
+    {k:'liquidity', title:'LIQUIDITY & FED BALANCE SHEET', sub:'M2 money supply & Fed balance sheet'},
     {k:'ism', title:'INDUSTRIAL PRODUCTION', sub:'Manufacturing index · monthly'}
   ];
   chartPanels.forEach(function(p) {
