@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Fetch USDA FAS PSD data via bulk CSV download from PSD Online.
-Computes World totals by summing all countries (not just tracked ones).
+Computes World totals by summing all countries (deduped by country, so running
+through multiple overlapping ZIP files doesn't double-count).
 Saves as data/psd_data.json matching terminal _PSD_RAW format.
 """
 import os, sys, json, urllib.request, csv, io, zipfile
@@ -90,7 +91,11 @@ def download_zip(filename):
         return resp.read()
  
  
-def parse_csv_zip(zipdata, result, world_sums):
+def parse_csv_zip(zipdata, result, world_by_country):
+    """
+    result: {comm: {country: {year: {attr: val}}}} — tracked countries only
+    world_by_country: {comm: {year: {attr: {country: val}}}} — ALL countries, deduped by assignment
+    """
     count = 0
     unseen = set()
     zf = zipfile.ZipFile(io.BytesIO(zipdata))
@@ -136,10 +141,9 @@ def parse_csv_zip(zipdata, result, world_sums):
  
                 val = round(v, 2) if short == "yl" else int(round(v))
  
-                # Accumulate World sums from ALL countries
+                # World rollup: store per-country so duplicate passes don't double-count
                 if short in SUM_ATTRS and country != "World":
-                    world_sums.setdefault(comm_name, {}).setdefault(year, {})
-                    world_sums[comm_name][year][short] = world_sums[comm_name][year].get(short, 0) + val
+                    world_by_country.setdefault(comm_name, {}).setdefault(year, {}).setdefault(short, {})[country] = val
  
                 # Store individual country data for tracked countries only
                 if country in COUNTRIES:
@@ -158,6 +162,8 @@ def parse_csv_zip(zipdata, result, world_sums):
 def main():
     print("Fetching FAS PSD data via bulk CSV download...")
  
+    # psd_alldata_csv.zip contains everything. Category-specific files are
+    # fallbacks in case the master file is unavailable.
     candidates = [
         "psd_alldata_csv.zip",
         "psd_grains_csv.zip",
@@ -172,17 +178,25 @@ def main():
     ]
  
     result = {}
-    world_sums = {}
+    world_by_country = {}
     downloaded = []
+    master_ok = False
  
     for filename in candidates:
+        # If the master all-data file already succeeded, skip category files
+        # (they contain the same records and just waste network+CPU)
+        if master_ok:
+            break
         try:
             print(f"  {filename}...", end=" ", flush=True)
             data = download_zip(filename)
             print(f"OK ({len(data):,} bytes)")
-            count = parse_csv_zip(data, result, world_sums)
+            count = parse_csv_zip(data, result, world_by_country)
             if count > 0:
                 downloaded.append(filename)
+                if filename == "psd_alldata_csv.zip":
+                    master_ok = True
+                    print("  (psd_alldata contains all commodities — skipping category files)")
         except urllib.error.HTTPError as e:
             print(f"{e.code} {e.reason}")
         except Exception as e:
@@ -192,13 +206,17 @@ def main():
         print("\nERROR: No data fetched.", file=sys.stderr)
         sys.exit(1)
  
-    # Add computed World totals (no yield for World)
+    # Aggregate World totals by summing per-country values (deduped)
     print("\nComputing World totals...")
-    for comm, years in world_sums.items():
+    for comm, years in world_by_country.items():
         result.setdefault(comm, {})["World"] = {}
         for year, attrs in years.items():
-            result[comm]["World"][year] = dict(attrs)
-        print(f"  {comm}: World totals for {len(years)} years")
+            result[comm]["World"][year] = {
+                attr: sum(countries.values())
+                for attr, countries in attrs.items()
+            }
+        n_countries_sample = len(next(iter(next(iter(years.values())).values()))) if years else 0
+        print(f"  {comm}: World totals for {len(years)} years (~{n_countries_sample} countries)")
  
     # Snapshot previous WASDE values before overwriting
     prev_wasde = {}
@@ -236,7 +254,7 @@ def main():
         json.dump(result, f, separators=(",", ":"))
  
     size = os.path.getsize(OUT)
-    comms = sorted(result.keys())
+    comms = sorted(k for k in result.keys() if not k.startswith("_"))
     print(f"\nDownloaded from: {', '.join(downloaded)}")
     print(f"Commodities ({len(comms)}): {', '.join(comms)}")
     for c in comms:
@@ -248,5 +266,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
  
