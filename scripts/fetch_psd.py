@@ -225,6 +225,26 @@ def main():
         print("\nERROR: No data fetched.", file=sys.stderr)
         sys.exit(1)
  
+    # Cotton conversion: USDA PSD reports cotton in 1000 × 480-lb bales.
+    # Convert to 1000 MT for consistency with other commodities.
+    # 1 × 480-lb bale = 217.724 kg = 0.217724 MT
+    BALE_TO_MT = 0.217724
+    BALE_ATTRS = {"bs", "dc", "es", "ex", "im", "pr", "td", "ts"}  # NOT ah (hectares) or yl (kg/ha)
+    if "Cotton" in result:
+        for country, cdata in result["Cotton"].items():
+            if country.startswith("_") or country == "World":
+                continue
+            for year, attrs in cdata.items():
+                for k in list(attrs.keys()):
+                    if k in BALE_ATTRS and attrs[k]:
+                        attrs[k] = int(round(attrs[k] * BALE_TO_MT))
+    if "Cotton" in world_by_country:
+        for year, attrs in world_by_country["Cotton"].items():
+            for attr, countries in attrs.items():
+                if attr in BALE_ATTRS:
+                    for c in countries:
+                        countries[c] = int(round(countries[c] * BALE_TO_MT))
+ 
     # Aggregate World totals by summing per-country values (deduped)
     print("\nComputing World totals...")
     for comm, years in world_by_country.items():
@@ -236,6 +256,54 @@ def main():
             }
         n_countries_sample = len(next(iter(next(iter(years.values())).values()))) if years else 0
         print(f"  {comm}: World totals for {len(years)} years (~{n_countries_sample} countries)")
+ 
+    # Validation: sanity-check World totals against plausible ranges
+    # Ranges expressed in 1000 MT for production, latest complete marketing year
+    SANITY_RANGES = {
+        "Wheat":            (700_000, 900_000),     # ~800 mmt
+        "Corn":             (1_100_000, 1_400_000), # ~1230 mmt
+        "Soybeans":         (350_000, 500_000),     # ~428 mmt
+        "Rapeseed/Canola":  (70_000, 110_000),      # ~90 mmt
+        "Sunflowerseed":    (45_000, 70_000),       # ~55 mmt
+        "Cotton":           (20_000, 32_000),       # ~26 mmt (after MT conversion)
+        "Palm Oil":         (70_000, 90_000),       # ~78 mmt
+        "Soybean Meal":     (240_000, 320_000),     # ~280 mmt
+        "Soybean Oil":      (60_000, 85_000),       # ~70 mmt
+        "Sunflowerseed Oil":(17_000, 25_000),       # ~20 mmt
+        "Rapeseed Oil":     (25_000, 40_000),       # ~32 mmt
+        "Sunflowerseed Meal":(15_000, 25_000),      # ~20 mmt
+        "Rapeseed Meal":    (40_000, 55_000),       # ~47 mmt
+        "Beef and Veal":    (55_000, 70_000),       # ~60 mmt
+    }
+    print("\nSanity checking World production (latest complete MY)...")
+    warnings = []
+    for comm, (lo, hi) in SANITY_RANGES.items():
+        world = result.get(comm, {}).get("World", {})
+        if not world:
+            warnings.append(f"  {comm}: NO World rollup (missing data)")
+            continue
+        yrs = sorted(world.keys())
+        # Use the latest year with non-zero production
+        latest_yr = None
+        latest_pr = 0
+        for yr in reversed(yrs):
+            pr = world[yr].get("pr", 0) or 0
+            if pr > 0:
+                latest_yr, latest_pr = yr, pr
+                break
+        if latest_pr == 0:
+            warnings.append(f"  {comm}: production = 0 (unexpected)")
+        elif not (lo <= latest_pr <= hi):
+            warnings.append(
+                f"  {comm} {latest_yr}: production = {latest_pr:,} out of expected range "
+                f"[{lo:,}, {hi:,}] — POSSIBLE BUG"
+            )
+        else:
+            print(f"  ✓ {comm} {latest_yr}: {latest_pr:,} kMT (within [{lo:,}, {hi:,}])")
+    if warnings:
+        print("\n⚠️  SANITY CHECK WARNINGS:")
+        for w in warnings:
+            print(w)
  
     # Snapshot previous WASDE values before overwriting
     prev_wasde = {}
