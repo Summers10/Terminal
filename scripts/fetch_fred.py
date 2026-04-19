@@ -33,7 +33,6 @@ SERIES = [
     ("BAMLH0A0HYM2", 252), ("BAMLC0A4CBBB", 252),
     # ── Labour / real economy ─────────────────────────────────────────────────
     ("UNRATE", 60), ("ICSA", 104),
-    ("CPALTT01USM657N", 60),
     ("M2SL", 60), ("WALCL", 104),
     ("INDPRO", 60),
     # ── FX rates (daily) — required by Currencies dashboard ───────────────────
@@ -54,7 +53,8 @@ SERIES = [
  
 # Series that need a non-default units transform
 SPECIAL = {
-    "PCEPI": {"lim": 60, "extra": "&units=pc1"},  # PCE YoY %
+    "CPIAUCSL": {"lim": 60, "extra": "&units=pc1"},  # CPI YoY %
+    "PCEPI":    {"lim": 60, "extra": "&units=pc1"},  # PCE YoY %
 }
  
  
