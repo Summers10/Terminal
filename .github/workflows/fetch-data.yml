@@ -7,7 +7,6 @@ on:
 permissions:
   contents: write
  
-# Prevent overlapping runs — queue if one is already in progress
 concurrency:
   group: fetch-data
   cancel-in-progress: false
@@ -15,6 +14,7 @@ concurrency:
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
  
@@ -22,35 +22,46 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+ 
+      - name: Install deps
+        run: pip install --quiet yfinance requests pandas
  
       - name: Run NASS fetch
         env:
           NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
-        run: python scripts/fetch_nass.py
+        run: time python scripts/fetch_nass.py
+        timeout-minutes: 3
         continue-on-error: true
  
       - name: Run PSD fetch
-        run: python scripts/fetch_psd.py
+        run: time python scripts/fetch_psd.py
+        timeout-minutes: 3
         continue-on-error: true
  
       - name: Run FRED fetch
-        run: python scripts/fetch_fred.py
+        run: time python scripts/fetch_fred.py
+        timeout-minutes: 2
         continue-on-error: true
  
       - name: Run Export Sales fetch
-        run: python scripts/fetch_exports.py
+        run: time python scripts/fetch_exports.py
+        timeout-minutes: 2
         continue-on-error: true
  
       - name: Run CGC GSW fetch
-        run: python scripts/fetch_cgc.py
+        run: time python scripts/fetch_cgc.py
+        timeout-minutes: 2
         continue-on-error: true
  
       - name: Run StatsCan S&D fetch
-        run: python scripts/fetch_statscan.py
+        run: time python scripts/fetch_statscan.py
+        timeout-minutes: 3
         continue-on-error: true
  
       - name: Run Prices fetch
-        run: python scripts/fetch_prices.py
+        run: time python scripts/fetch_prices.py
+        timeout-minutes: 3
         continue-on-error: true
  
       - name: Commit data
@@ -64,7 +75,6 @@ jobs:
           fi
           git commit -m "Auto-update data $(date -u +%Y-%m-%d)"
  
-          # Push with retry — fresh pipeline data always wins on conflict
           for attempt in 1 2 3 4 5; do
             git pull --no-rebase --no-edit -X ours origin main || true
             if git push origin main; then
@@ -76,3 +86,4 @@ jobs:
           done
           echo "All push attempts failed"
           exit 1
+ 
