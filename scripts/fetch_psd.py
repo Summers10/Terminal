@@ -170,80 +170,86 @@ def main():
     print("Fetching FAS PSD data via bulk CSV download...")
  
     # psd_alldata_csv.zip covers grains, oilseeds, cotton — but NOT livestock.
-    # Livestock (Beef and Veal) requires the separate livestock_poultry file.
-    # We try alldata first, then livestock, skipping the redundant category files.
-    primary_files = [
+    # Livestock (Beef and Veal) lives in a separate zip whose filename has drifted
+    # over the years, so we try multiple candidates and accept the first that
+    # returns records. Dedup via world_by_country keeps duplicates safe.
+    crop_files = [
         "psd_alldata_csv.zip",
-        "psd_livestock_poultry_csv.zip",
     ]
-    fallback_files = [
+    livestock_files = [
+        "psd_livestock_csv.zip",
+        "psd_livestock_poultry_csv.zip",
+        "psd_livestockandpoultry_csv.zip",
+    ]
+    crop_fallbacks = [
         "psd_grains_csv.zip",
         "psd_grains_pulses_csv.zip",
         "psd_oilseeds_csv.zip",
         "psd_cotton_csv.zip",
-        "psd_livestock_csv.zip",
     ]
  
     result = {}
     world_by_country = {}
     downloaded = []
     alldata_ok = False
+    livestock_ok = False
  
-    # Try primary files first
-    for filename in primary_files:
+    def try_fetch(filename):
+        """Download + parse one zip. Returns record count (0 on failure)."""
         try:
             print(f"  {filename}...", end=" ", flush=True)
             data = download_zip(filename)
             print(f"OK ({len(data):,} bytes)")
-            count = parse_csv_zip(data, result, world_by_country)
-            if count > 0:
-                downloaded.append(filename)
-                if filename == "psd_alldata_csv.zip":
-                    alldata_ok = True
+            return parse_csv_zip(data, result, world_by_country)
         except urllib.error.HTTPError as e:
             print(f"{e.code} {e.reason}")
         except Exception as e:
             print(f"error: {e}")
+        return 0
  
-    # If alldata failed, fall back to category files (dedup-safe via world_by_country)
+    # Fetch grain/oilseed/cotton data
+    for filename in crop_files:
+        count = try_fetch(filename)
+        if count > 0:
+            downloaded.append(filename)
+            if filename == "psd_alldata_csv.zip":
+                alldata_ok = True
+ 
+    # Always fetch livestock (alldata does not include it). Try candidates in
+    # order and stop at the first one that returns data.
+    for filename in livestock_files:
+        count = try_fetch(filename)
+        if count > 0:
+            downloaded.append(filename)
+            livestock_ok = True
+            break
+ 
+    # Fallback: alldata failed → try per-category crop files
     if not alldata_ok:
         print("  alldata missing — falling back to category files...")
-        for filename in fallback_files:
-            try:
-                print(f"  {filename}...", end=" ", flush=True)
-                data = download_zip(filename)
-                print(f"OK ({len(data):,} bytes)")
-                count = parse_csv_zip(data, result, world_by_country)
-                if count > 0:
-                    downloaded.append(filename)
-            except urllib.error.HTTPError as e:
-                print(f"{e.code} {e.reason}")
-            except Exception as e:
-                print(f"error: {e}")
+        for filename in crop_fallbacks:
+            count = try_fetch(filename)
+            if count > 0:
+                downloaded.append(filename)
  
     if not result:
         print("\nERROR: No data fetched.", file=sys.stderr)
         sys.exit(1)
  
-    # Cotton conversion: USDA PSD reports cotton in 1000 × 480-lb bales.
-    # Convert to 1000 MT for consistency with other commodities.
-    # 1 × 480-lb bale = 217.724 kg = 0.217724 MT
-    BALE_TO_MT = 0.217724
-    BALE_ATTRS = {"bs", "dc", "es", "ex", "im", "pr", "td", "ts"}  # NOT ah (hectares) or yl (kg/ha)
-    if "Cotton" in result:
-        for country, cdata in result["Cotton"].items():
-            if country.startswith("_") or country == "World":
-                continue
-            for year, attrs in cdata.items():
-                for k in list(attrs.keys()):
-                    if k in BALE_ATTRS and attrs[k]:
-                        attrs[k] = int(round(attrs[k] * BALE_TO_MT))
-    if "Cotton" in world_by_country:
-        for year, attrs in world_by_country["Cotton"].items():
-            for attr, countries in attrs.items():
-                if attr in BALE_ATTRS:
-                    for c in countries:
-                        countries[c] = int(round(countries[c] * BALE_TO_MT))
+    # Fail loud if livestock wasn't retrieved — beef/veal is a required commodity
+    if not livestock_ok or "Beef and Veal" not in result:
+        print(
+            "\nERROR: Beef and Veal data not retrieved. All known livestock "
+            "zip filenames failed:\n  " + "\n  ".join(livestock_files)
+            + "\nCheck USDA PSD downloads page for the current filename.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+ 
+    # Cotton is left in USDA's native units (1000 × 480-lb bales) to match
+    # how cotton traders read the balance sheet. Area stays in 1000 ha and
+    # yield stays in kg/ha (USDA's own convention). The UI flips the unit
+    # badge to "(1000 480-lb bales)" when Cotton is selected.
  
     # Aggregate World totals by summing per-country values (deduped)
     print("\nComputing World totals...")
@@ -265,7 +271,7 @@ def main():
         "Soybeans":         (350_000, 500_000),     # ~428 mmt
         "Rapeseed/Canola":  (70_000, 110_000),      # ~90 mmt
         "Sunflowerseed":    (45_000, 70_000),       # ~55 mmt
-        "Cotton":           (20_000, 32_000),       # ~26 mmt (after MT conversion)
+        "Cotton":           (110_000, 130_000),     # ~120M 480-lb bales (USDA native)
         "Palm Oil":         (70_000, 90_000),       # ~78 mmt
         "Soybean Meal":     (240_000, 320_000),     # ~280 mmt
         "Soybean Oil":      (60_000, 85_000),       # ~70 mmt
@@ -299,7 +305,8 @@ def main():
                 f"[{lo:,}, {hi:,}] — POSSIBLE BUG"
             )
         else:
-            print(f"  ✓ {comm} {latest_yr}: {latest_pr:,} kMT (within [{lo:,}, {hi:,}])")
+            unit = "1000 bales" if comm == "Cotton" else "kMT"
+            print(f"  ✓ {comm} {latest_yr}: {latest_pr:,} {unit} (within [{lo:,}, {hi:,}])")
     if warnings:
         print("\n⚠️  SANITY CHECK WARNINGS:")
         for w in warnings:
