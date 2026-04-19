@@ -34,6 +34,7 @@ COMM_MAP = {
     "Canola": "Rapeseed/Canola",
     "Cotton": "Cotton",
     "Beef and Veal": "Beef and Veal", "Beef": "Beef and Veal",
+    "Meat, Beef and Veal": "Beef and Veal",
     # Oilseeds
     "Sunflowerseed": "Sunflowerseed", "Oilseed, Sunflowerseed": "Sunflowerseed",
     "Sunflowerseed Oil": "Sunflowerseed Oil", "Oil, Sunflowerseed": "Sunflowerseed Oil",
