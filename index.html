@@ -2585,7 +2585,7 @@ drawChart('c4',{labels:years,type:'bar',datasets:[{data:aggD['Ending Stocks'],co
 }
 }
 function buildCountryMiniTable(countries, key, years){
-const showYrs = years.slice(-6);
+const showYrs = years.slice(-5);
 const curYr = showYrs[showYrs.length-1];
 const commData = getPSDComm(currentComm);
 const f = v => (v===null||v===undefined||isNaN(v)) ? '—' : fmtNum(v);
