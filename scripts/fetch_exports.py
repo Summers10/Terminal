@@ -152,20 +152,23 @@ def num(v):
 # ------------------------------------------------------------------
 # Fetch + aggregate
 # ------------------------------------------------------------------
-def fetch_commodity_my(name, code, my_year, my_start_month):
-    """Hit the ESR API for a single (commodity, marketYear).
+def fetch_commodity_my(name, code, my_start_year, my_start_month):
+    """Hit the ESR API for a single (commodity, MY that starts in my_start_year).
+       The V2 API uses END-YEAR convention for its `marketYear` path param, so
+       we query `my_start_year + 1` and filter results to the window actually
+       anchored at my_start_year.
        Returns {week_num: {"ex": MT, "ns": MT}} aggregated across all countries.
        Records whose weekEndingDate falls outside the requested MY window are
-       skipped (the V2 API sometimes returns such rows, and they used to get
-       misclassified as week 52 of the requested MY).
+       skipped and counted (helps catch future API semantic changes).
        Raises on hard failure; returns {} on empty."""
-    path = "/api/esr/exports/commodityCode/{}/allCountries/marketYear/{}".format(code, my_year)
+    api_market_year = my_start_year + 1
+    path = "/api/esr/exports/commodityCode/{}/allCountries/marketYear/{}".format(code, api_market_year)
     data = api_get(path)
  
     if not isinstance(data, list):
         raise RuntimeError(
-            "{} MY{}: unexpected response shape (type={}, keys={})".format(
-                name, my_year, type(data).__name__,
+            "{} MY{}/{}: unexpected response shape (type={}, keys={})".format(
+                name, my_start_year, api_market_year, type(data).__name__,
                 list(data.keys())[:5] if isinstance(data, dict) else "N/A"
             )
         )
@@ -178,7 +181,7 @@ def fetch_commodity_my(name, code, my_year, my_start_month):
         if not wed:
             skipped_no_date += 1
             continue
-        wk = week_within_specific_my(wed, my_year, my_start_month)
+        wk = week_within_specific_my(wed, my_start_year, my_start_month)
         if wk is None:
             skipped_out_of_my += 1
             continue
@@ -186,8 +189,9 @@ def fetch_commodity_my(name, code, my_year, my_start_month):
         slot["ex"] += num(rec.get("weeklyExports"))
         slot["ns"] += num(rec.get("currentMYNetSales"))
  
-    print("    {} MY{}: {} weeks filled from {} rows ({} skipped out-of-MY, {} bad dates)".format(
-        name, my_year, len(weekly), len(data), skipped_out_of_my, skipped_no_date))
+    print("    {} MY {}/{} (api marketYear={}): {} weeks filled from {} rows ({} skipped out-of-MY, {} bad dates)".format(
+        name, my_start_year, my_start_year + 1, api_market_year,
+        len(weekly), len(data), skipped_out_of_my, skipped_no_date))
     return weekly
  
  
@@ -327,12 +331,12 @@ def main():
                     body = e.read().decode("utf-8", errors="replace")[:500]
                 except Exception:
                     pass
-                msg = "{} MY{}: HTTP {} {} — {}".format(name, my_year, e.code, e.reason, body.strip())
+                msg = "{} MY start {}: HTTP {} {} — {}".format(name, my_year, e.code, e.reason, body.strip())
                 print("    " + msg)
                 fetch_errors.append(msg)
                 continue
             except Exception as e:
-                msg = "{} MY{}: fetch failed — {}".format(name, my_year, e)
+                msg = "{} MY start {}: fetch failed — {}".format(name, my_year, e)
                 print("    " + msg)
                 fetch_errors.append(msg)
                 continue
