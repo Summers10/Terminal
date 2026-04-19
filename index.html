@@ -216,7 +216,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
           <span class="panel-title" id="p2-title">WORLD</span>
           <span class="panel-sub">Global balance</span>
         </div>
-        <div class="panel-right"><span class="unit-badge">(1000 MT)</span></div>
+        <div class="panel-right"><span class="unit-badge" id="p2-unit">(1000 MT)</span></div>
       </div>
       <table class="bal-table" id="p2-table"></table>
     </div>
@@ -227,7 +227,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
           <span class="panel-title" id="p3-title">MAJOR EXPORTERS</span>
           <span class="panel-sub" id="p3-sub"></span>
         </div>
-        <div class="panel-right"><span class="unit-badge">(1000 MT)</span></div>
+        <div class="panel-right"><span class="unit-badge" id="p3-unit">(1000 MT)</span></div>
       </div>
       <table class="bal-table" id="p3-table"></table>
     </div>
@@ -238,7 +238,7 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
           <span class="panel-title" id="p4-title">MAJOR IMPORTERS</span>
           <span class="panel-sub" id="p4-sub"></span>
         </div>
-        <div class="panel-right"><span class="unit-badge">(1000 MT)</span></div>
+        <div class="panel-right"><span class="unit-badge" id="p4-unit">(1000 MT)</span></div>
       </div>
       <table class="bal-table" id="p4-table"></table>
     </div>
@@ -1956,7 +1956,7 @@ const wbcEl = document.getElementById('wbc-panels');
 if(wbcEl) wbcEl.style.display = 'none';
 document.getElementById('charts-section').style.display = '';
 const p2opts = EXPORTERS[currentComm] || ['United States','Canada'];
-currentP1Country = p2opts[0];
+currentP1Country = p2opts.includes('United States') ? 'United States' : p2opts[0];
 const hasBu = !!BU_PER_MT[currentComm];
 document.getElementById('bu-wrap').style.display = hasBu ? 'flex' : 'none';
 if(!hasBu) currentUnit = 'mt';
@@ -2127,7 +2127,7 @@ const P1_EXTRA = {Wheat:['China'],Corn:['China'],Soybeans:['China'],'Rapeseed/Ca
 const _rawOpts = (EXPORTERS[comm] || ['United States','Canada']).concat(P1_EXTRA[comm]||[]);
 // For Grains: collapse Russia+Ukraine into a 'Black Sea' virtual option
 const p2opts = (comm==='Grains') ? _rawOpts.filter(c=>c!=='Russia'&&c!=='Ukraine').concat(['Black Sea']) : _rawOpts;
-if(!p2opts.includes(currentP1Country)) currentP1Country = p2opts[0];
+if(!p2opts.includes(currentP1Country)) currentP1Country = p2opts.includes('United States') ? 'United States' : p2opts[0];
 const tog = document.getElementById('p1-toggle');
 tog.innerHTML = p2opts.map(c=>
 `<button class="p2-btn${currentP1Country===c?' active':''}" data-c="${c}" onclick="setP1Country('${c}')">${{'United States':'US','European Union':'EU','South Korea':'Korea','New Zealand':'NZ'}[c]||c}</button>`
@@ -2144,8 +2144,13 @@ const hasBu = !!BU_PER_MT[comm];
 document.getElementById('bu-wrap').style.display = hasBu ? 'flex' : 'none';
 document.getElementById('btn-bu').classList.toggle('active', currentUnit==='bu');
 document.getElementById('btn-mt').classList.toggle('active', currentUnit==='mt');
-const unitLabel = (hasBu && currentUnit==='bu') ? '(Mil Bu)' : '(1000 MT)';
+const unitLabel = (comm==='Cotton') ? '(1000 480-lb bales)'
+                : (hasBu && currentUnit==='bu') ? '(Mil Bu)'
+                : '(1000 MT)';
 document.getElementById('p1-unit').textContent = unitLabel;
+document.getElementById('p2-unit').textContent = unitLabel;
+document.getElementById('p3-unit').textContent = unitLabel;
+document.getElementById('p4-unit').textContent = unitLabel;
 const yc = YIELD_CONV[comm];
 const isBuMode = hasBu && currentUnit==='bu';
 const yUnit = 'bu/ac';
@@ -2558,8 +2563,6 @@ currentChartTab = t;
 ['world','us','exp','imp'].forEach(x=>{
 document.getElementById('ct-'+x).classList.toggle('active',x===t);
 });
-const usBtn = document.getElementById('ct-us');
-usBtn.textContent = currentP1Country === 'United States' ? 'United States' : currentP1Country;
 renderCharts();
 }
 function renderCharts(){
@@ -2567,6 +2570,9 @@ const comm = currentComm;
 const years = getYears();
 const t = currentChartTab;
 const stuFmt = v=>v.toFixed(1)+'%';
+// Keep the chart-tab country label in sync with the top-of-page country toggle
+const usBtn = document.getElementById('ct-us');
+if(usBtn) usBtn.textContent = currentP1Country === 'United States' ? 'United States' : (currentP1Country==='Black Sea' ? 'Black Sea' : currentP1Country);
 const grid = document.querySelector('.charts-grid');
 grid.style.display='';
 const oldWrap = document.getElementById('ctry-tables-wrap');
