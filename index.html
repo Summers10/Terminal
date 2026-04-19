@@ -247,8 +247,8 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       <button class="ctab" id="ct-imp" onclick="setChartTab('imp')">Importers</button>
     </div>
     <div class="charts-grid">
-      <div class="chart-cell"><div class="chart-title" id="c1-title">STOCKS / USE %</div><canvas class="chart-canvas" id="c1"></canvas><div id="c1-tbl-wrap" style="display:none;overflow-y:auto;max-height:280px;"></div></div>
-      <div class="chart-cell"><div class="chart-title" id="c2-title">PRODUCTION VS CONSUMPTION</div><canvas class="chart-canvas" id="c2"></canvas><div id="c2-tbl-wrap" style="display:none;overflow-y:auto;max-height:280px;"></div></div>
+      <div class="chart-cell"><div class="chart-title" id="c1-title">STOCKS / USE %</div><canvas class="chart-canvas" id="c1"></canvas><div id="c1-tbl-wrap" style="display:none;"></div></div>
+      <div class="chart-cell"><div class="chart-title" id="c2-title">PRODUCTION VS CONSUMPTION</div><canvas class="chart-canvas" id="c2"></canvas><div id="c2-tbl-wrap" style="display:none;"></div></div>
       <div class="chart-cell"><div class="chart-title" id="c3-title">ENDING STOCKS</div><canvas class="chart-canvas" id="c3"></canvas></div>
       <div class="chart-cell"><div class="chart-title" id="c4-title">EXPORTS VS IMPORTS</div><canvas class="chart-canvas" id="c4"></canvas></div>
     </div>
@@ -1093,6 +1093,22 @@ const IMPORTERS = {
   VegOils:["India","China","European Union","Pakistan","Bangladesh","Egypt","Nigeria","Algeria","Iran","Myanmar"]
 };
 const BU_PER_MT  = {Wheat:36.744,Soybeans:36.744,Corn:39.368,"Rapeseed/Canola":44.092};
+const COUNTRY_REGION = {
+  "United States":"North America","Canada":"North America","Mexico":"North America",
+  "Brazil":"South America","Argentina":"South America","Colombia":"South America","Paraguay":"South America","Uruguay":"South America","Peru":"South America","Chile":"South America",
+  "European Union":"Europe","United Kingdom":"Europe","Norway":"Europe","Switzerland":"Europe",
+  "Russia":"Black Sea","Ukraine":"Black Sea","Kazakhstan":"Black Sea","Belarus":"Black Sea",
+  "China":"Asia Pacific","Japan":"Asia Pacific","South Korea":"Asia Pacific","Taiwan":"Asia Pacific",
+  "India":"Asia Pacific","Indonesia":"Asia Pacific","Malaysia":"Asia Pacific","Thailand":"Asia Pacific",
+  "Vietnam":"Asia Pacific","Philippines":"Asia Pacific","Bangladesh":"Asia Pacific","Pakistan":"Asia Pacific",
+  "Sri Lanka":"Asia Pacific","Myanmar":"Asia Pacific","Papua New Guinea":"Asia Pacific",
+  "Australia":"Asia Pacific","New Zealand":"Asia Pacific",
+  "Turkey":"MENA & Africa","Egypt":"MENA & Africa","Iran":"MENA & Africa","Iraq":"MENA & Africa",
+  "Algeria":"MENA & Africa","Morocco":"MENA & Africa","Israel":"MENA & Africa",
+  "Saudi Arabia":"MENA & Africa","United Arab Emirates":"MENA & Africa",
+  "Nigeria":"MENA & Africa","Kenya":"MENA & Africa","South Africa":"MENA & Africa","Ethiopia":"MENA & Africa"
+};
+const REGION_ORDER = ["North America","South America","Europe","Black Sea","Asia Pacific","MENA & Africa","Other"];
 const YIELD_CONV = {Wheat:14.87,Soybeans:14.87,Corn:15.93,"Rapeseed/Canola":17.84};
 let currentComm = 'Rapeseed/Canola';
 let currentUnit = 'mt';   // 'bu' or 'mt'
@@ -2589,7 +2605,7 @@ const showYrs = years.slice(-4);
 const curYr = showYrs[showYrs.length-1];
 const commData = getPSDComm(currentComm);
 const f = v => (v===null||v===undefined||isNaN(v)) ? '—' : fmtNum(v);
-const allVals = {}; // [country] = [val per showYr]
+const allVals = {};
 for(const country of countries){
 const cdata = commData[country]||{};
 allVals[country] = showYrs.map(yr => {
@@ -2597,14 +2613,26 @@ const v = (cdata[String(yr)]||{})[key];
 return (v!==undefined && !isNaN(v)) ? v : null;
 });
 }
+// Group countries by region, preserving input order within each region
+const byRegion = {};
+for(const country of countries){
+const region = COUNTRY_REGION[country] || 'Other';
+if(!byRegion[region]) byRegion[region] = [];
+byRegion[region].push(country);
+}
 const totals = showYrs.map((yr, yi) => {
 const colVals = countries.map(c => allVals[c][yi]).filter(v => v !== null);
 return colVals.length ? colVals.reduce((a,b)=>a+b, 0) : null;
 });
+const ncols = showYrs.length + 1;
 let html = `<table class="ctry-mini-tbl"><thead><tr><th>Country</th>`;
 for(const yr of showYrs) html += `<th class="${yr===curYr?'cur':''}">${yr}</th>`;
 html += '</tr></thead><tbody>';
-for(const country of countries){
+const orderedRegions = REGION_ORDER.filter(r => byRegion[r] && byRegion[r].length);
+const regionHdrStyle = 'background:var(--section-bg);color:var(--amber);font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;border-top:1px solid var(--border2);text-align:left;';
+for(const region of orderedRegions){
+html += `<tr><td colspan="${ncols}" style="${regionHdrStyle}">${region}</td></tr>`;
+for(const country of byRegion[region]){
 const vals = allVals[country];
 const nonNull = vals.filter(v=>v!==null);
 const maxV = nonNull.length ? Math.max(...nonNull) : null;
@@ -2621,6 +2649,7 @@ if(!isCur && v!==null && minV!==null && v===minV && maxV!==minV) cls='lo';
 html += `<td class="${cls}">${f(v)}</td>`;
 }
 html += '</tr>';
+}
 }
 html += '</tbody><tfoot><tr><td>TOTAL</td>';
 for(let i=0;i<showYrs.length;i++){
