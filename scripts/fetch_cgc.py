@@ -92,7 +92,7 @@ def download_csv(crop_year):
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                     "Accept": "text/csv,*/*",
                 })
-                with urllib.request.urlopen(req, timeout=300, context=ctx) as resp:
+                with urllib.request.urlopen(req, timeout=45, context=ctx) as resp:
                     data = resp.read()
                     print(f"  {crop_year}: {len(data):,} bytes from {url}")
                     return data.decode("utf-8-sig", errors="replace")
