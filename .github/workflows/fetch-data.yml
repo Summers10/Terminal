@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write
  
+# Prevent overlapping runs — queue if one is already in progress
+concurrency:
+  group: fetch-data
+  cancel-in-progress: false
+ 
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
@@ -17,6 +22,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+ 
+      - name: Run NASS fetch
+        env:
+          NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
+        run: python scripts/fetch_nass.py
+        continue-on-error: true
  
       - name: Run PSD fetch
         run: python scripts/fetch_psd.py
@@ -34,6 +45,10 @@ jobs:
         run: python scripts/fetch_cgc.py
         continue-on-error: true
  
+      - name: Run StatsCan S&D fetch
+        run: python scripts/fetch_statscan.py
+        continue-on-error: true
+ 
       - name: Run Prices fetch
         run: python scripts/fetch_prices.py
         continue-on-error: true
@@ -43,7 +58,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          git diff --staged --quiet || git commit -m "Auto-update data $(date -u +%Y-%m-%d)"
-          git pull --rebase
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Auto-update data $(date -u +%Y-%m-%d)"
  
+          # Push with retry — fresh pipeline data always wins on conflict
+          for attempt in 1 2 3 4 5; do
+            git pull --no-rebase --no-edit -X ours origin main || true
+            if git push origin main; then
+              echo "Pushed successfully on attempt $attempt"
+              exit 0
+            fi
+            echo "Push failed on attempt $attempt, retrying in 3s..."
+            sleep 3
+          done
+          echo "All push attempts failed"
+          exit 1
