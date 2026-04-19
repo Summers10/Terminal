@@ -70,11 +70,13 @@ COMM_MAP = {
 COUNTRIES = {
     "Algeria", "Argentina", "Australia", "Bangladesh", "Brazil",
     "Canada", "China", "Colombia", "Egypt", "European Union",
-    "India", "Indonesia", "Iran", "Israel", "Japan", "Kazakhstan",
-    "Kenya", "Malaysia", "Mexico", "Morocco", "Myanmar", "Nigeria",
-    "Pakistan", "Papua New Guinea", "Philippines", "Russia",
-    "South Africa", "South Korea", "Sri Lanka", "Taiwan", "Thailand",
-    "Turkey", "Ukraine", "United Kingdom", "United States", "Vietnam",
+    "India", "Indonesia", "Iran", "Iraq", "Israel", "Japan",
+    "Kazakhstan", "Kenya", "Malaysia", "Mexico", "Morocco", "Myanmar",
+    "New Zealand", "Nigeria",
+    "Pakistan", "Papua New Guinea", "Paraguay", "Philippines", "Russia",
+    "Saudi Arabia", "South Africa", "South Korea", "Sri Lanka",
+    "Taiwan", "Thailand", "Turkey", "Ukraine", "United Arab Emirates",
+    "United Kingdom", "United States", "Uruguay", "Vietnam",
 }
  
 COUNTRY_MAP = {
@@ -361,4 +363,5 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
  
