@@ -112,6 +112,11 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
     </div>
     <div class="info-panel" id="sum-info"><strong>SUMMARY</strong> — At-a-glance view of the terminal. Commodity Overview shows price, regression fair value prem/disc, S/U ratio, forward curve structure, and managed money positioning. Relativities shows spread percentiles and z-scores. Macro Snapshot shows live FRED data (load by visiting MACRO tab).</div>
 
+    <div id="sum-freshness-strip" style="display:flex;gap:14px;padding:8px 14px;background:var(--bg1);border:1px solid var(--border);border-top:3px solid var(--amber);margin-bottom:14px;flex-wrap:wrap;align-items:center;font-size:12px;">
+      <span style="font-weight:900;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;">Data Freshness</span>
+      <div id="freshness-items" style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;"><span style="color:var(--text3);">loading…</span></div>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start;">
       <!-- Left column: two panels stacked -->
       <div style="display:flex;flex-direction:column;gap:16px;">
@@ -247,8 +252,8 @@ if(sessionStorage.getItem('pw-ok')==='1') document.getElementById('pw-gate').sty
       <button class="ctab" id="ct-imp" onclick="setChartTab('imp')">Importers</button>
     </div>
     <div class="charts-grid">
-      <div class="chart-cell"><div class="chart-title" id="c1-title">STOCKS / USE %</div><canvas class="chart-canvas" id="c1"></canvas><div id="c1-tbl-wrap" style="display:none;"></div></div>
-      <div class="chart-cell"><div class="chart-title" id="c2-title">PRODUCTION VS CONSUMPTION</div><canvas class="chart-canvas" id="c2"></canvas><div id="c2-tbl-wrap" style="display:none;"></div></div>
+      <div class="chart-cell"><div class="chart-title" id="c1-title">STOCKS / USE %</div><canvas class="chart-canvas" id="c1"></canvas><div id="c1-tbl-wrap" style="display:none;overflow-y:auto;max-height:280px;"></div></div>
+      <div class="chart-cell"><div class="chart-title" id="c2-title">PRODUCTION VS CONSUMPTION</div><canvas class="chart-canvas" id="c2"></canvas><div id="c2-tbl-wrap" style="display:none;overflow-y:auto;max-height:280px;"></div></div>
       <div class="chart-cell"><div class="chart-title" id="c3-title">ENDING STOCKS</div><canvas class="chart-canvas" id="c3"></canvas></div>
       <div class="chart-cell"><div class="chart-title" id="c4-title">EXPORTS VS IMPORTS</div><canvas class="chart-canvas" id="c4"></canvas></div>
     </div>
@@ -1093,22 +1098,6 @@ const IMPORTERS = {
   VegOils:["India","China","European Union","Pakistan","Bangladesh","Egypt","Nigeria","Algeria","Iran","Myanmar"]
 };
 const BU_PER_MT  = {Wheat:36.744,Soybeans:36.744,Corn:39.368,"Rapeseed/Canola":44.092};
-const COUNTRY_REGION = {
-  "United States":"North America","Canada":"North America","Mexico":"North America",
-  "Brazil":"South America","Argentina":"South America","Colombia":"South America","Paraguay":"South America","Uruguay":"South America","Peru":"South America","Chile":"South America",
-  "European Union":"Europe","United Kingdom":"Europe","Norway":"Europe","Switzerland":"Europe",
-  "Russia":"Black Sea","Ukraine":"Black Sea","Kazakhstan":"Black Sea","Belarus":"Black Sea",
-  "China":"Asia Pacific","Japan":"Asia Pacific","South Korea":"Asia Pacific","Taiwan":"Asia Pacific",
-  "India":"Asia Pacific","Indonesia":"Asia Pacific","Malaysia":"Asia Pacific","Thailand":"Asia Pacific",
-  "Vietnam":"Asia Pacific","Philippines":"Asia Pacific","Bangladesh":"Asia Pacific","Pakistan":"Asia Pacific",
-  "Sri Lanka":"Asia Pacific","Myanmar":"Asia Pacific","Papua New Guinea":"Asia Pacific",
-  "Australia":"Asia Pacific","New Zealand":"Asia Pacific",
-  "Turkey":"MENA & Africa","Egypt":"MENA & Africa","Iran":"MENA & Africa","Iraq":"MENA & Africa",
-  "Algeria":"MENA & Africa","Morocco":"MENA & Africa","Israel":"MENA & Africa",
-  "Saudi Arabia":"MENA & Africa","United Arab Emirates":"MENA & Africa",
-  "Nigeria":"MENA & Africa","Kenya":"MENA & Africa","South Africa":"MENA & Africa","Ethiopia":"MENA & Africa"
-};
-const REGION_ORDER = ["North America","South America","Europe","Black Sea","Asia Pacific","MENA & Africa","Other"];
 const YIELD_CONV = {Wheat:14.87,Soybeans:14.87,Corn:15.93,"Rapeseed/Canola":17.84};
 let currentComm = 'Rapeseed/Canola';
 let currentUnit = 'mt';   // 'bu' or 'mt'
@@ -1135,8 +1124,48 @@ if(spreadsInited) renderSpreads();
 
 }
 let sumInited = false;
+async function renderDataFreshness(){
+  const sources = [
+    {file:'psd_data.json',     label:'USDA PSD'},
+    {file:'fred_data.json',    label:'FRED'},
+    {file:'prices.json',       label:'Prices'},
+    {file:'spreads_data.json', label:'Spreads'},
+    {file:'export_sales.json', label:'Export Sales'},
+    {file:'gsw_data.json',     label:'CGC GSW'},
+  ];
+  const el = document.getElementById('freshness-items');
+  if(!el) return;
+  const now = Date.now();
+  const results = await Promise.all(sources.map(async src => {
+    try {
+      const r = await fetch('data/' + src.file, {method:'HEAD', cache:'no-cache'});
+      const lm = r.headers.get('Last-Modified');
+      if(!lm) return {...src, ageMin: null};
+      const ageMin = (now - new Date(lm).getTime()) / 60000;
+      return {...src, ageMin};
+    } catch(e){ return {...src, ageMin: null}; }
+  }));
+  el.innerHTML = results.map(r => {
+    let color, rel;
+    if(r.ageMin === null){ color = '#b83838'; rel = 'unavailable'; }
+    else {
+      // Pipeline runs every 30 min. Green <45m, yellow <3h, red >3h.
+      if(r.ageMin < 45) color = '#2e8f52';
+      else if(r.ageMin < 180) color = '#f5a623';
+      else color = '#b83838';
+      if(r.ageMin < 60) rel = Math.max(1, Math.round(r.ageMin)) + 'm ago';
+      else if(r.ageMin < 1440) rel = Math.round(r.ageMin/60) + 'h ago';
+      else rel = Math.round(r.ageMin/1440) + 'd ago';
+    }
+    return '<span style="display:inline-flex;align-items:center;gap:6px;">' +
+      '<span style="width:9px;height:9px;border-radius:50%;background:' + color + ';display:inline-block;"></span>' +
+      '<span style="color:var(--text2);font-weight:700;">' + r.label + '</span>' +
+      '<span style="color:var(--text3);font-weight:600;">' + rel + '</span></span>';
+  }).join('');
+}
 function renderSummaryPage(){
   try {
+  renderDataFreshness();
   // === COMMODITY OVERVIEW TABLE ===
   const comms = [
     {name:'_SECTION_', label:'GRAINS'},
@@ -1462,7 +1491,7 @@ function renderMacroSnapshot(){
   var dgs10=fv('DGS10'),dgs10p=fv2('DGS10'),dff=fv('DFF'),dffp=fv2('DFF');
   var t10y2y=fv('T10Y2Y'),dfii10=fv('DFII10'),t10yie=fv('T10YIE');
   var hyOAS=fv('BAMLH0A0HYM2'),hyp=fv2('BAMLH0A0HYM2');
-  var unrate=fv('UNRATE'),cpi=fv('CPALTT01USM657N');
+  var unrate=fv('UNRATE'),cpi=fv('CPIAUCSL');
   var cad=fv('DEXCAUS'),cadp=fv2('DEXCAUS'),eur=fv('DEXUSEU');
 
   var dg10c=(dgs10!==null&&dgs10p!==null)?dgs10-dgs10p:null;
@@ -1572,7 +1601,6 @@ var _GROUP_ITEMS = {
   ],
   macro: [
     {id:'dashboard', label:'Dashboard', section:'MACRO'},
-    {id:'currency', label:'Currencies'},
     {id:'guide', label:'Field Guide'}
   ],
   cal: [
@@ -2605,7 +2633,7 @@ const showYrs = years.slice(-4);
 const curYr = showYrs[showYrs.length-1];
 const commData = getPSDComm(currentComm);
 const f = v => (v===null||v===undefined||isNaN(v)) ? '—' : fmtNum(v);
-const allVals = {};
+const allVals = {}; // [country] = [val per showYr]
 for(const country of countries){
 const cdata = commData[country]||{};
 allVals[country] = showYrs.map(yr => {
@@ -2613,26 +2641,14 @@ const v = (cdata[String(yr)]||{})[key];
 return (v!==undefined && !isNaN(v)) ? v : null;
 });
 }
-// Group countries by region, preserving input order within each region
-const byRegion = {};
-for(const country of countries){
-const region = COUNTRY_REGION[country] || 'Other';
-if(!byRegion[region]) byRegion[region] = [];
-byRegion[region].push(country);
-}
 const totals = showYrs.map((yr, yi) => {
 const colVals = countries.map(c => allVals[c][yi]).filter(v => v !== null);
 return colVals.length ? colVals.reduce((a,b)=>a+b, 0) : null;
 });
-const ncols = showYrs.length + 1;
 let html = `<table class="ctry-mini-tbl"><thead><tr><th>Country</th>`;
 for(const yr of showYrs) html += `<th class="${yr===curYr?'cur':''}">${yr}</th>`;
 html += '</tr></thead><tbody>';
-const orderedRegions = REGION_ORDER.filter(r => byRegion[r] && byRegion[r].length);
-const regionHdrStyle = 'background:var(--section-bg);color:var(--amber);font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;border-top:1px solid var(--border2);text-align:left;';
-for(const region of orderedRegions){
-html += `<tr><td colspan="${ncols}" style="${regionHdrStyle}">${region}</td></tr>`;
-for(const country of byRegion[region]){
+for(const country of countries){
 const vals = allVals[country];
 const nonNull = vals.filter(v=>v!==null);
 const maxV = nonNull.length ? Math.max(...nonNull) : null;
@@ -2649,7 +2665,6 @@ if(!isCur && v!==null && minV!==null && v===minV && maxV!==minV) cls='lo';
 html += `<td class="${cls}">${f(v)}</td>`;
 }
 html += '</tr>';
-}
 }
 html += '</tbody><tfoot><tr><td>TOTAL</td>';
 for(let i=0;i<showYrs.length;i++){
@@ -8287,10 +8302,12 @@ const FRED_SERIES = {
   labor:{title:"LABOR MARKET",sub:"Unemployment & claims",dual:true,s:[
     {id:"UNRATE",l:"Unemp %",c:"#5b9cf0",lim:24,yAxis:'y'},{id:"ICSA",l:"Claims",c:"#40c8b0",lim:104,yAxis:'y1'}]},
   cpi:{title:"CPI & PCE INFLATION",sub:"Year-over-year % change",s:[
-    {id:"CPALTT01USM657N",l:"CPI YoY %",c:"#C4302B",lim:60},
+    {id:"CPIAUCSL",l:"CPI YoY %",c:"#C4302B",lim:60,extra:"&units=pc1"},
     {id:"PCEPI",l:"PCE YoY %",c:"#8b5cf6",lim:60,extra:"&units=pc1"}]},
-  liquidity:{title:"LIQUIDITY & FED BALANCE SHEET",sub:"Trillions USD",dual:true,s:[
-    {id:"M2SL",l:"M2",c:"#5b9cf0",lim:60,yAxis:'y'},{id:"WALCL",l:"Fed B/S",c:"#D4850A",lim:104,yAxis:'y1'}]},
+  liquidity:{title:"M2 MONEY SUPPLY",sub:"Year-over-year % change",s:[
+    {id:"M2SL",l:"M2 YoY %",c:"#5b9cf0",lim:60,extra:"&units=pc1"}]},
+  fedbs:{title:"FED BALANCE SHEET",sub:"Year-over-year % change",s:[
+    {id:"WALCL",l:"Fed B/S YoY %",c:"#D4850A",lim:104,extra:"&units=pc1"}]},
   ism:{title:"INDUSTRIAL PRODUCTION",sub:"Manufacturing index · monthly",s:[
     {id:"INDPRO",l:"Ind. Prod.",c:"#40c8b0",lim:60}]}
 };
@@ -8604,7 +8621,8 @@ function buildFredDashboard() {
     {k:'labor', title:'LABOR MARKET', sub:'Unemployment rate & initial claims'},
     {k:'spreads', title:'CURVE SPREADS', sub:'10Y-2Y & 10Y-3M · Negative = inverted'},
     {k:'cpi', title:'CPI & PCE INFLATION', sub:'Year-over-year % change'},
-    {k:'liquidity', title:'LIQUIDITY & FED BALANCE SHEET', sub:'M2 money supply & Fed balance sheet'},
+    {k:'liquidity', title:'M2 MONEY SUPPLY', sub:'Year-over-year % change'},
+    {k:'fedbs', title:'FED BALANCE SHEET', sub:'Year-over-year % change'},
     {k:'ism', title:'INDUSTRIAL PRODUCTION', sub:'Manufacturing index · monthly'}
   ];
   chartPanels.forEach(function(p) {
