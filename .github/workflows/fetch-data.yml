@@ -37,6 +37,9 @@ jobs:
         continue-on-error: true
  
       - name: Run Export Sales fetch
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          FAS_API_KEY: ${{ secrets.FAS_API_KEY }}
         run: time python scripts/fetch_exports.py
         timeout-minutes: 4
         continue-on-error: true
