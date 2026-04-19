@@ -29,7 +29,7 @@ jobs:
       - name: Run PSD fetch
         run: time python scripts/fetch_psd.py
         timeout-minutes: 6
-        continue-on-error: true
+        continue-on-error: false
  
       - name: Run FRED fetch
         run: time python scripts/fetch_fred.py
@@ -42,7 +42,7 @@ jobs:
           FAS_API_KEY: ${{ secrets.FAS_API_KEY }}
         run: time python scripts/fetch_exports.py
         timeout-minutes: 4
-        continue-on-error: true
+        continue-on-error: false
  
       - name: Run CGC GSW fetch
         run: time python scripts/fetch_cgc.py
@@ -52,7 +52,7 @@ jobs:
       - name: Run Prices fetch
         run: time python scripts/fetch_prices.py
         timeout-minutes: 4
-        continue-on-error: true
+        continue-on-error: false
  
       - name: Commit data
         run: |
