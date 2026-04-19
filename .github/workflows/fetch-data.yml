@@ -14,7 +14,7 @@ concurrency:
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
  
@@ -30,37 +30,37 @@ jobs:
         env:
           NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
         run: time python scripts/fetch_nass.py
-        timeout-minutes: 3
+        timeout-minutes: 5
         continue-on-error: true
  
       - name: Run PSD fetch
         run: time python scripts/fetch_psd.py
-        timeout-minutes: 3
+        timeout-minutes: 6
         continue-on-error: true
  
       - name: Run FRED fetch
         run: time python scripts/fetch_fred.py
-        timeout-minutes: 2
+        timeout-minutes: 4
         continue-on-error: true
  
       - name: Run Export Sales fetch
         run: time python scripts/fetch_exports.py
-        timeout-minutes: 2
+        timeout-minutes: 4
         continue-on-error: true
  
       - name: Run CGC GSW fetch
         run: time python scripts/fetch_cgc.py
-        timeout-minutes: 2
+        timeout-minutes: 4
         continue-on-error: true
  
       - name: Run StatsCan S&D fetch
         run: time python scripts/fetch_statscan.py
-        timeout-minutes: 3
+        timeout-minutes: 4
         continue-on-error: true
  
       - name: Run Prices fetch
         run: time python scripts/fetch_prices.py
-        timeout-minutes: 3
+        timeout-minutes: 4
         continue-on-error: true
  
       - name: Commit data
