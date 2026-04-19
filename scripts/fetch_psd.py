@@ -92,13 +92,25 @@ BASE = "https://apps.fas.usda.gov/psdonline/downloads"
  
  
 def download_zip(filename):
+    """Download a PSD CSV zip with retries. Fail loud after 3 attempts."""
     url = f"{BASE}/{filename}"
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "*/*",
-    })
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        return resp.read()
+    last_err = None
+    for attempt in range(1, 4):
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Accept": "*/*",
+            })
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return resp.read()
+        except Exception as e:
+            last_err = e
+            if attempt < 3:
+                import time
+                sleep_s = 3 * attempt  # 3s, 6s
+                print(f"    {filename} attempt {attempt} failed ({e}); retrying in {sleep_s}s...")
+                time.sleep(sleep_s)
+    raise RuntimeError(f"{filename}: all 3 attempts failed. Last error: {last_err}")
  
  
 def parse_csv_zip(zipdata, result, world_by_country):
@@ -363,5 +375,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
  
