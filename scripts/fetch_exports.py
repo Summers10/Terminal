@@ -117,6 +117,16 @@ def week_of_my(dt, my_start_month):
     return max(1, min(52, (dt - start).days // 7 + 1))
  
  
+def week_within_specific_my(dt, my_start_year, my_start_month):
+    """1-indexed week within a specific MY that began in (year, month).
+       Returns None if dt is outside that MY."""
+    start = date(my_start_year, my_start_month, 1)
+    end = date(my_start_year + 1, my_start_month, 1)
+    if dt < start or dt >= end:
+        return None
+    return max(1, min(52, (dt - start).days // 7 + 1))
+ 
+ 
 def my_week_to_date(my_start_year, my_start_month, week_num):
     """Approximate calendar date corresponding to week N of a given MY."""
     return date(my_start_year, my_start_month, 1) + timedelta(weeks=week_num - 1)
@@ -142,10 +152,13 @@ def num(v):
 # ------------------------------------------------------------------
 # Fetch + aggregate
 # ------------------------------------------------------------------
-def fetch_commodity_my(name, code, my_year):
+def fetch_commodity_my(name, code, my_year, my_start_month):
     """Hit the ESR API for a single (commodity, marketYear).
-       Returns a dict: {week_ending_date: {"ex": MT, "ns": MT}} aggregated
-       across all countries. Raises on hard failure; returns {} on empty."""
+       Returns {week_num: {"ex": MT, "ns": MT}} aggregated across all countries.
+       Records whose weekEndingDate falls outside the requested MY window are
+       skipped (the V2 API sometimes returns such rows, and they used to get
+       misclassified as week 52 of the requested MY).
+       Raises on hard failure; returns {} on empty."""
     path = "/api/esr/exports/commodityCode/{}/allCountries/marketYear/{}".format(code, my_year)
     data = api_get(path)
  
@@ -158,16 +171,23 @@ def fetch_commodity_my(name, code, my_year):
         )
  
     weekly = {}
+    skipped_out_of_my = 0
+    skipped_no_date = 0
     for rec in data:
         wed = parse_week_ending(rec.get("weekEndingDate"))
         if not wed:
+            skipped_no_date += 1
             continue
-        slot = weekly.setdefault(wed, {"ex": 0.0, "ns": 0.0})
+        wk = week_within_specific_my(wed, my_year, my_start_month)
+        if wk is None:
+            skipped_out_of_my += 1
+            continue
+        slot = weekly.setdefault(wk, {"ex": 0.0, "ns": 0.0})
         slot["ex"] += num(rec.get("weeklyExports"))
         slot["ns"] += num(rec.get("currentMYNetSales"))
  
-    print("    {} MY{}: {} weekly aggregates across {} country rows".format(
-        name, my_year, len(weekly), len(data)))
+    print("    {} MY{}: {} weeks filled from {} rows ({} skipped out-of-MY, {} bad dates)".format(
+        name, my_year, len(weekly), len(data), skipped_out_of_my, skipped_no_date))
     return weekly
  
  
@@ -300,7 +320,7 @@ def main():
             # For the prior MY, only fill gaps.
             force = (my_year == this_my)
             try:
-                weekly = fetch_commodity_my(name, cfg["code"], my_year)
+                weekly = fetch_commodity_my(name, cfg["code"], my_year, cfg["my_start_month"])
             except urllib.error.HTTPError as e:
                 body = ""
                 try:
@@ -318,8 +338,14 @@ def main():
                 continue
  
             added = 0
-            for wed, vals in sorted(weekly.items()):
-                wk = week_of_my(wed, cfg["my_start_month"])
+            # For the current MY, null out the array before writing fresh data.
+            # This wipes any weeks that a previous run incorrectly populated
+            # (e.g. the week-52 poisoning bug from mis-classifying pre-MY
+            # records). The API is the authoritative source for current MY.
+            if force and weekly:
+                for section in ("insp", "sales"):
+                    comm[section]["w"][my_str] = [None] * 52
+            for wk, vals in sorted(weekly.items()):
                 if upsert_week(comm, my_str, wk, vals["ex"], vals["ns"], force=force):
                     added += 1
             if added:
