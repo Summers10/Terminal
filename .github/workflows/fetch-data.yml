@@ -14,7 +14,7 @@ concurrency:
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
  
@@ -25,13 +25,6 @@ jobs:
  
       - name: Install deps
         run: pip install --quiet yfinance requests pandas
- 
-      - name: Run NASS fetch
-        env:
-          NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
-        run: time python scripts/fetch_nass.py
-        timeout-minutes: 5
-        continue-on-error: true
  
       - name: Run PSD fetch
         run: time python scripts/fetch_psd.py
@@ -50,11 +43,6 @@ jobs:
  
       - name: Run CGC GSW fetch
         run: time python scripts/fetch_cgc.py
-        timeout-minutes: 4
-        continue-on-error: true
- 
-      - name: Run StatsCan S&D fetch
-        run: time python scripts/fetch_statscan.py
         timeout-minutes: 4
         continue-on-error: true
  
