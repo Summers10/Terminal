@@ -93,13 +93,21 @@ def fetch_all():
     raw = yf.download(all_tickers, period='6y', interval='1d', auto_adjust=True, progress=False)
     return raw
  
-def build_prices_json(raw):
+def build_prices_json(raw, existing=None):
     """
     Build prices.json: weekly Friday closes organized by marketing year.
     Format matches _SEAS_ENC structure expected by index.html:
     { SYM: { name, unit, exchange, my, data: { 'YYYY-YY': [[day, price], ...] } } }
+ 
+    If `existing` is provided and a symbol returns fewer than MIN_POINTS_TO_OVERWRITE
+    fresh points (flaky Yahoo feed, e.g. RS=F / MW=F occasional outages), the
+    existing historical entry is preserved instead of being overwritten with
+    empty data. This prevents silent wipe of years of accumulated history when
+    Yahoo's feed breaks for a run.
     """
+    MIN_POINTS_TO_OVERWRITE = 20
     out = {}
+    stale_syms = []
     closes = raw['Close'] if 'Close' in raw.columns.get_level_values(0) else raw
  
     for sym, cfg in SYMBOLS.items():
@@ -108,10 +116,28 @@ def build_prices_json(raw):
             series = closes[ticker].dropna()
         except Exception as e:
             print(f"  {sym}: FAILED - {e}")
-            continue
+            series = None
  
-        # Keep only Fridays (weekday==4)
-        series = series[series.index.weekday == 4]
+        if series is not None:
+            # Keep only Fridays (weekday==4)
+            series = series[series.index.weekday == 4]
+ 
+        # Flaky fetch -> preserve existing history rather than wiping
+        if series is None or len(series) < MIN_POINTS_TO_OVERWRITE:
+            prev = (existing or {}).get(sym)
+            if prev and prev.get('data'):
+                fresh = 0 if series is None else len(series)
+                prev_pts = sum(len(v) for v in prev['data'].values())
+                print(f"  {sym}: only {fresh} fresh pts - KEEPING existing ({prev_pts} pts across {len(prev['data'])} MYs)")
+                out[sym] = prev
+                stale_syms.append(sym)
+                continue
+            print(f"  {sym}: 0 marketing years, 0 weekly points (no existing history)")
+            out[sym] = {
+                'name': cfg['name'], 'unit': cfg['unit'], 'exchange': cfg['exchange'],
+                'my': cfg['my'], 'data': {}
+            }
+            continue
  
         # Group by marketing year
         by_my = {}
@@ -127,7 +153,6 @@ def build_prices_json(raw):
                 by_my[label] = []
             by_my[label].append([day, val])
  
-        # Sort each MY by day
         for label in by_my:
             by_my[label].sort(key=lambda x: x[0])
  
@@ -140,6 +165,9 @@ def build_prices_json(raw):
         }
         n_pts = sum(len(v) for v in by_my.values())
         print(f"  {sym}: {len(by_my)} marketing years, {n_pts} weekly points")
+ 
+    if stale_syms:
+        print(f"\n  NOTE: preserved existing history for {len(stale_syms)} stale ticker(s): {', '.join(stale_syms)}")
  
     return out
  
@@ -262,8 +290,17 @@ def main():
     now_ct = datetime.now(timezone(timedelta(hours=-5)))
     date_str = now_ct.strftime('%Y-%m-%d')
  
-    # 1. Build and save prices.json
-    prices = build_prices_json(raw)
+    # 1. Load existing prices.json so we can preserve history on flaky fetches
+    existing = {}
+    if PRICES_FILE.exists():
+        try:
+            with open(PRICES_FILE) as f:
+                existing = json.load(f)
+        except Exception as e:
+            print(f"  WARN: could not parse existing prices.json ({e}); starting fresh")
+ 
+    # 2. Build and save prices.json
+    prices = build_prices_json(raw, existing=existing)
     prices['_meta'] = {
         'fetched_at': datetime.now(timezone.utc).isoformat(),
         'symbols': list(SYMBOLS.keys()),
@@ -289,4 +326,5 @@ def main():
  
 if __name__ == '__main__':
     main()
+ 
  
