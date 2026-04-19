@@ -63,18 +63,25 @@ COMM_MAP = {
     "Milk, Whole Dry": None, "Whey, Dry": None, "Fluid Milk": None,
 }
  
+# All countries referenced in the UI's EXPORTERS and IMPORTERS lists.
+# Any country in this set will have its individual S&D records stored.
+# World totals are summed from ALL countries in the CSV (not just these).
 COUNTRIES = {
-    "Argentina", "Australia", "Brazil", "Canada", "China",
-    "Egypt", "European Union", "India", "Indonesia", "Japan",
-    "Kazakhstan", "Mexico", "Pakistan", "Russia", "South Africa",
-    "Thailand", "Turkey", "Ukraine", "United Kingdom",
-    "United States", "Vietnam",
+    "Algeria", "Argentina", "Australia", "Bangladesh", "Brazil",
+    "Canada", "China", "Colombia", "Egypt", "European Union",
+    "India", "Indonesia", "Iran", "Israel", "Japan", "Kazakhstan",
+    "Kenya", "Malaysia", "Mexico", "Morocco", "Myanmar", "Nigeria",
+    "Pakistan", "Papua New Guinea", "Philippines", "Russia",
+    "South Africa", "South Korea", "Sri Lanka", "Taiwan", "Thailand",
+    "Turkey", "Ukraine", "United Kingdom", "United States", "Vietnam",
 }
  
 COUNTRY_MAP = {
     "European Union (EU-27)": "European Union",
     "European Union-27": "European Union",
     "EU-27": "European Union", "EU27": "European Union",
+    "Korea, South": "South Korea", "Korea, Republic of": "South Korea",
+    "Burma": "Myanmar",
 }
  
 MIN_YEAR = 2015
@@ -162,31 +169,28 @@ def parse_csv_zip(zipdata, result, world_by_country):
 def main():
     print("Fetching FAS PSD data via bulk CSV download...")
  
-    # psd_alldata_csv.zip contains everything. Category-specific files are
-    # fallbacks in case the master file is unavailable.
-    candidates = [
+    # psd_alldata_csv.zip covers grains, oilseeds, cotton — but NOT livestock.
+    # Livestock (Beef and Veal) requires the separate livestock_poultry file.
+    # We try alldata first, then livestock, skipping the redundant category files.
+    primary_files = [
         "psd_alldata_csv.zip",
+        "psd_livestock_poultry_csv.zip",
+    ]
+    fallback_files = [
         "psd_grains_csv.zip",
         "psd_grains_pulses_csv.zip",
-        "psd_grain_csv.zip",
         "psd_oilseeds_csv.zip",
-        "psd_oilseed_csv.zip",
         "psd_cotton_csv.zip",
         "psd_livestock_csv.zip",
-        "psd_livestock_poultry_csv.zip",
-        "psd_dairy_csv.zip",
     ]
  
     result = {}
     world_by_country = {}
     downloaded = []
-    master_ok = False
+    alldata_ok = False
  
-    for filename in candidates:
-        # If the master all-data file already succeeded, skip category files
-        # (they contain the same records and just waste network+CPU)
-        if master_ok:
-            break
+    # Try primary files first
+    for filename in primary_files:
         try:
             print(f"  {filename}...", end=" ", flush=True)
             data = download_zip(filename)
@@ -195,12 +199,27 @@ def main():
             if count > 0:
                 downloaded.append(filename)
                 if filename == "psd_alldata_csv.zip":
-                    master_ok = True
-                    print("  (psd_alldata contains all commodities — skipping category files)")
+                    alldata_ok = True
         except urllib.error.HTTPError as e:
             print(f"{e.code} {e.reason}")
         except Exception as e:
             print(f"error: {e}")
+ 
+    # If alldata failed, fall back to category files (dedup-safe via world_by_country)
+    if not alldata_ok:
+        print("  alldata missing — falling back to category files...")
+        for filename in fallback_files:
+            try:
+                print(f"  {filename}...", end=" ", flush=True)
+                data = download_zip(filename)
+                print(f"OK ({len(data):,} bytes)")
+                count = parse_csv_zip(data, result, world_by_country)
+                if count > 0:
+                    downloaded.append(filename)
+            except urllib.error.HTTPError as e:
+                print(f"{e.code} {e.reason}")
+            except Exception as e:
+                print(f"error: {e}")
  
     if not result:
         print("\nERROR: No data fetched.", file=sys.stderr)
