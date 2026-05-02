@@ -8581,14 +8581,30 @@ async function refreshFred() {
   // Fallback: live API
   if (!fredApiKey) { if(lb) lb.style.display='none'; return; }
   var ok = 0, fail = 0;
-  for (var i = 0; i < fetchSeries.length; i++) {
-    var s = fetchSeries[i];
-    if (lp) lp.style.width = ((i + 1) / fetchSeries.length * 100) + '%';
-    try {
-      var data = await fredFetch(s.id, s.lim, s.extra);
-      if (data && data.length > 0) { fredData[s.id] = data; ok++; updateFredMetric(s); } else { fail++; }
-    } catch(e) { fail++; }
+var results = await Promise.allSettled(
+  fetchSeries.map(function(s) {
+    return fredFetch(s.id, s.lim, s.extra)
+      .then(function(data) {
+        return { s: s, data: data };
+      });
+  })
+);
+
+results.forEach(function(result, i) {
+  if (lp) lp.style.width = ((i + 1) / fetchSeries.length * 100) + '%';
+
+  if (
+    result.status === 'fulfilled' &&
+    result.value.data &&
+    result.value.data.length > 0
+  ) {
+    fredData[result.value.s.id] = result.value.data;
+    ok++;
+    updateFredMetric(result.value.s);
+  } else {
+    fail++;
   }
+});
   computeDerivedSeries();
   updateFredCharts();
   setTimeout(function(){ Object.values(fredCharts).forEach(function(c){ try{c.resize();}catch(e){} }); drawYieldCurveSnapshot(); }, 100);
