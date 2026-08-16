@@ -27,6 +27,7 @@ COMM_MAP = {
     "Corn": "Corn",
     "Soybeans": "Soybeans", "Soybean Oilseed": "Soybeans", "Oilseed, Soybean": "Soybeans",
     "Rapeseed": "Rapeseed/Canola", "Oilseed, Rapeseed": "Rapeseed/Canola", "Canola": "Rapeseed/Canola",
+    "Oats": "Oats",
 }
  
 COUNTRIES = {
@@ -162,6 +163,7 @@ def main():
         "Corn":             (1_100_000, 1_400_000),
         "Soybeans":         (350_000, 500_000),
         "Rapeseed/Canola":  (70_000, 110_000),
+        "Oats":             (18_000, 30_000),
     }
     print("\nSanity checking World production...")
     warnings = []
