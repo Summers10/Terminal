@@ -31,7 +31,7 @@ body.light{
 .tbtn{padding:7px 15px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:all .1s}
 .tbtn.active{background:var(--amber);color:#000}
 .tbtn:hover:not(.active){color:var(--amber)}
-#root{max-width:1500px;margin:0 auto;padding:22px}
+#root{max-width:1280px;margin:0 auto;padding:22px}
 .sec-hdr{font-size:15px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);padding:16px 0 9px;border-bottom:2px solid var(--amber);margin:32px 0 14px}
 .sec-hdr:first-child{margin-top:0}
 .panel{border-bottom:2px solid var(--amber);margin-bottom:20px;overflow:hidden}
@@ -40,11 +40,11 @@ body.light{
 .panel-sub{font-size:13px;color:var(--text3);letter-spacing:.05em;margin-left:8px}
 .tbl-wrap{overflow-x:auto}
 .bal-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
-.bal-table th{background:var(--th-bg);padding:8px 10px;text-align:right;font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
+.bal-table th{background:var(--th-bg);padding:8px 8px;text-align:right;font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
 .bal-table th:first-child{text-align:left;font-size:14px;letter-spacing:.08em}
 .bal-table th.latest{color:var(--amber);font-weight:900;border-bottom:2px solid var(--amber)}
 .bal-table th.yoy{color:var(--text3);font-style:italic}
-.bal-table td{padding:5px 10px;text-align:right;font-size:15px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.bal-table td{padding:5px 8px;text-align:right;font-size:15px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
 .bal-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 td.latest{color:var(--amber) !important;font-weight:800 !important}
 .row-section td{background:var(--section-bg);color:var(--text3) !important;font-size:12px !important;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:5px 10px 4px;border-top:1px solid var(--border2)}
@@ -107,14 +107,14 @@ const HIST_YEARS = 7;
 
 const EXPORTERS = {
   Wheat: ["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],
-  Corn: ["United States","Brazil","Argentina","Ukraine"],
-  Soybeans: ["United States","Brazil","Argentina"],
+  Corn: ["United States","Brazil","Argentina","Ukraine","European Union"],
+  Soybeans: ["United States","Brazil","Argentina","Paraguay"],
   "Rapeseed/Canola": ["Canada","Australia","European Union","Ukraine"],
   Oats: ["Canada","Australia","European Union"]
 };
 const IMPORTERS = {
   Wheat: ["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh"],
-  Corn: ["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
+  Corn: ["China","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
   Soybeans: ["China","European Union","Mexico","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
   "Rapeseed/Canola": ["China","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
   Oats: ["United States","Mexico","Brazil"]
@@ -230,7 +230,7 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
     return convertVal(getRaw(yd, row.key), currentUnit, comm);
   }
 
-  let html = `<div class="tbl-wrap"><table class="bal-table"><colgroup><col style="width:190px">`;
+  let html = `<div class="tbl-wrap"><table class="bal-table"><colgroup><col style="width:175px">`;
   for(const y of years) html += '<col>';
   if(includeYoy) html += '<col style="width:75px">';
   html += `</colgroup><thead><tr><th>ITEM</th>`;
