@@ -52,7 +52,10 @@ td.latest{color:var(--amber) !important;font-weight:800 !important}
 .row-total td{font-weight:800;font-size:16px !important;color:var(--amber) !important}
 .row-ending td{font-weight:900;font-size:16px !important;color:var(--text) !important;background:var(--row-latest) !important}
 .row-stu td{font-style:italic;color:var(--amber) !important;font-size:15px !important}
-.row-pctile td{font-style:italic;color:var(--text3) !important;font-size:13px !important;border-bottom:2px solid var(--border2)}
+.row-pctile td{font-style:italic;font-size:13px !important;border-bottom:2px solid var(--border2)}
+td.pctile-tight{color:var(--red) !important;font-weight:800 !important}
+td.pctile-loose{color:var(--green) !important;font-weight:800 !important}
+td.pctile-mid{color:var(--text3) !important}
 td.up{color:var(--green) !important}
 td.dn{color:var(--red) !important}
 .stack-wrap{display:flex;flex-direction:column;gap:0}
@@ -97,22 +100,24 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
 <div id="root"></div>
 
 <script>
-const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola"];
-const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924};
+const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats"];
+const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924, Oats:68.8955};
 const ACRES_PER_HA = 2.47105;
-const HIST_YEARS = 10;
+const HIST_YEARS = 7;
 
 const EXPORTERS = {
   Wheat: ["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],
   Corn: ["United States","Brazil","Argentina","Ukraine"],
   Soybeans: ["United States","Brazil","Argentina"],
-  "Rapeseed/Canola": ["Canada","Australia","European Union","Ukraine"]
+  "Rapeseed/Canola": ["Canada","Australia","European Union","Ukraine"],
+  Oats: ["Canada","Australia","European Union"]
 };
 const IMPORTERS = {
-  Wheat: ["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],
+  Wheat: ["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh"],
   Corn: ["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
-  Soybeans: ["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
-  "Rapeseed/Canola": ["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"]
+  Soybeans: ["China","European Union","Mexico","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
+  "Rapeseed/Canola": ["China","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
+  Oats: ["United States","Mexico","Brazil"]
 };
 
 let DATA = null;
@@ -249,6 +254,9 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
       if(row.type!=='stu' && row.type!=='stu_pctile' && v!==null && prev!==null){
         if(v>prev) tdCls+=' up'; else if(v<prev) tdCls+=' dn';
       }
+      if(row.type==='stu_pctile' && v!==null){
+        tdCls += v<=25 ? ' pctile-tight' : (v>=75 ? ' pctile-loose' : ' pctile-mid');
+      }
       const text = row.type==='stu' ? fmtStu(v) : (row.type==='stu_pctile' ? (v===null?'—':v.toFixed(0)+'th') : (row.yield ? fmt2(v) : fmt(v)));
       html += `<td class="${tdCls.trim()}">${text}</td>`;
     }
@@ -275,16 +283,23 @@ function panelWrap(title, sub, innerHtml){
   return `<div class="panel"><div class="panel-hdr"><span class="panel-title">${title}</span><span class="panel-sub">${sub}</span></div>${innerHtml}</div>`;
 }
 
-// Multi-year, country-by-year breakout table for a single metric (e.g. Acres across 10 years).
+// Multi-year, country-by-year breakout table for a single metric (e.g. Acres across N years), plus YoY change.
 function buildMetricByCountryTable(countryList, countries, years, metric){
   const latestYear = years[years.length-1];
+  const prevYear = years.length>1 ? years[years.length-2] : null;
   let html = `<div class="tbl-wrap"><table class="bal-table"><thead><tr><th>Country</th>`;
   years.forEach(y=>{ html += `<th class="${y===latestYear?'latest':''}">${y}</th>`; });
+  html += `<th class="yoy">YoY Δ</th>`;
   html += `</tr></thead><tbody>`;
 
   let alt=false;
   const totals = {};
   years.forEach(y=>totals[y]={sum:0,has:false});
+
+  function metricVal(cd, y){
+    if(metric==='ah') return acresK(getRaw(cd[y], 'ah'));
+    return convertVal(getRaw(cd[y], metric), currentUnit, currentComm);
+  }
 
   countryList.forEach(c=>{
     const cd = countries[c] || {};
@@ -292,26 +307,32 @@ function buildMetricByCountryTable(countryList, countries, years, metric){
     alt=!alt;
     let prevVal = null;
     years.forEach(y=>{
-      let v;
-      if(metric==='ah') v = acresK(getRaw(cd[y], 'ah'));
-      else v = convertVal(getRaw(cd[y], metric), currentUnit, currentComm);
+      const v = metricVal(cd, y);
       if(v!==null){ totals[y].sum += v; totals[y].has = true; }
       let cls = y===latestYear ? 'latest' : '';
       if(v!==null && prevVal!==null){ cls += v>prevVal?' up':(v<prevVal?' dn':''); }
       html += `<td class="${cls.trim()}">${fmt(v)}</td>`;
       prevVal = v;
     });
+    const curV = metricVal(cd, latestYear);
+    const prevV = prevYear ? metricVal(cd, prevYear) : null;
+    const yoy = yoyPct(curV, prevV);
+    let yoyCls = 'latest';
+    if(yoy!==null){ yoyCls += yoy>0?' up':(yoy<0?' dn':''); }
+    html += `<td class="${yoyCls}">${fmtYoy(yoy)}</td>`;
     html += `</tr>`;
   });
 
   html += `<tr class="row-total"><td>Total</td>`;
-  let prevTotal = null;
   years.forEach(y=>{
     const t = totals[y];
     const v = t.has ? t.sum : null;
     html += `<td>${fmt(v)}</td>`;
-    prevTotal = v;
   });
+  const totCur = totals[latestYear].has ? totals[latestYear].sum : null;
+  const totPrev = prevYear && totals[prevYear].has ? totals[prevYear].sum : null;
+  const totYoy = yoyPct(totCur, totPrev);
+  html += `<td>${fmtYoy(totYoy)}</td>`;
   html += `</tr></tbody></table></div>`;
   return html;
 }
