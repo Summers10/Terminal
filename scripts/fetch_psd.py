@@ -34,7 +34,7 @@ COUNTRIES = {
     "Algeria", "Argentina", "Australia", "Bangladesh", "Brazil", "Canada",
     "China", "Colombia", "Egypt", "European Union", "India", "Indonesia",
     "Iran", "Japan", "Kazakhstan", "Malaysia", "Mexico", "Morocco",
-    "Pakistan", "Philippines", "Russia", "South Korea", "Taiwan",
+    "Pakistan", "Paraguay", "Philippines", "Russia", "South Korea", "Taiwan",
     "Thailand", "Turkey", "Ukraine", "United States", "Vietnam",
 }
  
