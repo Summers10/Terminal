@@ -7,48 +7,80 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{height:100%}
 body{
-  font-family:'Courier New',Courier,monospace;font-size:15px;font-weight:500;min-height:100%;
-  background:#000;color:#d4b896;font-variant-numeric:tabular-nums;
+  font-family:'Courier New',Courier,monospace;font-size:17px;font-weight:500;min-height:100%;
+  background:var(--bg);color:var(--text);font-variant-numeric:tabular-nums;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  transition:background .15s,color .15s;
+}
+body.dark{
   --bg:#000;--bg1:#060606;--bg2:#0a0a0a;--border:#141414;--border2:#1e1e1e;
   --text:#d4b896;--text2:#8a7a68;--text3:#6a5a4a;
   --amber:#f5a623;--green:#2e8f52;--red:#b83838;
   --th-bg:#040404;--section-bg:#050505;--row-alt:#030303;--row-latest:#0c0800;
 }
-#topbar{position:sticky;top:0;z-index:10;padding:12px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-#topbar h1{font-size:16px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap}
-#meta{font-size:11px;color:var(--text3);letter-spacing:.04em;margin-left:auto}
+body.light{
+  --bg:#FFFFFF;--bg1:#F7F8FA;--bg2:#F0F1F4;--border:#E0E2E8;--border2:#C8CCD4;
+  --text:#1A1D24;--text2:#3A3F4A;--text3:#6B7280;
+  --amber:#B8720A;--green:#0E7A3A;--red:#C4302B;
+  --th-bg:#F2F3F6;--section-bg:#ECEDF0;--row-alt:#F7F8FA;--row-latest:#FFF3DC;
+}
+#topbar{position:sticky;top:0;z-index:10;padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+#topbar h1{font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap}
+#meta{font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto}
 .toggle{display:flex;border:1px solid var(--border2);border-radius:3px;overflow:hidden}
-.tbtn{padding:6px 14px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:all .1s}
+.tbtn{padding:7px 15px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:all .1s}
 .tbtn.active{background:var(--amber);color:#000}
 .tbtn:hover:not(.active){color:var(--amber)}
-#root{max-width:1300px;margin:0 auto;padding:20px}
-.sec-hdr{font-size:13px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);padding:14px 0 8px;border-bottom:2px solid var(--amber);margin:28px 0 12px}
+#root{max-width:1500px;margin:0 auto;padding:22px}
+.sec-hdr{font-size:15px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);padding:16px 0 9px;border-bottom:2px solid var(--amber);margin:32px 0 14px}
 .sec-hdr:first-child{margin-top:0}
-.panel{border-bottom:2px solid var(--amber);margin-bottom:18px;overflow:hidden}
-.panel-hdr{padding:8px 14px;background:var(--bg1);border:1px solid var(--border);border-bottom:none;border-top:3px solid var(--amber)}
-.panel-title{font-size:15px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--amber)}
-.panel-sub{font-size:11px;color:var(--text3);letter-spacing:.05em;margin-left:8px}
+.panel{border-bottom:2px solid var(--amber);margin-bottom:20px;overflow:hidden}
+.panel-hdr{padding:9px 16px;background:var(--bg1);border:1px solid var(--border);border-bottom:none;border-top:3px solid var(--amber)}
+.panel-title{font-size:16px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--amber)}
+.panel-sub{font-size:13px;color:var(--text3);letter-spacing:.05em;margin-left:8px}
+.tbl-wrap{overflow-x:auto}
 .bal-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
-.bal-table th{background:var(--th-bg);padding:7px 9px;text-align:right;font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
-.bal-table th:first-child{text-align:left;font-size:12px;letter-spacing:.08em}
+.bal-table th{background:var(--th-bg);padding:8px 10px;text-align:right;font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
+.bal-table th:first-child{text-align:left;font-size:14px;letter-spacing:.08em}
 .bal-table th.latest{color:var(--amber);font-weight:900;border-bottom:2px solid var(--amber)}
 .bal-table th.yoy{color:var(--text3);font-style:italic}
-.bal-table td{padding:4px 9px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.bal-table td{padding:5px 10px;text-align:right;font-size:15px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
 .bal-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 td.latest{color:var(--amber) !important;font-weight:800 !important}
-.row-section td{background:var(--section-bg);color:var(--text3) !important;font-size:10px !important;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px 3px;border-top:1px solid var(--border2)}
+.row-section td{background:var(--section-bg);color:var(--text3) !important;font-size:12px !important;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:5px 10px 4px;border-top:1px solid var(--border2)}
 .row-alt td{background:var(--row-alt) !important}
-.row-total td{font-weight:800;font-size:14px !important;color:var(--amber) !important}
-.row-ending td{font-weight:900;font-size:14px !important;color:var(--text) !important;background:var(--row-latest) !important}
-.row-stu td{font-style:italic;color:var(--amber) !important;font-size:13px !important}
+.row-total td{font-weight:800;font-size:16px !important;color:var(--amber) !important}
+.row-ending td{font-weight:900;font-size:16px !important;color:var(--text) !important;background:var(--row-latest) !important}
+.row-stu td{font-style:italic;color:var(--amber) !important;font-size:15px !important}
+.row-pctile td{font-style:italic;color:var(--text3) !important;font-size:13px !important;border-bottom:2px solid var(--border2)}
 td.up{color:var(--green) !important}
 td.dn{color:var(--red) !important}
 .stack-wrap{display:flex;flex-direction:column;gap:0}
-#err{padding:40px;text-align:center;color:var(--red);font-size:14px}
+#err{padding:40px;text-align:center;color:var(--red);font-size:16px}
 </style>
 </head>
-<body>
+<body class="dark">
+<div id="pw-gate" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column">
+  <div style="text-align:center">
+    <div style="font-size:20px;font-weight:900;letter-spacing:.14em;color:#f5a623;margin-bottom:20px">SUMCO RESEARCH</div>
+    <input id="pw-input" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')checkPw()"
+      style="background:#111;border:1px solid #333;color:#f5a623;font-family:'Courier New',Courier,monospace;font-size:16px;padding:10px 16px;width:240px;text-align:center;letter-spacing:.1em;outline:none;border-radius:3px">
+    <br><button onclick="checkPw()" style="margin-top:12px;background:#f5a623;border:none;color:#000;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;padding:8px 24px;cursor:pointer;letter-spacing:.1em;border-radius:3px">ENTER</button>
+    <div id="pw-err" style="color:#b83838;font-size:12px;margin-top:10px;height:16px"></div>
+  </div>
+</div>
+<script>
+function checkPw(){
+  var p = document.getElementById('pw-input').value;
+  if(p === 'Plamoil'){
+    document.getElementById('pw-gate').style.display = 'none';
+    sessionStorage.setItem('pw-ok', '1');
+  } else {
+    document.getElementById('pw-err').textContent = 'Invalid password';
+  }
+}
+if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').style.display = 'none';
+</script>
 <div id="topbar">
   <h1>USDA Balance Sheets</h1>
   <div class="toggle" id="comm-toggle"></div>
@@ -56,33 +88,37 @@ td.dn{color:var(--red) !important}
     <button class="tbtn" data-u="mt">MT</button>
     <button class="tbtn" data-u="bu">BU</button>
   </div>
+  <div class="toggle" id="theme-toggle">
+    <button class="tbtn" data-t="dark">Dark</button>
+    <button class="tbtn" data-t="light">Light</button>
+  </div>
   <div id="meta">Loading...</div>
 </div>
 <div id="root"></div>
 
 <script>
 const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola"];
-// Bushel conversion: bu per metric tonne. Acre conversion: acres per hectare (constant).
 const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924};
 const ACRES_PER_HA = 2.47105;
+const HIST_YEARS = 10;
 
-// Country groupings, limited to the 11 countries this basic pipeline tracks.
 const EXPORTERS = {
-  Wheat: ["United States","Canada","Australia","European Union","Argentina","Russia","Ukraine","Kazakhstan"],
+  Wheat: ["United States","European Union","Russia","Canada","Australia","Ukraine","Argentina"],
   Corn: ["United States","Brazil","Argentina","Ukraine"],
   Soybeans: ["United States","Brazil","Argentina"],
-  "Rapeseed/Canola": ["Canada","Australia","Ukraine"]
+  "Rapeseed/Canola": ["Canada","Australia","European Union","Ukraine"]
 };
 const IMPORTERS = {
-  Wheat: ["China","India","Brazil"],
-  Corn: ["China","European Union"],
-  Soybeans: ["China","European Union"],
-  "Rapeseed/Canola": ["China","European Union"]
+  Wheat: ["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh","European Union"],
+  Corn: ["China","European Union","Mexico","Japan","South Korea","Vietnam","Egypt","Colombia","Malaysia","Algeria","Indonesia","Iran"],
+  Soybeans: ["China","European Union","Mexico","Argentina","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
+  "Rapeseed/Canola": ["China","European Union","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"]
 };
 
 let DATA = null;
 let currentComm = "Wheat";
 let currentUnit = "mt";
+let currentTheme = "dark";
 
 function fmt(v){
   if(v===null || v===undefined || isNaN(v)) return '—';
@@ -120,8 +156,8 @@ function getStu(yearData){
 }
 function convertVal(raw, unit, comm){
   if(raw===null) return null;
-  if(unit==='bu') return raw * (BU_PER_MT[comm]||36.7437) / 1000; // -> million bu
-  return raw; // 1000 MT
+  if(unit==='bu') return raw * (BU_PER_MT[comm]||36.7437) / 1000;
+  return raw;
 }
 function yieldBuAc(prRaw, ahRaw, comm){
   if(prRaw===null||ahRaw===null||ahRaw===0) return null;
@@ -130,7 +166,6 @@ function yieldBuAc(prRaw, ahRaw, comm){
 }
 function acresK(ahRaw){ return ahRaw===null ? null : ahRaw*ACRES_PER_HA; }
 
-// Sum a set of country year-objects into one aggregate year-object (raw units).
 function sumCountries(countries, countryNames, year){
   const keys=['ah','bs','pr','im','dc','ex','es'];
   const out={}; let any=false;
@@ -148,11 +183,19 @@ function sumCountries(countries, countryNames, year){
 
 function unitLabel(){ return currentUnit==='bu' ? 'Million Bu' : '1000 MT'; }
 
-// Builds a full balance-sheet table (Area/Yield + Supply/Use/Balance) for a list of years,
-// given a function yearData(y) => raw {ah,bs,pr,im,dc,ex,es} for that year.
-function buildBalanceTable(comm, yearDataFn, years, includeYoy){
+function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
   const latestYear = years[years.length-1];
   const prevYear = years.length>1 ? years[years.length-2] : null;
+
+  // Full-history S/U values (not just the displayed years) for percentile ranking.
+  const fullYears = allYearsFull || years;
+  const stuHistory = fullYears.map(y => getStu(yearDataFn(y))).filter(v => v!==null);
+  function stuPctile(y){
+    const v = getStu(yearDataFn(y));
+    if(v===null || stuHistory.length===0) return null;
+    const countLE = stuHistory.filter(x => x<=v).length;
+    return (countLE/stuHistory.length)*100;
+  }
 
   const ROWS = [
     {type:'row', key:'ah', label:'Area harvested (1000 ac)', area:true},
@@ -169,6 +212,7 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy){
     {type:'section', label:'Balance'},
     {type:'row', key:'es', label:'Ending stocks', cls:'row-ending'},
     {type:'stu', label:'Stocks / Use %', cls:'row-stu'},
+    {type:'stu_pctile', label:'S/U Percentile Rank (' + fullYears.length + 'yr hist)', cls:'row-pctile'},
   ];
 
   function displayVal(row, y){
@@ -177,12 +221,13 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy){
     if(row.yield) return yieldBuAc(getRaw(yd,'pr'), getRaw(yd,'ah'), comm);
     if(row.type==='total') return convertVal(getTotalRaw(yd, row.keys), currentUnit, comm);
     if(row.type==='stu') return getStu(yd);
+    if(row.type==='stu_pctile') return stuPctile(y);
     return convertVal(getRaw(yd, row.key), currentUnit, comm);
   }
 
-  let html = `<table class="bal-table"><colgroup><col style="width:180px">`;
+  let html = `<div class="tbl-wrap"><table class="bal-table"><colgroup><col style="width:190px">`;
   for(const y of years) html += '<col>';
-  if(includeYoy) html += '<col style="width:70px">';
+  if(includeYoy) html += '<col style="width:75px">';
   html += `</colgroup><thead><tr><th>ITEM</th>`;
   for(const y of years) html += `<th class="${y===latestYear?'latest':''}">${y}</th>`;
   if(includeYoy) html += `<th class="yoy">YoY Δ</th>`;
@@ -201,24 +246,28 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy){
     for(let i=0;i<years.length;i++){
       const v=vals[i], prev=i>0?vals[i-1]:null;
       let tdCls = years[i]===latestYear?'latest':'';
-      if(row.type!=='stu' && v!==null && prev!==null){
+      if(row.type!=='stu' && row.type!=='stu_pctile' && v!==null && prev!==null){
         if(v>prev) tdCls+=' up'; else if(v<prev) tdCls+=' dn';
       }
-      const text = row.type==='stu' ? fmtStu(v) : (row.yield ? fmt2(v) : fmt(v));
+      const text = row.type==='stu' ? fmtStu(v) : (row.type==='stu_pctile' ? (v===null?'—':v.toFixed(0)+'th') : (row.yield ? fmt2(v) : fmt(v)));
       html += `<td class="${tdCls.trim()}">${text}</td>`;
     }
     if(includeYoy){
-      const cur = displayVal(row, latestYear);
-      const prev = prevYear ? displayVal(row, prevYear) : null;
-      const yoy = row.type==='stu' ? (cur!==null&&prev!==null?cur-prev:null) : yoyPct(cur,prev);
-      let cls = 'latest';
-      if(yoy!==null){ cls += yoy>0?' up':(yoy<0?' dn':''); }
-      const text = row.type==='stu' ? (yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(1)+'pp') : fmtYoy(yoy);
-      html += `<td class="${cls}">${text}</td>`;
+      if(row.type==='stu_pctile'){
+        html += `<td class="latest">—</td>`;
+      } else {
+        const cur = displayVal(row, latestYear);
+        const prev = prevYear ? displayVal(row, prevYear) : null;
+        const yoy = row.type==='stu' ? (cur!==null&&prev!==null?cur-prev:null) : yoyPct(cur,prev);
+        let cls = 'latest';
+        if(yoy!==null){ cls += yoy>0?' up':(yoy<0?' dn':''); }
+        const text = row.type==='stu' ? (yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(1)+'pp') : fmtYoy(yoy);
+        html += `<td class="${cls}">${text}</td>`;
+      }
     }
     html += '</tr>';
   }
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   return html;
 }
 
@@ -226,48 +275,44 @@ function panelWrap(title, sub, innerHtml){
   return `<div class="panel"><div class="panel-hdr"><span class="panel-title">${title}</span><span class="panel-sub">${sub}</span></div>${innerHtml}</div>`;
 }
 
-function buildSummaryTable(countryList, countries, years, cols){
-  // cols: array of {key, label, area?:bool}
+// Multi-year, country-by-year breakout table for a single metric (e.g. Acres across 10 years).
+function buildMetricByCountryTable(countryList, countries, years, metric){
   const latestYear = years[years.length-1];
-  const prevYear = years.length>1 ? years[years.length-2] : null;
-  let html = `<table class="bal-table"><thead><tr><th>Country</th>`;
-  cols.forEach(c=>{ html += `<th class="latest">${c.label} ${latestYear}</th><th class="yoy">YoY Δ</th>`; });
+  let html = `<div class="tbl-wrap"><table class="bal-table"><thead><tr><th>Country</th>`;
+  years.forEach(y=>{ html += `<th class="${y===latestYear?'latest':''}">${y}</th>`; });
   html += `</tr></thead><tbody>`;
+
   let alt=false;
   const totals = {};
-  cols.forEach(c=>totals[c.key]={cur:0,prev:0,hasCur:false,hasPrev:false});
+  years.forEach(y=>totals[y]={sum:0,has:false});
 
   countryList.forEach(c=>{
     const cd = countries[c] || {};
     html += `<tr class="${alt?'row-alt':''}"><td>${c}</td>`;
     alt=!alt;
-    cols.forEach(col=>{
-      let cur, prev;
-      if(col.area){
-        cur = acresK(getRaw(cd[latestYear], 'ah'));
-        prev = prevYear ? acresK(getRaw(cd[prevYear],'ah')) : null;
-      } else {
-        cur = convertVal(getRaw(cd[latestYear], col.key), currentUnit, currentComm);
-        prev = prevYear ? convertVal(getRaw(cd[prevYear], col.key), currentUnit, currentComm) : null;
-      }
-      if(cur!==null){ totals[col.key].cur += cur; totals[col.key].hasCur=true; }
-      if(prev!==null){ totals[col.key].prev += prev; totals[col.key].hasPrev=true; }
-      const yoy = yoyPct(cur,prev);
-      let cls = cur!==null && prev!==null ? (cur>prev?'up':(cur<prev?'dn':'')) : '';
-      html += `<td class="latest">${fmt(cur)}</td><td class="${cls}">${fmtYoy(yoy)}</td>`;
+    let prevVal = null;
+    years.forEach(y=>{
+      let v;
+      if(metric==='ah') v = acresK(getRaw(cd[y], 'ah'));
+      else v = convertVal(getRaw(cd[y], metric), currentUnit, currentComm);
+      if(v!==null){ totals[y].sum += v; totals[y].has = true; }
+      let cls = y===latestYear ? 'latest' : '';
+      if(v!==null && prevVal!==null){ cls += v>prevVal?' up':(v<prevVal?' dn':''); }
+      html += `<td class="${cls.trim()}">${fmt(v)}</td>`;
+      prevVal = v;
     });
     html += `</tr>`;
   });
 
   html += `<tr class="row-total"><td>Total</td>`;
-  cols.forEach(col=>{
-    const t = totals[col.key];
-    const cur = t.hasCur ? t.cur : null;
-    const prev = t.hasPrev ? t.prev : null;
-    const yoy = yoyPct(cur,prev);
-    html += `<td>${fmt(cur)}</td><td>${fmtYoy(yoy)}</td>`;
+  let prevTotal = null;
+  years.forEach(y=>{
+    const t = totals[y];
+    const v = t.has ? t.sum : null;
+    html += `<td>${fmt(v)}</td>`;
+    prevTotal = v;
   });
-  html += `</tr></tbody></table>`;
+  html += `</tr></tbody></table></div>`;
   return html;
 }
 
@@ -280,54 +325,51 @@ function render(){
 
   const allYears = new Set();
   Object.values(countries).forEach(yrs=>Object.keys(yrs).forEach(y=>allYears.add(y)));
-  const years5 = [...allYears].sort().slice(-5);
-  if(!years5.length){ root.innerHTML = '<div id="err">No years of data available</div>'; return; }
+  const yearsAll = [...allYears].sort();
+  const years10 = yearsAll.slice(-HIST_YEARS);
+  if(!years10.length){ root.innerHTML = '<div id="err">No years of data available</div>'; return; }
 
   const expList = (EXPORTERS[comm]||[]).filter(c=>countries[c]);
   const impList = (IMPORTERS[comm]||[]).filter(c=>countries[c]);
 
-  // SECTION 1: World
   root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">World Balance Sheet — ${comm}</div>`);
   root.insertAdjacentHTML('beforeend', panelWrap('WORLD', unitLabel(),
-    buildBalanceTable(comm, y=>(countries['World']||{})[y], years5, true)));
+    buildBalanceTable(comm, y=>(countries['World']||{})[y], years10, true, yearsAll)));
 
-  // SECTION 2: Major Exporters aggregate
   root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Aggregate Balance Sheet</div>`);
   root.insertAdjacentHTML('beforeend', panelWrap('MAJOR EXPORTERS', expList.join(', '),
-    buildBalanceTable(comm, y=>sumCountries(countries, expList, y), years5, true)));
+    buildBalanceTable(comm, y=>sumCountries(countries, expList, y), years10, true, yearsAll)));
 
-  // SECTION 3: Major Importers aggregate
   root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — Aggregate Balance Sheet</div>`);
   root.insertAdjacentHTML('beforeend', panelWrap('MAJOR IMPORTERS', impList.join(', '),
-    buildBalanceTable(comm, y=>sumCountries(countries, impList, y), years5, true)));
+    buildBalanceTable(comm, y=>sumCountries(countries, impList, y), years10, true, yearsAll)));
 
-  // SECTION 4: Individual exporter balance sheets, stacked
   root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Individual Balance Sheets</div>`);
   const stack = document.createElement('div');
   stack.className = 'stack-wrap';
   expList.forEach(c=>{
     stack.insertAdjacentHTML('beforeend', panelWrap(c.toUpperCase(), unitLabel(),
-      buildBalanceTable(comm, y=>(countries[c]||{})[y], years5, true)));
+      buildBalanceTable(comm, y=>(countries[c]||{})[y], years10, true, yearsAll)));
   });
   root.appendChild(stack);
 
-  // SECTION 5: Exporters summary — Acres, Production, Exports
-  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Acres / Production / Exports</div>`);
-  root.insertAdjacentHTML('beforeend', panelWrap('EXPORTERS SUMMARY', unitLabel(),
-    buildSummaryTable(expList, countries, years5, [
-      {key:'ah', label:'Acres (1000)', area:true},
-      {key:'pr', label:'Production'},
-      {key:'ex', label:'Exports'},
-    ])));
+  // Exporters: Acres / Production / Exports, each as its own 10-year country x year table
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — 10-Year Country Breakout</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('ACRES', 'Exporters — 1000 acres',
+    buildMetricByCountryTable(expList, countries, years10, 'ah')));
+  root.insertAdjacentHTML('beforeend', panelWrap('PRODUCTION', 'Exporters — ' + unitLabel(),
+    buildMetricByCountryTable(expList, countries, years10, 'pr')));
+  root.insertAdjacentHTML('beforeend', panelWrap('EXPORTS', 'Exporters — ' + unitLabel(),
+    buildMetricByCountryTable(expList, countries, years10, 'ex')));
 
-  // SECTION 6: Importers summary — Production, Imports, Ending stocks
-  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — Production / Imports / Ending Stocks</div>`);
-  root.insertAdjacentHTML('beforeend', panelWrap('IMPORTERS SUMMARY', unitLabel(),
-    buildSummaryTable(impList, countries, years5, [
-      {key:'pr', label:'Production'},
-      {key:'im', label:'Imports'},
-      {key:'es', label:'Ending Stocks'},
-    ])));
+  // Importers: Production / Imports / Ending Stocks, same layout
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — 10-Year Country Breakout</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('PRODUCTION', 'Importers — ' + unitLabel(),
+    buildMetricByCountryTable(impList, countries, years10, 'pr')));
+  root.insertAdjacentHTML('beforeend', panelWrap('IMPORTS', 'Importers — ' + unitLabel(),
+    buildMetricByCountryTable(impList, countries, years10, 'im')));
+  root.insertAdjacentHTML('beforeend', panelWrap('ENDING STOCKS', 'Importers — ' + unitLabel(),
+    buildMetricByCountryTable(impList, countries, years10, 'es')));
 }
 
 function initToggles(){
@@ -346,6 +388,17 @@ function initToggles(){
       currentUnit = b.dataset.u;
       ut.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', x===b));
       render();
+    });
+  });
+
+  const tt = document.getElementById('theme-toggle');
+  tt.querySelectorAll('.tbtn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.t===currentTheme);
+    b.addEventListener('click', ()=>{
+      currentTheme = b.dataset.t;
+      document.body.classList.toggle('dark', currentTheme==='dark');
+      document.body.classList.toggle('light', currentTheme==='light');
+      tt.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', x===b));
     });
   });
 }
