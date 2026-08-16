@@ -353,6 +353,19 @@ function render(){
   const expList = (EXPORTERS[comm]||[]).filter(c=>countries[c]);
   const impList = (IMPORTERS[comm]||[]).filter(c=>countries[c]);
 
+  // Oats: simplified view — just the two country balance sheets, nothing else.
+  if(comm === 'Oats'){
+    root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Oats — Canada / United States Balance Sheets</div>`);
+    const stackOats = document.createElement('div');
+    stackOats.className = 'stack-wrap';
+    ['Canada','United States'].filter(c=>countries[c]).forEach(c=>{
+      stackOats.insertAdjacentHTML('beforeend', panelWrap(c.toUpperCase(), unitLabel(),
+        buildBalanceTable(comm, y=>(countries[c]||{})[y], years10, true, yearsAll)));
+    });
+    root.appendChild(stackOats);
+    return;
+  }
+
   root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">World Balance Sheet — ${comm}</div>`);
   root.insertAdjacentHTML('beforeend', panelWrap('WORLD', unitLabel(),
     buildBalanceTable(comm, y=>(countries['World']||{})[y], years10, true, yearsAll)));
