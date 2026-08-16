@@ -4,71 +4,362 @@
 <meta charset="UTF-8">
 <title>USDA Balance Sheets</title>
 <style>
-  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; background:#0b0f14; color:#e6e6e6; margin:0; padding:24px; }
-  h1 { font-size:20px; margin-bottom:4px; }
-  #meta { color:#888; font-size:13px; margin-bottom:20px; }
-  .comm { margin-bottom:32px; }
-  .comm h2 { font-size:16px; border-bottom:1px solid #333; padding-bottom:6px; }
-  table { border-collapse:collapse; width:100%; font-size:13px; }
-  th, td { padding:5px 10px; text-align:right; border-bottom:1px solid #222; }
-  th:first-child, td:first-child { text-align:left; }
-  th { color:#9ab; font-weight:600; }
-  tr:hover { background:#151b22; }
-  .world { font-weight:700; color:#fff; background:#141a20; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{
+  font-family:'Courier New',Courier,monospace;font-size:15px;font-weight:500;min-height:100%;
+  background:#000;color:#d4b896;font-variant-numeric:tabular-nums;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  --bg:#000;--bg1:#060606;--bg2:#0a0a0a;--border:#141414;--border2:#1e1e1e;
+  --text:#d4b896;--text2:#8a7a68;--text3:#6a5a4a;
+  --amber:#f5a623;--green:#2e8f52;--red:#b83838;
+  --th-bg:#040404;--section-bg:#050505;--row-alt:#030303;--row-latest:#0c0800;
+}
+#topbar{position:sticky;top:0;z-index:10;padding:12px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+#topbar h1{font-size:16px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap}
+#meta{font-size:11px;color:var(--text3);letter-spacing:.04em;margin-left:auto}
+.toggle{display:flex;border:1px solid var(--border2);border-radius:3px;overflow:hidden}
+.tbtn{padding:6px 14px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:all .1s}
+.tbtn.active{background:var(--amber);color:#000}
+.tbtn:hover:not(.active){color:var(--amber)}
+#root{max-width:1300px;margin:0 auto;padding:20px}
+.sec-hdr{font-size:13px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);padding:14px 0 8px;border-bottom:2px solid var(--amber);margin:28px 0 12px}
+.sec-hdr:first-child{margin-top:0}
+.panel{border-bottom:2px solid var(--amber);margin-bottom:18px;overflow:hidden}
+.panel-hdr{padding:8px 14px;background:var(--bg1);border:1px solid var(--border);border-bottom:none;border-top:3px solid var(--amber)}
+.panel-title{font-size:15px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--amber)}
+.panel-sub{font-size:11px;color:var(--text3);letter-spacing:.05em;margin-left:8px}
+.bal-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.bal-table th{background:var(--th-bg);padding:7px 9px;text-align:right;font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
+.bal-table th:first-child{text-align:left;font-size:12px;letter-spacing:.08em}
+.bal-table th.latest{color:var(--amber);font-weight:900;border-bottom:2px solid var(--amber)}
+.bal-table th.yoy{color:var(--text3);font-style:italic}
+.bal-table td{padding:4px 9px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.bal-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+td.latest{color:var(--amber) !important;font-weight:800 !important}
+.row-section td{background:var(--section-bg);color:var(--text3) !important;font-size:10px !important;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:4px 9px 3px;border-top:1px solid var(--border2)}
+.row-alt td{background:var(--row-alt) !important}
+.row-total td{font-weight:800;font-size:14px !important;color:var(--amber) !important}
+.row-ending td{font-weight:900;font-size:14px !important;color:var(--text) !important;background:var(--row-latest) !important}
+.row-stu td{font-style:italic;color:var(--amber) !important;font-size:13px !important}
+td.up{color:var(--green) !important}
+td.dn{color:var(--red) !important}
+.stack-wrap{display:flex;flex-direction:column;gap:0}
+#err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 </style>
 </head>
 <body>
-<h1>USDA Balance Sheets — Wheat / Corn / Soybeans / Canola</h1>
-<div id="meta">Loading...</div>
+<div id="topbar">
+  <h1>USDA Balance Sheets</h1>
+  <div class="toggle" id="comm-toggle"></div>
+  <div class="toggle" id="unit-toggle">
+    <button class="tbtn" data-u="mt">MT</button>
+    <button class="tbtn" data-u="bu">BU</button>
+  </div>
+  <div id="meta">Loading...</div>
+</div>
 <div id="root"></div>
 
 <script>
-const ATTR_LABELS = { bs:"Beg. Stocks", pr:"Production", im:"Imports", dc:"Domestic Use", ex:"Exports", es:"End. Stocks" };
-const ATTR_ORDER = ["bs","pr","im","dc","ex","es"];
+const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola"];
+// Bushel conversion: bu per metric tonne. Acre conversion: acres per hectare (constant).
+const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924};
+const ACRES_PER_HA = 2.47105;
+
+// Country groupings, limited to the 11 countries this basic pipeline tracks.
+const EXPORTERS = {
+  Wheat: ["United States","Canada","Australia","European Union","Argentina","Russia","Ukraine","Kazakhstan"],
+  Corn: ["United States","Brazil","Argentina","Ukraine"],
+  Soybeans: ["United States","Brazil","Argentina"],
+  "Rapeseed/Canola": ["Canada","Australia","Ukraine"]
+};
+const IMPORTERS = {
+  Wheat: ["China","India","Brazil"],
+  Corn: ["China","European Union"],
+  Soybeans: ["China","European Union"],
+  "Rapeseed/Canola": ["China","European Union"]
+};
+
+let DATA = null;
+let currentComm = "Wheat";
+let currentUnit = "mt";
+
+function fmt(v){
+  if(v===null || v===undefined || isNaN(v)) return '—';
+  return Math.round(v).toLocaleString();
+}
+function fmt2(v){
+  if(v===null || v===undefined || isNaN(v)) return '—';
+  return v.toFixed(1);
+}
+function fmtStu(v){ return v===null ? '—' : v.toFixed(1)+'%'; }
+function fmtYoy(v){
+  if(v===null) return '—';
+  const s = v>=0?'+':'';
+  return s+v.toFixed(1)+'%';
+}
+function yoyPct(cur,prev){
+  if(cur===null||prev===null||prev===0) return null;
+  return (cur-prev)/Math.abs(prev)*100;
+}
+
+function getRaw(yearData, key){
+  const v = yearData ? yearData[key] : undefined;
+  return (v!==undefined && !isNaN(v)) ? v : null;
+}
+function getTotalRaw(yearData, keys){
+  let sum=0, any=false;
+  for(const k of keys){ const v=getRaw(yearData,k); if(v!==null){sum+=v;any=true;} }
+  return any?sum:null;
+}
+function getStu(yearData){
+  const end=getRaw(yearData,'es'), dom=getRaw(yearData,'dc'), exp=getRaw(yearData,'ex');
+  if(end===null||dom===null) return null;
+  const denom=dom+(exp||0);
+  return denom>0 ? (end/denom)*100 : null;
+}
+function convertVal(raw, unit, comm){
+  if(raw===null) return null;
+  if(unit==='bu') return raw * (BU_PER_MT[comm]||36.7437) / 1000; // -> million bu
+  return raw; // 1000 MT
+}
+function yieldBuAc(prRaw, ahRaw, comm){
+  if(prRaw===null||ahRaw===null||ahRaw===0) return null;
+  const mtPerHa = prRaw/ahRaw;
+  return mtPerHa * (BU_PER_MT[comm]||36.7437) / ACRES_PER_HA;
+}
+function acresK(ahRaw){ return ahRaw===null ? null : ahRaw*ACRES_PER_HA; }
+
+// Sum a set of country year-objects into one aggregate year-object (raw units).
+function sumCountries(countries, countryNames, year){
+  const keys=['ah','bs','pr','im','dc','ex','es'];
+  const out={}; let any=false;
+  for(const k of keys){
+    let s=0, has=false;
+    for(const c of countryNames){
+      const cd = countries[c];
+      const v = cd && cd[year] ? cd[year][k] : undefined;
+      if(v!==undefined && !isNaN(v)){ s+=v; has=true; any=true; }
+    }
+    out[k]= has ? s : undefined;
+  }
+  return any ? out : null;
+}
+
+function unitLabel(){ return currentUnit==='bu' ? 'Million Bu' : '1000 MT'; }
+
+// Builds a full balance-sheet table (Area/Yield + Supply/Use/Balance) for a list of years,
+// given a function yearData(y) => raw {ah,bs,pr,im,dc,ex,es} for that year.
+function buildBalanceTable(comm, yearDataFn, years, includeYoy){
+  const latestYear = years[years.length-1];
+  const prevYear = years.length>1 ? years[years.length-2] : null;
+
+  const ROWS = [
+    {type:'row', key:'ah', label:'Area harvested (1000 ac)', area:true},
+    {type:'row', key:'yl', label:'Yield (bu/ac)', yield:true},
+    {type:'section', label:'Supply'},
+    {type:'row', key:'bs', label:'Beginning stocks'},
+    {type:'row', key:'pr', label:'Production'},
+    {type:'row', key:'im', label:'Imports'},
+    {type:'total', keys:['bs','pr','im'], label:'Total supply'},
+    {type:'section', label:'Use'},
+    {type:'row', key:'dc', label:'Dom. consumption'},
+    {type:'row', key:'ex', label:'Exports'},
+    {type:'total', keys:['dc','ex'], label:'Total demand'},
+    {type:'section', label:'Balance'},
+    {type:'row', key:'es', label:'Ending stocks', cls:'row-ending'},
+    {type:'stu', label:'Stocks / Use %', cls:'row-stu'},
+  ];
+
+  function displayVal(row, y){
+    const yd = yearDataFn(y);
+    if(row.area) return acresK(getRaw(yd,'ah'));
+    if(row.yield) return yieldBuAc(getRaw(yd,'pr'), getRaw(yd,'ah'), comm);
+    if(row.type==='total') return convertVal(getTotalRaw(yd, row.keys), currentUnit, comm);
+    if(row.type==='stu') return getStu(yd);
+    return convertVal(getRaw(yd, row.key), currentUnit, comm);
+  }
+
+  let html = `<table class="bal-table"><colgroup><col style="width:180px">`;
+  for(const y of years) html += '<col>';
+  if(includeYoy) html += '<col style="width:70px">';
+  html += `</colgroup><thead><tr><th>ITEM</th>`;
+  for(const y of years) html += `<th class="${y===latestYear?'latest':''}">${y}</th>`;
+  if(includeYoy) html += `<th class="yoy">YoY Δ</th>`;
+  html += `</tr></thead><tbody>`;
+
+  let alt=false;
+  for(const row of ROWS){
+    if(row.type==='section'){
+      html += `<tr class="row-section"><td colspan="${years.length+1+(includeYoy?1:0)}">${row.label}</td></tr>`;
+      alt=false; continue;
+    }
+    const cls=[row.cls||'', alt?'row-alt':''].filter(Boolean).join(' ');
+    html += `<tr class="${cls}"><td>${row.label}</td>`;
+    alt=!alt;
+    const vals = years.map(y=>displayVal(row,y));
+    for(let i=0;i<years.length;i++){
+      const v=vals[i], prev=i>0?vals[i-1]:null;
+      let tdCls = years[i]===latestYear?'latest':'';
+      if(row.type!=='stu' && v!==null && prev!==null){
+        if(v>prev) tdCls+=' up'; else if(v<prev) tdCls+=' dn';
+      }
+      const text = row.type==='stu' ? fmtStu(v) : (row.yield ? fmt2(v) : fmt(v));
+      html += `<td class="${tdCls.trim()}">${text}</td>`;
+    }
+    if(includeYoy){
+      const cur = displayVal(row, latestYear);
+      const prev = prevYear ? displayVal(row, prevYear) : null;
+      const yoy = row.type==='stu' ? (cur!==null&&prev!==null?cur-prev:null) : yoyPct(cur,prev);
+      let cls = 'latest';
+      if(yoy!==null){ cls += yoy>0?' up':(yoy<0?' dn':''); }
+      const text = row.type==='stu' ? (yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(1)+'pp') : fmtYoy(yoy);
+      html += `<td class="${cls}">${text}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function panelWrap(title, sub, innerHtml){
+  return `<div class="panel"><div class="panel-hdr"><span class="panel-title">${title}</span><span class="panel-sub">${sub}</span></div>${innerHtml}</div>`;
+}
+
+function buildSummaryTable(countryList, countries, years, cols){
+  // cols: array of {key, label, area?:bool}
+  const latestYear = years[years.length-1];
+  const prevYear = years.length>1 ? years[years.length-2] : null;
+  let html = `<table class="bal-table"><thead><tr><th>Country</th>`;
+  cols.forEach(c=>{ html += `<th class="latest">${c.label} ${latestYear}</th><th class="yoy">YoY Δ</th>`; });
+  html += `</tr></thead><tbody>`;
+  let alt=false;
+  const totals = {};
+  cols.forEach(c=>totals[c.key]={cur:0,prev:0,hasCur:false,hasPrev:false});
+
+  countryList.forEach(c=>{
+    const cd = countries[c] || {};
+    html += `<tr class="${alt?'row-alt':''}"><td>${c}</td>`;
+    alt=!alt;
+    cols.forEach(col=>{
+      let cur, prev;
+      if(col.area){
+        cur = acresK(getRaw(cd[latestYear], 'ah'));
+        prev = prevYear ? acresK(getRaw(cd[prevYear],'ah')) : null;
+      } else {
+        cur = convertVal(getRaw(cd[latestYear], col.key), currentUnit, currentComm);
+        prev = prevYear ? convertVal(getRaw(cd[prevYear], col.key), currentUnit, currentComm) : null;
+      }
+      if(cur!==null){ totals[col.key].cur += cur; totals[col.key].hasCur=true; }
+      if(prev!==null){ totals[col.key].prev += prev; totals[col.key].hasPrev=true; }
+      const yoy = yoyPct(cur,prev);
+      let cls = cur!==null && prev!==null ? (cur>prev?'up':(cur<prev?'dn':'')) : '';
+      html += `<td class="latest">${fmt(cur)}</td><td class="${cls}">${fmtYoy(yoy)}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `<tr class="row-total"><td>Total</td>`;
+  cols.forEach(col=>{
+    const t = totals[col.key];
+    const cur = t.hasCur ? t.cur : null;
+    const prev = t.hasPrev ? t.prev : null;
+    const yoy = yoyPct(cur,prev);
+    html += `<td>${fmt(cur)}</td><td>${fmtYoy(yoy)}</td>`;
+  });
+  html += `</tr></tbody></table>`;
+  return html;
+}
+
+function render(){
+  const root = document.getElementById('root');
+  root.innerHTML = '';
+  const comm = currentComm;
+  const countries = DATA[comm];
+  if(!countries){ root.innerHTML = '<div id="err">No data for '+comm+'</div>'; return; }
+
+  const allYears = new Set();
+  Object.values(countries).forEach(yrs=>Object.keys(yrs).forEach(y=>allYears.add(y)));
+  const years5 = [...allYears].sort().slice(-5);
+  if(!years5.length){ root.innerHTML = '<div id="err">No years of data available</div>'; return; }
+
+  const expList = (EXPORTERS[comm]||[]).filter(c=>countries[c]);
+  const impList = (IMPORTERS[comm]||[]).filter(c=>countries[c]);
+
+  // SECTION 1: World
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">World Balance Sheet — ${comm}</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('WORLD', unitLabel(),
+    buildBalanceTable(comm, y=>(countries['World']||{})[y], years5, true)));
+
+  // SECTION 2: Major Exporters aggregate
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Aggregate Balance Sheet</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('MAJOR EXPORTERS', expList.join(', '),
+    buildBalanceTable(comm, y=>sumCountries(countries, expList, y), years5, true)));
+
+  // SECTION 3: Major Importers aggregate
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — Aggregate Balance Sheet</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('MAJOR IMPORTERS', impList.join(', '),
+    buildBalanceTable(comm, y=>sumCountries(countries, impList, y), years5, true)));
+
+  // SECTION 4: Individual exporter balance sheets, stacked
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Individual Balance Sheets</div>`);
+  const stack = document.createElement('div');
+  stack.className = 'stack-wrap';
+  expList.forEach(c=>{
+    stack.insertAdjacentHTML('beforeend', panelWrap(c.toUpperCase(), unitLabel(),
+      buildBalanceTable(comm, y=>(countries[c]||{})[y], years5, true)));
+  });
+  root.appendChild(stack);
+
+  // SECTION 5: Exporters summary — Acres, Production, Exports
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Acres / Production / Exports</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('EXPORTERS SUMMARY', unitLabel(),
+    buildSummaryTable(expList, countries, years5, [
+      {key:'ah', label:'Acres (1000)', area:true},
+      {key:'pr', label:'Production'},
+      {key:'ex', label:'Exports'},
+    ])));
+
+  // SECTION 6: Importers summary — Production, Imports, Ending stocks
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — Production / Imports / Ending Stocks</div>`);
+  root.insertAdjacentHTML('beforeend', panelWrap('IMPORTERS SUMMARY', unitLabel(),
+    buildSummaryTable(impList, countries, years5, [
+      {key:'pr', label:'Production'},
+      {key:'im', label:'Imports'},
+      {key:'es', label:'Ending Stocks'},
+    ])));
+}
+
+function initToggles(){
+  const ct = document.getElementById('comm-toggle');
+  ct.innerHTML = COMMS.map(c=>`<button class="tbtn${c===currentComm?' active':''}" data-c="${c}">${c==='Rapeseed/Canola'?'Canola':c}</button>`).join('');
+  ct.querySelectorAll('.tbtn').forEach(b=>b.addEventListener('click',()=>{
+    currentComm = b.dataset.c;
+    ct.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', x===b));
+    render();
+  }));
+
+  const ut = document.getElementById('unit-toggle');
+  ut.querySelectorAll('.tbtn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.u===currentUnit);
+    b.addEventListener('click', ()=>{
+      currentUnit = b.dataset.u;
+      ut.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', x===b));
+      render();
+    });
+  });
+}
 
 fetch('data/psd_data.json?_=' + Date.now())
-  .then(r => r.json())
-  .then(data => {
-    document.getElementById('meta').textContent =
-      'Last updated: ' + (data._meta?.fetched_at || 'unknown');
-
-    const root = document.getElementById('root');
-    for (const comm of Object.keys(data)) {
-      if (comm.startsWith('_')) continue;
-      const countries = data[comm];
-      const allYears = new Set();
-      Object.values(countries).forEach(yrs => Object.keys(yrs).forEach(y => allYears.add(y)));
-      const years = [...allYears].sort().slice(-3); // last 3 marketing years
-      if (!years.length) continue;
-
-      const section = document.createElement('div');
-      section.className = 'comm';
-      const latestYear = years[years.length - 1];
-
-      let html = `<h2>${comm} — ${latestYear} (1000 MT)</h2><table><thead><tr><th>Country</th>`;
-      ATTR_ORDER.forEach(a => html += `<th>${ATTR_LABELS[a]}</th>`);
-      html += `</tr></thead><tbody>`;
-
-      const countryNames = Object.keys(countries).filter(c => c !== 'World').sort();
-      countryNames.push('World');
-
-      countryNames.forEach(c => {
-        const row = countries[c]?.[latestYear] || {};
-        const cls = c === 'World' ? 'world' : '';
-        html += `<tr class="${cls}"><td>${c}</td>`;
-        ATTR_ORDER.forEach(a => {
-          const v = row[a];
-          html += `<td>${v != null ? v.toLocaleString() : '—'}</td>`;
-        });
-        html += `</tr>`;
-      });
-      html += `</tbody></table>`;
-      section.innerHTML = html;
-      root.appendChild(section);
-    }
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(data=>{
+    DATA = data;
+    document.getElementById('meta').textContent = 'Last updated: ' + (data._meta?.fetched_at || 'unknown');
+    initToggles();
+    render();
   })
-  .catch(e => {
-    document.getElementById('meta').textContent = 'Error loading data: ' + e;
+  .catch(e=>{
+    document.getElementById('root').innerHTML = `<div id="err">Error loading data: ${e.message}</div>`;
   });
 </script>
 </body>
