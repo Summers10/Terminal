@@ -26,6 +26,7 @@ body.light{
 }
 #topbar{position:sticky;top:0;z-index:10;padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
 #topbar h1{font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap}
+#conv-label{font-size:12px;color:var(--text3);letter-spacing:.04em;white-space:nowrap}
 #meta{font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto}
 .toggle{display:flex;border:1px solid var(--border2);border-radius:3px;overflow:hidden}
 .tbtn{padding:7px 15px;background:none;border:none;color:var(--text3);cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;transition:all .1s}
@@ -95,6 +96,7 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
     <button class="tbtn" data-t="dark">Dark</button>
     <button class="tbtn" data-t="light">Light</button>
   </div>
+  <div id="conv-label"></div>
   <div id="meta">Loading...</div>
 </div>
 <div id="root"></div>
@@ -134,6 +136,17 @@ function fmt2(v){
   return v.toFixed(1);
 }
 function fmtStu(v){ return v===null ? '—' : v.toFixed(1)+'%'; }
+function ordinal(n){
+  const r = Math.round(n);
+  const mod100 = r % 100;
+  if(mod100>=11 && mod100<=13) return r+'th';
+  switch(r % 10){
+    case 1: return r+'st';
+    case 2: return r+'nd';
+    case 3: return r+'rd';
+    default: return r+'th';
+  }
+}
 function fmtYoy(v){
   if(v===null) return '—';
   const s = v>=0?'+':'';
@@ -257,7 +270,7 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
       if(row.type==='stu_pctile' && v!==null){
         tdCls += v<=25 ? ' pctile-tight' : (v>=75 ? ' pctile-loose' : ' pctile-mid');
       }
-      const text = row.type==='stu' ? fmtStu(v) : (row.type==='stu_pctile' ? (v===null?'—':v.toFixed(0)+'th') : (row.yield ? fmt2(v) : fmt(v)));
+      const text = row.type==='stu' ? fmtStu(v) : (row.type==='stu_pctile' ? (v===null?'—':ordinal(v)) : (row.yield ? fmt2(v) : fmt(v)));
       html += `<td class="${tdCls.trim()}">${text}</td>`;
     }
     if(includeYoy){
@@ -342,6 +355,11 @@ function render(){
   root.innerHTML = '';
   const comm = currentComm;
   const countries = DATA[comm];
+
+  const convLabel = document.getElementById('conv-label');
+  const buPerMt = BU_PER_MT[comm] || 36.7437;
+  convLabel.textContent = `1 MT = ${buPerMt.toFixed(2)} bu (${comm==='Rapeseed/Canola'?'Canola':comm})`;
+
   if(!countries){ root.innerHTML = '<div id="err">No data for '+comm+'</div>'; return; }
 
   const allYears = new Set();
