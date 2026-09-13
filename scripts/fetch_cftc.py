@@ -41,7 +41,7 @@ CONTRACTS = {
     "085692": "Copper",
 }
  
-YEARS_HISTORY = 5
+YEARS_HISTORY = 10
 FIELDS = [
     "report_date_as_yyyy_mm_dd", "cftc_contract_market_code", "contract_market_name",
     "open_interest_all", "change_in_open_interest_all",
@@ -140,7 +140,10 @@ def main():
             sys.exit(1)
         result["codes"][code] = {"label": label, "history": history}
  
-    result["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
+    result["_meta"] = {
+        "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "years_history": YEARS_HISTORY,
+    }
  
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
