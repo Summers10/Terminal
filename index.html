@@ -85,11 +85,32 @@ function checkPw(){
 }
 if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').style.display = 'none';
 </script>
-<div id="page-tabs" style="display:flex;border-bottom:2px solid #f5a623;background:#000">
+<div id="page-tabs" style="display:flex;align-items:center;border-bottom:2px solid #f5a623;background:#000">
   <button class="page-tab active" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#f5a623;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
+  <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
+    <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
+    <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
+  </div>
 </div>
 <script>
+function setGlobalTheme(theme){
+  document.body.classList.toggle('dark', theme==='dark');
+  document.body.classList.toggle('light', theme==='light');
+  document.querySelectorAll('.global-theme-btn').forEach(function(b){
+    const active = b.dataset.t === theme;
+    b.style.background = active ? '#f5a623' : 'none';
+    b.style.color = active ? '#000' : '#6a5a4a';
+  });
+  const usdaToggle = document.getElementById('theme-toggle');
+  if(usdaToggle){
+    usdaToggle.querySelectorAll('.tbtn').forEach(function(b){ b.classList.toggle('active', b.dataset.t===theme); });
+  }
+  if(typeof currentTheme !== 'undefined') currentTheme = theme;
+}
+document.querySelectorAll('.global-theme-btn').forEach(function(b){
+  b.addEventListener('click', function(){ setGlobalTheme(b.dataset.t); });
+});
 document.querySelectorAll('.page-tab').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('.page-tab').forEach(function(b){ b.classList.remove('active'); b.style.color = '#6a5a4a'; });
@@ -467,9 +488,8 @@ function initToggles(){
   tt.querySelectorAll('.tbtn').forEach(b=>{
     b.classList.toggle('active', b.dataset.t===currentTheme);
     b.addEventListener('click', ()=>{
+      if(typeof setGlobalTheme === 'function') setGlobalTheme(b.dataset.t);
       currentTheme = b.dataset.t;
-      document.body.classList.toggle('dark', currentTheme==='dark');
-      document.body.classList.toggle('light', currentTheme==='light');
       tt.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', x===b));
     });
   });
@@ -574,10 +594,8 @@ function computeRow(hist, i){
   return {oi, oiChg:h.oi_chg, mmL, mmS, net, netPctOi, grossLPctOi, grossSPctOi, weeklyChange};
 }
 
-function buildCftcTable(codeEntry, hist){
-  if(!hist || !hist.length){
-    return `<div style="padding:10px;color:var(--text3)">No data for ${codeEntry.label} (code ${codeEntry.code})</div>`;
-  }
+function computeLatestMetrics(entry, hist){
+  if(!hist || !hist.length) return null;
   const rows = hist.map((h,i)=>computeRow(hist,i));
   const latest = rows[rows.length-1];
   const netHistory = rows.map(r=>r.netPctOi).filter(v=>v!==null);
@@ -588,34 +606,60 @@ function buildCftcTable(codeEntry, hist){
     if(v===null || !arr.length) return null;
     return arr.filter(x=>x<=v).length/arr.length*100;
   }
-  const netPctile = pctileOf(latest.netPctOi, netHistory);
-  const glPctile = pctileOf(latest.grossLPctOi, glHistory);
-  const gsPctile = pctileOf(latest.grossSPctOi, gsHistory);
+  return {
+    ...latest,
+    netPctile: pctileOf(latest.netPctOi, netHistory),
+    glPctile: pctileOf(latest.grossLPctOi, glHistory),
+    gsPctile: pctileOf(latest.grossSPctOi, gsHistory),
+  };
+}
 
-  function extremeClass(p){
-    if(p===null) return '';
-    if(p>=90) return 'cftc-extreme-hi';
-    if(p<=10) return 'cftc-extreme-lo';
-    return '';
-  }
+function extremeClass(p){
+  if(p===null || p===undefined) return '';
+  if(p>=90) return 'cftc-extreme-hi';
+  if(p<=10) return 'cftc-extreme-lo';
+  return '';
+}
 
-  const html = `<table class="cftc-table">
-    <thead><tr>
-      <th>Metric</th><th>Value</th>
-    </tr></thead>
-    <tbody>
-      <tr><td>Fund Net Position</td><td class="${latest.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(latest.net)}</td></tr>
-      <tr><td>Weekly Change</td><td class="${latest.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSigned(latest.weeklyChange,0)}</td></tr>
-      <tr><td>Net % of OI</td><td class="${latest.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcSigned(latest.netPctOi,1)}</td></tr>
-      <tr><td>Net % of OI Percentile Rank</td><td class="${extremeClass(netPctile)}">${netPctile===null?'—':cftcOrdinal(netPctile)}</td></tr>
-      <tr><td>Gross Long</td><td>${cftcFmt(latest.mmL)}</td></tr>
-      <tr><td>Gross Short</td><td>${cftcFmt(latest.mmS)}</td></tr>
-      <tr><td>Gross Long % of OI</td><td class="${extremeClass(glPctile)}">${cftcPct(latest.grossLPctOi)} <span style="color:var(--text3);font-size:11px">(${glPctile===null?'—':cftcOrdinal(glPctile)} pct.)</span></td></tr>
-      <tr><td>Gross Short % of OI</td><td class="${extremeClass(gsPctile)}">${cftcPct(latest.grossSPctOi)} <span style="color:var(--text3);font-size:11px">(${gsPctile===null?'—':cftcOrdinal(gsPctile)} pct.)</span></td></tr>
-      <tr><td>Open Interest</td><td>${cftcFmt(latest.oi)}</td></tr>
-      <tr><td>OI Change (week)</td><td class="${latest.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSigned(latest.oiChg,0)}</td></tr>
-    </tbody>
-  </table>`;
+function buildCftcGroupTable(group){
+  const cols = [
+    {label:'Fund Net Position'},
+    {label:'Weekly Change'},
+    {label:'Net % of OI'},
+    {label:'Net % of OI Pctile'},
+    {label:'Gross Long'},
+    {label:'Gross Short'},
+    {label:'Gross Long % of OI'},
+    {label:'Gross Short % of OI'},
+    {label:'Open Interest'},
+    {label:'OI Change'},
+  ];
+
+  let html = `<table class="cftc-table"><thead><tr><th>Product</th>`;
+  cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  group.codes.forEach(entry=>{
+    const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
+    const m = computeLatestMetrics(entry, hist);
+    html += `<tr><td>${entry.label}</td>`;
+    if(!m){
+      html += `<td colspan="${cols.length}" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
+    } else {
+      html += `<td class="${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
+      html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSigned(m.weeklyChange,0)}</td>`;
+      html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcSigned(m.netPctOi,1)}</td>`;
+      html += `<td class="${extremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
+      html += `<td>${cftcFmt(m.mmL)}</td>`;
+      html += `<td>${cftcFmt(m.mmS)}</td>`;
+      html += `<td class="${extremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
+      html += `<td class="${extremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
+      html += `<td>${cftcFmt(m.oi)}</td>`;
+      html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSigned(m.oiChg,0)}</td>`;
+    }
+    html += `</tr>`;
+  });
+  html += `</tbody></table>`;
   return html;
 }
 
@@ -629,18 +673,7 @@ function renderCftc(){
 
   CFTC_GROUPS.forEach(group=>{
     root.insertAdjacentHTML('beforeend', `<div class="cftc-sec-hdr">${group.label}</div>`);
-    const wrap = document.createElement('div');
-    wrap.style.display = 'grid';
-    wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(320px, 1fr))';
-    wrap.style.gap = '16px';
-    group.codes.forEach(entry=>{
-      const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
-      const panel = document.createElement('div');
-      panel.className = 'panel';
-      panel.innerHTML = `<div class="panel-hdr"><span class="panel-title">${entry.label.toUpperCase()}</span></div>${buildCftcTable(entry, hist)}`;
-      wrap.appendChild(panel);
-    });
-    root.appendChild(wrap);
+    root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCftcGroupTable(group)}</div>`);
   });
 }
 
