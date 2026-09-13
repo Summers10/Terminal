@@ -509,6 +509,7 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-dn{color:var(--red) !important}
 .cftc-extreme-hi{background:rgba(46,143,82,.22) !important;font-weight:800 !important}
 .cftc-extreme-lo{background:rgba(184,56,56,.22) !important;font-weight:800 !important}
+.cftc-extreme-yellow{background:rgba(230,180,20,.32) !important;font-weight:800 !important}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 </style>
 <script>
@@ -613,6 +614,19 @@ function extremeClass(p){
   if(p<=10) return 'cftc-extreme-lo';
   return '';
 }
+// Net % of OI: high percentile = crowded long (flag red), low percentile = crowded short (flag green)
+function netExtremeClass(p){
+  if(p===null || p===undefined) return '';
+  if(p>=90) return 'cftc-extreme-lo';   // red
+  if(p<=10) return 'cftc-extreme-hi';   // green
+  return '';
+}
+// Gross long/short % of OI: only flag unusually LARGE positions, in yellow. Small positions aren't flagged.
+function grossExtremeClass(p){
+  if(p===null || p===undefined) return '';
+  if(p>=90) return 'cftc-extreme-yellow';
+  return '';
+}
 
 const CFTC_COL_GROUPS = [
   {label:'Position', cols:['Net Position','Wkly Chg']},
@@ -630,12 +644,12 @@ function buildCftcRow(entry, hist){
   } else {
     html += `<td class="${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
     html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.weeklyChange)}</td>`;
-    html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(m.netPctOi,1)}</td>`;
-    html += `<td class="${extremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
+    html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
+    html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
     html += `<td>${cftcFmt(m.mmL)}</td>`;
     html += `<td>${cftcFmt(m.mmS)}</td>`;
-    html += `<td class="${extremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
-    html += `<td class="${extremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
+    html += `<td class="${grossExtremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
+    html += `<td class="${grossExtremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
     html += `<td>${cftcFmt(m.oi)}</td>`;
     html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.oiChg)}</td>`;
   }
