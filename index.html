@@ -1021,6 +1021,7 @@ renderSeasonals();
 </style>
 <script>
 let EXPORTS_DATA = null;
+let exportsCommodity = null;
 
 function expFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
 function expSignedPct(v){
@@ -1029,11 +1030,41 @@ function expSignedPct(v){
   return s+v.toFixed(1)+'%';
 }
 
-function buildExportsTable(){
+function buildExportsSummaryTable(){
   const cols = [
-    {label:'Net Sales'},
+    {label:'Net Sales (Wk)'},
     {label:'Outstanding Sales'},
-    {label:'Accum. Exports'},
+    {label:'Accum. Exports (YTD)'},
+    {label:'Total Commitment'},
+    {label:'Accum. Exports YoY'},
+    {label:'Outstanding Sales YoY'},
+  ];
+  let html = `<table class="exp-table"><thead><tr><th>Commodity</th>`;
+  cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  const commodities = EXPORTS_DATA.commodities || {};
+  Object.keys(commodities).forEach(commName=>{
+    const t = commodities[commName].total;
+    if(!t) return;
+    html += `<tr><td>${commName}</td>`;
+    html += `<td class="${t.net_sales>=0?'cftc-up':'cftc-dn'}">${expFmt(t.net_sales)}</td>`;
+    html += `<td>${expFmt(t.outstanding_sales)}</td>`;
+    html += `<td>${expFmt(t.accumulated_exports)}</td>`;
+    html += `<td>${expFmt(t.total_commitment)}</td>`;
+    html += `<td class="${t.yoy_accum_exports_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(t.yoy_accum_exports_pct)}</td>`;
+    html += `<td class="${t.yoy_outstanding_sales_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(t.yoy_outstanding_sales_pct)}</td>`;
+    html += `</tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+function buildExportsCountryTable(commName){
+  const cols = [
+    {label:'Net Sales (Wk)'},
+    {label:'Outstanding Sales'},
+    {label:'Accum. Exports (YTD)'},
     {label:'Total Commitment'},
     {label:'Accum. Exports YoY'},
     {label:'Outstanding Sales YoY'},
@@ -1042,16 +1073,14 @@ function buildExportsTable(){
   cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
   html += `</tr></thead><tbody>`;
 
-  const commodities = EXPORTS_DATA.commodities || {};
-  Object.keys(commodities).forEach(commName=>{
-    const comm = commodities[commName];
-    html += `<tr class="exp-row-section"><td colspan="${cols.length+1}">${commName}</td></tr>`;
-    const countries = comm.countries || {};
-    const countryNames = Object.keys(countries).sort();
-    if(!countryNames.length){
-      html += `<tr><td colspan="${cols.length+1}" style="color:var(--text3)">No country data</td></tr>`;
-      return;
-    }
+  const comm = (EXPORTS_DATA.commodities || {})[commName];
+  const countries = comm ? (comm.countries || {}) : {};
+  const countryNames = Object.keys(countries)
+    .sort((a,b) => (countries[b].accumulated_exports||0) - (countries[a].accumulated_exports||0));
+
+  if(!countryNames.length){
+    html += `<tr><td colspan="${cols.length+1}" style="color:var(--text3)">No country data</td></tr>`;
+  } else {
     countryNames.forEach(cName=>{
       const d = countries[cName];
       html += `<tr><td>${cName}</td>`;
@@ -1063,7 +1092,7 @@ function buildExportsTable(){
       html += `<td class="${d.yoy_outstanding_sales_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(d.yoy_outstanding_sales_pct)}</td>`;
       html += `</tr>`;
     });
-  });
+  }
   html += `</tbody></table>`;
   return html;
 }
@@ -1071,8 +1100,34 @@ function buildExportsTable(){
 function renderExports(){
   const root = document.getElementById('exports-root');
   root.innerHTML = '';
-  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in thousands (per USDA convention) — YoY compares current vs. prior marketing year.';
-  root.insertAdjacentHTML('beforeend', buildExportsTable());
+  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in thousands, YoY vs. prior marketing year (no 5-yr avg or USDA-estimate-pace data available from this source).';
+
+  const commodities = Object.keys(EXPORTS_DATA.commodities || {});
+  if(!exportsCommodity || !commodities.includes(exportsCommodity)){
+    exportsCommodity = commodities[0];
+  }
+
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin-bottom:0">Commodity Summary — YTD vs Prior Year</div>`);
+  root.insertAdjacentHTML('beforeend', buildExportsSummaryTable());
+
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:24px 0 0">By Country — Largest to Smallest</div>`);
+
+  const selWrap = document.createElement('div');
+  selWrap.style.margin = '14px 0';
+  selWrap.className = 'toggle';
+  selWrap.style.display = 'inline-flex';
+  selWrap.style.flexWrap = 'wrap';
+  commodities.forEach(c=>{
+    const btn = document.createElement('button');
+    btn.className = 'tbtn exp-comm-btn' + (c===exportsCommodity ? ' active' : '');
+    btn.dataset.c = c;
+    btn.textContent = c;
+    btn.addEventListener('click', ()=>{ exportsCommodity = c; renderExports(); });
+    selWrap.appendChild(btn);
+  });
+  root.appendChild(selWrap);
+
+  root.insertAdjacentHTML('beforeend', buildExportsCountryTable(exportsCommodity));
 }
 
 fetch('data/export_sales.json?_=' + Date.now())
