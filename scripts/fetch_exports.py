@@ -28,6 +28,9 @@ URL = "https://apps.fas.usda.gov/esrqs/StaticReports/CWRCountryCommoditySummary.
 # every class weren't independently confirmed this session.
 COMMODITY_KEYWORDS = ["WHEAT", "CORN", "SOYBEAN", "OATS"]
  
+# Excluded even if they match a keyword above.
+EXCLUDE_COMMODITIES = ["WHEAT PRODUCTS", "OATS"]
+ 
 # Candidate attribute names per logical field — the country-level report's
 # exact attribute spelling wasn't directly confirmed, so try several.
 FIELD_CANDIDATES = {
@@ -147,6 +150,8 @@ def main():
         commodity_name = get_field(attrib, FIELD_CANDIDATES["commodity_name"])
         if not commodity_name or not any(kw in commodity_name.upper() for kw in COMMODITY_KEYWORDS):
             continue
+        if any(excl in commodity_name.upper() for excl in EXCLUDE_COMMODITIES):
+            continue
  
         country_name = get_field(attrib, FIELD_CANDIDATES["country_name"])
         if not country_name:
@@ -191,6 +196,7 @@ def main():
             existing_total = comm.get("total")
             if existing_total is None or (week_num is not None and week_num > (existing_total.get("mkt_year_week") or -1)):
                 comm["total"] = record
+                comm["_total_raw_attrib"] = dict(attrib)  # diagnostic only, stripped before writing output
             continue
  
         # Skip other aggregate/rollup rows so per-country data stays clean.
@@ -224,6 +230,27 @@ def main():
         for n in missing_totals:
             print(f"  - {n}", file=sys.stderr)
         sys.exit(1)
+ 
+    # The prior-marketing-year field names were only confirmed on the national summary
+    # file, not this country-level one — verify they actually resolved to real numbers here.
+    # If not, print the raw attributes so the exact real field names can be read off directly.
+    missing_yoy = {name: data for name, data in result["commodities"].items()
+                   if data["total"]["prev_yr_accumulated_exports"] is None
+                   or data["total"]["prev_yr_outstanding_sales"] is None}
+    if missing_yoy:
+        print("ERROR: Prior-marketing-year fields (needed for YoY) did not resolve on the "
+              "'Total Known and Unknown' row for these commodities:", file=sys.stderr)
+        for name in missing_yoy:
+            print(f"  - {name}", file=sys.stderr)
+        sample_name = next(iter(missing_yoy))
+        print(f"\nAll attributes on the 'Total Known and Unknown' row for '{sample_name}':", file=sys.stderr)
+        for k, v in result["commodities"][sample_name]["_total_raw_attrib"].items():
+            print(f"  {k} = {v!r}", file=sys.stderr)
+        sys.exit(1)
+ 
+    # Diagnostic-only field — never persisted to the output file.
+    for data in result["commodities"].values():
+        data.pop("_total_raw_attrib", None)
  
     result["_meta"] = {
         "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
