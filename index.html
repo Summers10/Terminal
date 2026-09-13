@@ -86,7 +86,8 @@ function checkPw(){
 if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').style.display = 'none';
 </script>
 <div id="page-tabs" style="display:flex;align-items:center;border-bottom:2px solid #f5a623;background:#000">
-  <button class="page-tab active" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#f5a623;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
+  <button class="page-tab active" data-page="summary" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#f5a623;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SUMMARY</button>
+  <button class="page-tab" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
     <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
@@ -115,13 +116,20 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('.page-tab').forEach(function(b){ b.classList.remove('active'); b.style.color = '#6a5a4a'; });
     btn.classList.add('active'); btn.style.color = '#f5a623';
+    document.getElementById('summary-page').style.display = btn.dataset.page === 'summary' ? '' : 'none';
     document.getElementById('usda-page').style.display = btn.dataset.page === 'usda' ? '' : 'none';
     document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
-    if(btn.dataset.page === 'cftc' && typeof loadCftc === 'function') loadCftc();
   });
 });
 </script>
-<div id="usda-page">
+<div id="summary-page">
+<div id="summary-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Summary</h1>
+  <div id="summary-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
+</div>
+  <div id="summary-root" style="max-width:1300px;margin:0 auto;padding:22px"></div>
+</div>
+<div id="usda-page" style="display:none">
 <div id="topbar">
   <h1>USDA Balance Sheets</h1>
   <div class="toggle" id="comm-toggle"></div>
@@ -492,6 +500,8 @@ fetch('data/psd_data.json?_=' + Date.now())
     document.getElementById('meta').textContent = 'Last updated: ' + (data._meta?.fetched_at || 'unknown');
     initToggles();
     render();
+    usdaReady = true;
+    if(typeof checkSummaryReady === 'function') checkSummaryReady();
   })
   .catch(e=>{
     document.getElementById('root').innerHTML = `<div id="err">Error loading data: ${e.message}</div>`;
@@ -552,6 +562,11 @@ const CFTC_GROUPS = [
 
 let CFTC_DATA = null;
 let cftcLoaded = false;
+let usdaReady = false;
+let cftcReady = false;
+function checkSummaryReady(){
+  if(usdaReady && cftcReady && typeof renderSummary === 'function') renderSummary();
+}
 
 function cftcFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
 function cftcPct(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : v.toFixed(1)+'%'; }
@@ -694,11 +709,145 @@ function loadCftc(){
     .then(data=>{
       CFTC_DATA = data;
       renderCftc();
+      cftcReady = true;
+      checkSummaryReady();
     })
     .catch(e=>{
       document.getElementById('cftc-root').innerHTML = `<div id="cftc-err">Error loading CFTC data: ${e.message}</div>`;
       cftcLoaded = false;
     });
+}
+loadCftc();
+
+// ---------------- SUMMARY PAGE ----------------
+
+const SUMMARY_ROWS = [
+  {section:'Grains',   label:'Wheat (Chicago SRW)', cftcCode:'001602', usdaComm:'Wheat', domestic:'United States'},
+  {section:'Grains',   label:'Wheat (KC HRW)',       cftcCode:'001612', usdaComm:'Wheat', domestic:'United States'},
+  {section:'Grains',   label:'Wheat (Mpls Spring)',  cftcCode:'001626', usdaComm:'Wheat', domestic:'United States'},
+  {section:'Grains',   label:'Corn',                 cftcCode:'002602', usdaComm:'Corn', domestic:'United States'},
+  {section:'Oilseeds', label:'Soybeans',             cftcCode:'005602', usdaComm:'Soybeans', domestic:'United States'},
+  {section:'Oilseeds', label:'Canola',               cftcCode:'135731', usdaComm:'Rapeseed/Canola', domestic:'Canada'},
+];
+
+function summaryYearsSorted(usdaComm){
+  const countries = DATA[usdaComm];
+  if(!countries) return [];
+  const allYears = new Set();
+  Object.values(countries).forEach(yrs=>Object.keys(yrs).forEach(y=>allYears.add(y)));
+  return [...allYears].sort();
+}
+
+function summaryProdYoY(usdaComm, country){
+  const countries = DATA[usdaComm];
+  if(!countries || !countries[country]) return null;
+  const years = summaryYearsSorted(usdaComm);
+  if(years.length<2) return null;
+  const latest = years[years.length-1], prev = years[years.length-2];
+  const curRaw = countries[country][latest], prevRaw = countries[country][prev];
+  const cur = (curRaw && curRaw.pr!==undefined) ? curRaw.pr : null;
+  const pr0 = (prevRaw && prevRaw.pr!==undefined) ? prevRaw.pr : null;
+  return yoyPct(cur, pr0);
+}
+
+function summaryProdYoYAgg(usdaComm, countryList){
+  const countries = DATA[usdaComm];
+  if(!countries || !countryList || !countryList.length) return null;
+  const years = summaryYearsSorted(usdaComm);
+  if(years.length<2) return null;
+  const latest = years[years.length-1], prev = years[years.length-2];
+  const curAgg = sumCountries(countries, countryList, latest);
+  const prevAgg = sumCountries(countries, countryList, prev);
+  const cur = (curAgg && curAgg.pr!==undefined) ? curAgg.pr : null;
+  const pr0 = (prevAgg && prevAgg.pr!==undefined) ? prevAgg.pr : null;
+  return yoyPct(cur, pr0);
+}
+
+function summaryStuPctile(usdaComm, yearDataFn){
+  const years = summaryYearsSorted(usdaComm);
+  if(!years.length) return null;
+  const hist = years.map(y=>getStu(yearDataFn(y))).filter(v=>v!==null);
+  const latestYear = years[years.length-1];
+  const v = getStu(yearDataFn(latestYear));
+  if(v===null || !hist.length) return null;
+  return hist.filter(x=>x<=v).length/hist.length*100;
+}
+
+function summaryPctileClass(p){
+  if(p===null || p===undefined) return '';
+  if(p<=25) return 'pctile-tight';
+  if(p>=75) return 'pctile-loose';
+  return 'pctile-mid';
+}
+
+function summaryPctileText(p){ return p===null||p===undefined ? '—' : cftcOrdinal(p); }
+
+function buildSummaryTable(){
+  const groups = [
+    {label:'Positioning', cols:['Net % OI','Pctile']},
+    {label:'Production YoY', cols:['Domestic','Exporters']},
+    {label:'Stocks/Use % Rank', cols:['Domestic','World','Exporters','Importers']},
+  ];
+
+  let html = `<table class="cftc-table"><thead><tr><th rowspan="2">Product</th>`;
+  groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
+  html += `</tr><tr>`;
+  groups.forEach(g=>{
+    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c}</th>`; });
+  });
+  html += `</tr></thead><tbody>`;
+
+  let curSection = null;
+  SUMMARY_ROWS.forEach(row=>{
+    if(row.section !== curSection){
+      curSection = row.section;
+      html += `<tr class="cftc-row-section"><td colspan="9">${curSection}</td></tr>`;
+    }
+
+    const countries = DATA[row.usdaComm] || {};
+    const expList = (EXPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
+    const impList = (IMPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
+
+    // Positioning (CFTC)
+    const hist = (CFTC_DATA.codes && CFTC_DATA.codes[row.cftcCode]) ? CFTC_DATA.codes[row.cftcCode].history : null;
+    const m = computeLatestMetrics({code:row.cftcCode, label:row.label}, hist);
+
+    // Fundamentals
+    const domesticYoY = summaryProdYoY(row.usdaComm, row.domestic);
+    const exportersYoY = summaryProdYoYAgg(row.usdaComm, expList);
+    const domesticStu = summaryStuPctile(row.usdaComm, y=>(countries[row.domestic]||{})[y]);
+    const worldStu = summaryStuPctile(row.usdaComm, y=>(countries['World']||{})[y]);
+    const expStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, expList, y));
+    const impStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, impList, y));
+
+    html += `<tr><td>${row.label}</td>`;
+    if(!m){
+      html += `<td colspan="2" style="text-align:left;color:var(--text3)">No CFTC data</td>`;
+    } else {
+      html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
+      html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
+    }
+    html += `<td class="${domesticYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(domesticYoY,1)}</td>`;
+    html += `<td class="${exportersYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(exportersYoY,1)}</td>`;
+    html += `<td class="${summaryPctileClass(domesticStu)}">${summaryPctileText(domesticStu)}</td>`;
+    html += `<td class="${summaryPctileClass(worldStu)}">${summaryPctileText(worldStu)}</td>`;
+    html += `<td class="${summaryPctileClass(expStu)}">${summaryPctileText(expStu)}</td>`;
+    html += `<td class="${summaryPctileClass(impStu)}">${summaryPctileText(impStu)}</td>`;
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderSummary(){
+  const root = document.getElementById('summary-root');
+  root.innerHTML = '';
+  document.getElementById('summary-meta').textContent =
+    'USDA data updated: ' + (DATA._meta?.fetched_at || 'unknown') +
+    ' — CFTC data updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') +
+    ' — Domestic column uses United States, except Canola which uses Canada.';
+  root.insertAdjacentHTML('beforeend', buildSummaryTable());
 }
 </script>
 </body>
