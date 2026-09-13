@@ -85,6 +85,22 @@ function checkPw(){
 }
 if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').style.display = 'none';
 </script>
+<div id="page-tabs" style="display:flex;border-bottom:2px solid #f5a623;background:#000">
+  <button class="page-tab active" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#f5a623;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
+  <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
+</div>
+<script>
+document.querySelectorAll('.page-tab').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.page-tab').forEach(function(b){ b.classList.remove('active'); b.style.color = '#6a5a4a'; });
+    btn.classList.add('active'); btn.style.color = '#f5a623';
+    document.getElementById('usda-page').style.display = btn.dataset.page === 'usda' ? '' : 'none';
+    document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
+    if(btn.dataset.page === 'cftc' && typeof loadCftc === 'function') loadCftc();
+  });
+});
+</script>
+<div id="usda-page">
 <div id="topbar">
   <h1>USDA Balance Sheets</h1>
   <div class="toggle" id="comm-toggle"></div>
@@ -100,6 +116,10 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <div id="meta">Loading...</div>
 </div>
 <div id="root"></div>
+</div>
+<div id="cftc-page" style="display:none">
+  <div id="cftc-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
+</div>
 
 <script>
 const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats"];
@@ -466,6 +486,178 @@ fetch('data/psd_data.json?_=' + Date.now())
   .catch(e=>{
     document.getElementById('root').innerHTML = `<div id="err">Error loading data: ${e.message}</div>`;
   });
+</script>
+
+<style>
+.cftc-sec-hdr{font-size:15px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);padding:16px 0 9px;border-bottom:2px solid var(--amber);margin:32px 0 14px}
+.cftc-sec-hdr:first-child{margin-top:0}
+.cftc-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg);margin-bottom:20px}
+.cftc-table th{background:var(--th-bg);padding:8px 8px;text-align:right;font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
+.cftc-table th:first-child{text-align:left}
+.cftc-table td{padding:5px 8px;text-align:right;font-size:14px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+.cftc-up{color:var(--green) !important}
+.cftc-dn{color:var(--red) !important}
+.cftc-extreme-hi{background:rgba(46,143,82,.22) !important;font-weight:800 !important}
+.cftc-extreme-lo{background:rgba(184,56,56,.22) !important;font-weight:800 !important}
+#cftc-meta{font-size:12px;color:var(--text3);margin-bottom:14px}
+#cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
+</style>
+<script>
+const CFTC_GROUPS = [
+  {label:"Grains", codes:[
+    {code:"002602", label:"Corn"},
+    {code:"001602", label:"Wheat (Chicago SRW)"},
+    {code:"001612", label:"Wheat (KC HRW)"},
+    {code:"001626", label:"Wheat (Mpls Spring)"},
+  ]},
+  {label:"Oilseeds", codes:[
+    {code:"135741", label:"Canola"},
+    {code:"005602", label:"Soybeans"},
+    {code:"007601", label:"Soybean Oil"},
+    {code:"026603", label:"Soybean Meal"},
+  ]},
+  {label:"Meats", codes:[
+    {code:"061641", label:"Feeder Cattle"},
+    {code:"057642", label:"Live Cattle"},
+    {code:"054642", label:"Lean Hogs"},
+  ]},
+  {label:"Softs", codes:[
+    {code:"073732", label:"Cocoa"},
+    {code:"083731", label:"Coffee"},
+    {code:"033661", label:"Cotton"},
+    {code:"080732", label:"Sugar"},
+  ]},
+  {label:"Energies", codes:[
+    {code:"067651", label:"Crude Oil (WTI)"},
+    {code:"022651", label:"Heating Oil"},
+    {code:"026651", label:"RBOB Gasoline"},
+    {code:"023651", label:"Natural Gas"},
+  ]},
+  {label:"Metals", codes:[
+    {code:"088691", label:"Gold"},
+    {code:"084691", label:"Silver"},
+    {code:"085692", label:"Copper"},
+  ]},
+];
+
+let CFTC_DATA = null;
+let cftcLoaded = false;
+
+function cftcFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
+function cftcPct(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : v.toFixed(1)+'%'; }
+function cftcSigned(v, dec){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  const s = v>=0?'+':'';
+  return s+v.toFixed(dec===undefined?0:dec)+(dec!==undefined?'%':'');
+}
+function cftcOrdinal(n){
+  const r = Math.round(n), mod100 = r%100;
+  if(mod100>=11 && mod100<=13) return r+'th';
+  switch(r%10){case 1:return r+'st';case 2:return r+'nd';case 3:return r+'rd';default:return r+'th';}
+}
+
+function computeRow(hist, i){
+  const h = hist[i];
+  const oi = h.oi, mmL = h.mm_long, mmS = h.mm_short;
+  const net = (mmL!==null && mmS!==null) ? mmL-mmS : null;
+  const netPctOi = (net!==null && oi) ? net/oi*100 : null;
+  const grossLPctOi = (mmL!==null && oi) ? mmL/oi*100 : null;
+  const grossSPctOi = (mmS!==null && oi) ? mmS/oi*100 : null;
+  let weeklyChange = null;
+  if(i>0){
+    const prev = hist[i-1];
+    if(prev.mm_long!==null && prev.mm_short!==null && mmL!==null && mmS!==null){
+      weeklyChange = net - (prev.mm_long - prev.mm_short);
+    }
+  }
+  return {oi, oiChg:h.oi_chg, mmL, mmS, net, netPctOi, grossLPctOi, grossSPctOi, weeklyChange};
+}
+
+function buildCftcTable(codeEntry, hist){
+  if(!hist || !hist.length){
+    return `<div style="padding:10px;color:var(--text3)">No data for ${codeEntry.label} (code ${codeEntry.code})</div>`;
+  }
+  const rows = hist.map((h,i)=>computeRow(hist,i));
+  const latest = rows[rows.length-1];
+  const netHistory = rows.map(r=>r.netPctOi).filter(v=>v!==null);
+  const glHistory = rows.map(r=>r.grossLPctOi).filter(v=>v!==null);
+  const gsHistory = rows.map(r=>r.grossSPctOi).filter(v=>v!==null);
+
+  function pctileOf(v, arr){
+    if(v===null || !arr.length) return null;
+    return arr.filter(x=>x<=v).length/arr.length*100;
+  }
+  const netPctile = pctileOf(latest.netPctOi, netHistory);
+  const glPctile = pctileOf(latest.grossLPctOi, glHistory);
+  const gsPctile = pctileOf(latest.grossSPctOi, gsHistory);
+
+  function extremeClass(p){
+    if(p===null) return '';
+    if(p>=90) return 'cftc-extreme-hi';
+    if(p<=10) return 'cftc-extreme-lo';
+    return '';
+  }
+
+  const html = `<table class="cftc-table">
+    <thead><tr>
+      <th>Metric</th><th>Value</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Fund Net Position</td><td class="${latest.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(latest.net)}</td></tr>
+      <tr><td>Weekly Change</td><td class="${latest.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSigned(latest.weeklyChange,0)}</td></tr>
+      <tr><td>Net % of OI</td><td class="${latest.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcSigned(latest.netPctOi,1)}</td></tr>
+      <tr><td>Net % of OI Percentile Rank</td><td class="${extremeClass(netPctile)}">${netPctile===null?'—':cftcOrdinal(netPctile)}</td></tr>
+      <tr><td>Gross Long</td><td>${cftcFmt(latest.mmL)}</td></tr>
+      <tr><td>Gross Short</td><td>${cftcFmt(latest.mmS)}</td></tr>
+      <tr><td>Gross Long % of OI</td><td class="${extremeClass(glPctile)}">${cftcPct(latest.grossLPctOi)} <span style="color:var(--text3);font-size:11px">(${glPctile===null?'—':cftcOrdinal(glPctile)} pct.)</span></td></tr>
+      <tr><td>Gross Short % of OI</td><td class="${extremeClass(gsPctile)}">${cftcPct(latest.grossSPctOi)} <span style="color:var(--text3);font-size:11px">(${gsPctile===null?'—':cftcOrdinal(gsPctile)} pct.)</span></td></tr>
+      <tr><td>Open Interest</td><td>${cftcFmt(latest.oi)}</td></tr>
+      <tr><td>OI Change (week)</td><td class="${latest.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSigned(latest.oiChg,0)}</td></tr>
+    </tbody>
+  </table>`;
+  return html;
+}
+
+function renderCftc(){
+  const root = document.getElementById('cftc-root');
+  root.innerHTML = '';
+  const meta = document.createElement('div');
+  meta.id = 'cftc-meta';
+  meta.textContent = 'Last updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') + ' — Managed Money (Fund) category, CFTC Disaggregated report. Highlighted cells are within the top/bottom 10% of that series\' own history.';
+  root.appendChild(meta);
+
+  CFTC_GROUPS.forEach(group=>{
+    root.insertAdjacentHTML('beforeend', `<div class="cftc-sec-hdr">${group.label}</div>`);
+    const wrap = document.createElement('div');
+    wrap.style.display = 'grid';
+    wrap.style.gridTemplateColumns = 'repeat(auto-fit, minmax(320px, 1fr))';
+    wrap.style.gap = '16px';
+    group.codes.forEach(entry=>{
+      const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.innerHTML = `<div class="panel-hdr"><span class="panel-title">${entry.label.toUpperCase()}</span></div>${buildCftcTable(entry, hist)}`;
+      wrap.appendChild(panel);
+    });
+    root.appendChild(wrap);
+  });
+}
+
+function loadCftc(){
+  if(cftcLoaded) return;
+  cftcLoaded = true;
+  fetch('data/cftc_data.json?_=' + Date.now())
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data=>{
+      CFTC_DATA = data;
+      renderCftc();
+    })
+    .catch(e=>{
+      document.getElementById('cftc-root').innerHTML = `<div id="cftc-err">Error loading CFTC data: ${e.message}</div>`;
+      cftcLoaded = false;
+    });
+}
 </script>
 </body>
 </html>
