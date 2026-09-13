@@ -139,7 +139,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">CFTC Commitment of Traders</h1>
   <div id="cftc-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
-  <div id="cftc-root" style="max-width:100%;margin:0 auto;padding:22px"></div>
+  <div id="cftc-root" style="max-width:1300px;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
@@ -500,8 +500,9 @@ fetch('data/psd_data.json?_=' + Date.now())
 
 <style>
 .cftc-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
-.cftc-table th{background:var(--th-bg);padding:6px 4px;text-align:right;font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap;overflow:hidden}
+.cftc-table th{background:var(--th-bg);padding:7px 4px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap;overflow:hidden}
 .cftc-table th:first-child{text-align:left;width:15%}
+.cftc-row-section td{background:var(--section-bg);color:var(--amber) !important;font-size:13px !important;font-weight:900 !important;letter-spacing:.16em;text-transform:uppercase;padding:8px 10px 6px;border-top:2px solid var(--amber)}
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .cftc-up{color:var(--green) !important}
@@ -645,7 +646,7 @@ function buildCftcRow(entry, hist){
 function buildCftcMasterTable(){
   let html = `<table class="cftc-table"><thead>`;
   html += `<tr><th rowspan="2">Product</th>`;
-  CFTC_COL_GROUPS.forEach(g=>{ html += `<th colspan="2" style="text-align:center;border-left:1px solid var(--border2)">${g.label}</th>`; });
+  CFTC_COL_GROUPS.forEach(g=>{ html += `<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
   html += `</tr><tr>`;
   CFTC_COL_GROUPS.forEach(g=>{
     g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c}</th>`; });
@@ -653,7 +654,7 @@ function buildCftcMasterTable(){
   html += `</tr></thead><tbody>`;
 
   CFTC_GROUPS.forEach(group=>{
-    html += `<tr class="row-section"><td colspan="11">${group.label}</td></tr>`;
+    html += `<tr class="cftc-row-section"><td colspan="11">${group.label}</td></tr>`;
     group.codes.forEach(entry=>{
       const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
       html += buildCftcRow(entry, hist);
