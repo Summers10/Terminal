@@ -90,6 +90,7 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <button class="page-tab" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
   <button class="page-tab" data-page="seasonals" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SEASONALS</button>
+  <button class="page-tab" data-page="exports" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">EXPORTS</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
     <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
     <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
@@ -121,6 +122,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     document.getElementById('usda-page').style.display = btn.dataset.page === 'usda' ? '' : 'none';
     document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
     document.getElementById('seasonals-page').style.display = btn.dataset.page === 'seasonals' ? '' : 'none';
+    document.getElementById('exports-page').style.display = btn.dataset.page === 'exports' ? '' : 'none';
   });
 });
 </script>
@@ -157,6 +159,13 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <div id="seasonals-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Forward-looking weekly seasonal score (-5 to +5), 15-year lookback. Static — manually entered, not auto-updating.</div>
 </div>
   <div id="seasonals-root" style="max-width:100%;margin:0 auto;padding:22px"></div>
+</div>
+<div id="exports-page" style="display:none">
+<div id="exports-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">USDA Export Sales</h1>
+  <div id="exports-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
+</div>
+  <div id="exports-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
@@ -999,6 +1008,82 @@ function renderSeasonals(){
   });
 }
 renderSeasonals();
+</script>
+
+<style>
+.exp-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.exp-table th{background:var(--th-bg);padding:7px 4px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap;overflow:hidden}
+.exp-table th:first-child{text-align:left;width:20%}
+.exp-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
+.exp-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+.exp-row-section td{background:var(--section-bg);color:var(--amber) !important;font-size:13px !important;font-weight:900 !important;letter-spacing:.16em;text-transform:uppercase;padding:8px 10px 6px;border-top:2px solid var(--amber)}
+#exports-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
+</style>
+<script>
+let EXPORTS_DATA = null;
+
+function expFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
+function expSignedPct(v){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  const s = v>=0?'+':'';
+  return s+v.toFixed(1)+'%';
+}
+
+function buildExportsTable(){
+  const cols = [
+    {label:'Net Sales'},
+    {label:'Outstanding Sales'},
+    {label:'Accum. Exports'},
+    {label:'Total Commitment'},
+    {label:'Accum. Exports YoY'},
+    {label:'Outstanding Sales YoY'},
+  ];
+  let html = `<table class="exp-table"><thead><tr><th>Country</th>`;
+  cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  const commodities = EXPORTS_DATA.commodities || {};
+  Object.keys(commodities).forEach(commName=>{
+    const comm = commodities[commName];
+    html += `<tr class="exp-row-section"><td colspan="${cols.length+1}">${commName}</td></tr>`;
+    const countries = comm.countries || {};
+    const countryNames = Object.keys(countries).sort();
+    if(!countryNames.length){
+      html += `<tr><td colspan="${cols.length+1}" style="color:var(--text3)">No country data</td></tr>`;
+      return;
+    }
+    countryNames.forEach(cName=>{
+      const d = countries[cName];
+      html += `<tr><td>${cName}</td>`;
+      html += `<td class="${d.net_sales>=0?'cftc-up':'cftc-dn'}">${expFmt(d.net_sales)}</td>`;
+      html += `<td>${expFmt(d.outstanding_sales)}</td>`;
+      html += `<td>${expFmt(d.accumulated_exports)}</td>`;
+      html += `<td>${expFmt(d.total_commitment)}</td>`;
+      html += `<td class="${d.yoy_accum_exports_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(d.yoy_accum_exports_pct)}</td>`;
+      html += `<td class="${d.yoy_outstanding_sales_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(d.yoy_outstanding_sales_pct)}</td>`;
+      html += `</tr>`;
+    });
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderExports(){
+  const root = document.getElementById('exports-root');
+  root.innerHTML = '';
+  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in thousands (per USDA convention) — YoY compares current vs. prior marketing year.';
+  root.insertAdjacentHTML('beforeend', buildExportsTable());
+}
+
+fetch('data/export_sales.json?_=' + Date.now())
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(data=>{
+    EXPORTS_DATA = data;
+    renderExports();
+  })
+  .catch(e=>{
+    document.getElementById('exports-root').innerHTML = `<div id="exports-err">Error loading export sales data: ${e.message}</div>`;
+  });
 </script>
 </body>
 </html>
