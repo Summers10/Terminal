@@ -152,10 +152,6 @@ def main():
         if not country_name:
             skipped_no_country += 1
             continue
-        # Skip aggregate/rollup rows so per-country data stays clean.
-        if country_name.strip().upper() in ("TOTAL KNOWN", "TOTAL UNKNOWN", "TOTAL KNOWN AND UNKNOWN",
-                                             "OPTIONAL ORIGIN", "EXPORTS FOR OWN ACCT", "UNKNOWN"):
-            continue
  
         matched_commodities.add(commodity_name)
  
@@ -172,24 +168,40 @@ def main():
         comm = result["commodities"].setdefault(commodity_name, {
             "code": get_field(attrib, FIELD_CANDIDATES["commodity_code"]),
             "countries": {},
+            "total": None,
         })
+ 
+        record = {
+            "period_ending": period,
+            "mkt_year": get_field(attrib, FIELD_CANDIDATES["mkt_year"]),
+            "mkt_year_week": week_num,
+            "net_sales": net_sales,
+            "outstanding_sales": outstanding,
+            "accumulated_exports": accum_exports,
+            "total_commitment": total_commit,
+            "prev_yr_accumulated_exports": prev_accum,
+            "prev_yr_outstanding_sales": prev_outstanding,
+            "yoy_accum_exports_pct": yoy_pct(accum_exports, prev_accum),
+            "yoy_outstanding_sales_pct": yoy_pct(outstanding, prev_outstanding),
+        }
+ 
+        # "Total Known and Unknown" is the authoritative commodity-wide total (all destinations).
+        # Capture it separately as the summary total; keep it out of the per-country list.
+        if country_name.strip().upper() == "TOTAL KNOWN AND UNKNOWN":
+            existing_total = comm.get("total")
+            if existing_total is None or (week_num is not None and week_num > (existing_total.get("mkt_year_week") or -1)):
+                comm["total"] = record
+            continue
+ 
+        # Skip other aggregate/rollup rows so per-country data stays clean.
+        if country_name.strip().upper() in ("TOTAL KNOWN", "TOTAL UNKNOWN",
+                                             "OPTIONAL ORIGIN", "EXPORTS FOR OWN ACCT", "UNKNOWN"):
+            continue
  
         existing = comm["countries"].get(country_name)
         # Keep only the latest period per country (report includes 2 weeks; take the newer).
         if existing is None or (week_num is not None and week_num > (existing.get("mkt_year_week") or -1)):
-            comm["countries"][country_name] = {
-                "period_ending": period,
-                "mkt_year": get_field(attrib, FIELD_CANDIDATES["mkt_year"]),
-                "mkt_year_week": week_num,
-                "net_sales": net_sales,
-                "outstanding_sales": outstanding,
-                "accumulated_exports": accum_exports,
-                "total_commitment": total_commit,
-                "prev_yr_accumulated_exports": prev_accum,
-                "prev_yr_outstanding_sales": prev_outstanding,
-                "yoy_accum_exports_pct": yoy_pct(accum_exports, prev_accum),
-                "yoy_outstanding_sales_pct": yoy_pct(outstanding, prev_outstanding),
-            }
+            comm["countries"][country_name] = record
  
     if not matched_commodities:
         print("ERROR: No commodities matched the expected keywords (WHEAT, CORN, SOYBEAN, OATS).", file=sys.stderr)
@@ -204,6 +216,15 @@ def main():
         print("ERROR: Every record was missing a country name — check FIELD_CANDIDATES['country_name'].", file=sys.stderr)
         sys.exit(1)
  
+    missing_totals = [name for name, data in result["commodities"].items() if data["total"] is None]
+    if missing_totals:
+        print("ERROR: No 'Total Known and Unknown' row found for these matched commodities "
+              "(needed for the summary table) — the aggregate row's country-name text may have "
+              "changed on USDA's end:", file=sys.stderr)
+        for n in missing_totals:
+            print(f"  - {n}", file=sys.stderr)
+        sys.exit(1)
+ 
     result["_meta"] = {
         "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": URL,
@@ -216,7 +237,7 @@ def main():
     size = os.path.getsize(OUT)
     print(f"\nCommodities matched ({len(result['commodities'])}):")
     for name, data in result["commodities"].items():
-        print(f"  {name}: {len(data['countries'])} countries")
+        print(f"  {name}: {len(data['countries'])} countries, YTD accum exports={data['total']['accumulated_exports']}")
     print(f"\nSaved {OUT} ({size:,} bytes)")
  
  
