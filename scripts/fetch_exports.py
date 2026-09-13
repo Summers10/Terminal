@@ -41,15 +41,15 @@ FIELD_CANDIDATES = {
     "period_ending": ["PeriodEndingDate"],
     "mkt_year": ["MarketingYear"],
     "mkt_year_week": ["MarketingYearWeekNumber"],
-    "beginning_balance": ["BeginningBalance"],
+    "beginning_balance": ["BeginningBalance", "BeginingBalance"],
     "new_sales": ["NewSales"],
     "net_sales": ["NetSales"],
     "outstanding_sales": ["OutstandingSales"],
     "weekly_exports": ["WeeklyExports"],
     "accumulated_exports": ["AccumulatedExports"],
     "total_commitment": ["TotalCommitment"],
-    "prev_accumulated_exports": ["PreviousMKTYearAccumulatedExports"],
-    "prev_outstanding_sales": ["PreviousMKTYearOutstandingSales"],
+    "prev_accumulated_exports": ["PreviousMKTYearAccumulatedExports", "PreviousYearAccumulatedExports"],
+    "prev_outstanding_sales": ["PreviousMKTYearOutstandingSales", "PreviousYearOutstandingSales"],
 }
  
  
