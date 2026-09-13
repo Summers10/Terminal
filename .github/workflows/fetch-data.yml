@@ -1,30 +1,34 @@
-name: Fetch PSD Data
-
+name: Fetch PSD and CFTC Data
+ 
 on:
   schedule:
-    - cron: '0 13 * * *'
-  workflow_dispatch: {}
-
+    - cron: '0 13 * * *'      # daily 13:00 UTC — PSD/WASDE updates monthly, daily is plenty
+    - cron: '30 21 * * 5'     # Fridays 21:30 UTC (4:30pm ET) — after CFTC's 3:30pm ET COT release
+  workflow_dispatch: {}        # lets you trigger it manually from the Actions tab
+ 
 permissions:
   contents: write
-
+ 
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+ 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+ 
       - name: Run PSD fetcher
         run: python scripts/fetch_psd.py
-
+ 
+      - name: Run CFTC fetcher
+        run: python scripts/fetch_cftc.py
+ 
       - name: Commit updated data
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/psd_data.json
-          git diff --staged --quiet || git commit -m "Update PSD data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git add data/psd_data.json data/cftc_data.json
+          git diff --staged --quiet || git commit -m "Update PSD/CFTC data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push
