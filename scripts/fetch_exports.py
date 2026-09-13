@@ -52,8 +52,11 @@ FIELD_CANDIDATES = {
  
 def fetch_xml(url):
     req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "application/xml",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://apps.fas.usda.gov/esrqs/",
     })
     with urllib.request.urlopen(req, timeout=90) as resp:
         return resp.read()
@@ -91,7 +94,13 @@ def main():
     try:
         raw = fetch_xml(URL)
     except urllib.error.HTTPError as e:
-        print(f"ERROR: HTTP {e.code} {e.reason} — URL may not exist or path changed.", file=sys.stderr)
+        print(f"ERROR: HTTP {e.code} {e.reason}", file=sys.stderr)
+        try:
+            body = e.read(2000).decode("utf-8", errors="replace")
+            print("Response body (first 2000 chars):", file=sys.stderr)
+            print(body, file=sys.stderr)
+        except Exception:
+            pass
         sys.exit(1)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
