@@ -89,6 +89,7 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <button class="page-tab active" data-page="summary" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#f5a623;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SUMMARY</button>
   <button class="page-tab" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
+  <button class="page-tab" data-page="seasonals" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SEASONALS</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
     <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
     <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
@@ -119,6 +120,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     document.getElementById('summary-page').style.display = btn.dataset.page === 'summary' ? '' : 'none';
     document.getElementById('usda-page').style.display = btn.dataset.page === 'usda' ? '' : 'none';
     document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
+    document.getElementById('seasonals-page').style.display = btn.dataset.page === 'seasonals' ? '' : 'none';
   });
 });
 </script>
@@ -148,6 +150,13 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <div id="cftc-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
   <div id="cftc-root" style="max-width:1300px;margin:0 auto;padding:22px"></div>
+</div>
+<div id="seasonals-page" style="display:none">
+<div id="seasonals-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Seasonals</h1>
+  <div id="seasonals-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Forward-looking weekly seasonal score (-5 to +5), 15-year lookback. Static — manually entered, not auto-updating.</div>
+</div>
+  <div id="seasonals-root" style="max-width:100%;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
@@ -722,12 +731,12 @@ loadCftc();
 // ---------------- SUMMARY PAGE ----------------
 
 const SUMMARY_ROWS = [
-  {section:'Grains',   label:'Wheat (Chicago SRW)', cftcCode:'001602', usdaComm:'Wheat', domestic:'United States'},
-  {section:'Grains',   label:'Wheat (KC HRW)',       cftcCode:'001612', usdaComm:'Wheat', domestic:'United States'},
-  {section:'Grains',   label:'Wheat (Mpls Spring)',  cftcCode:'001626', usdaComm:'Wheat', domestic:'United States'},
-  {section:'Grains',   label:'Corn',                 cftcCode:'002602', usdaComm:'Corn', domestic:'United States'},
-  {section:'Oilseeds', label:'Soybeans',             cftcCode:'005602', usdaComm:'Soybeans', domestic:'United States'},
-  {section:'Oilseeds', label:'Canola',               cftcCode:'135731', usdaComm:'Rapeseed/Canola', domestic:'Canada'},
+  {section:'Grains',   label:'Wheat (Chicago SRW)', cftcCode:'001602', usdaComm:'Wheat', domestic:'United States', seasonalName:'Chicago Wheat'},
+  {section:'Grains',   label:'Wheat (KC HRW)',       cftcCode:'001612', usdaComm:'Wheat', domestic:'United States', seasonalName:'Kansas Wheat'},
+  {section:'Grains',   label:'Wheat (Mpls Spring)',  cftcCode:'001626', usdaComm:'Wheat', domestic:'United States', seasonalName:'Spring Wheat'},
+  {section:'Grains',   label:'Corn',                 cftcCode:'002602', usdaComm:'Corn', domestic:'United States', seasonalName:'Corn'},
+  {section:'Oilseeds', label:'Soybeans',             cftcCode:'005602', usdaComm:'Soybeans', domestic:'United States', seasonalName:'Soybeans'},
+  {section:'Oilseeds', label:'Canola',               cftcCode:'135731', usdaComm:'Rapeseed/Canola', domestic:'Canada', seasonalName:'Canola Seed'},
 ];
 
 function summaryYearsSorted(usdaComm){
@@ -782,12 +791,32 @@ function summaryPctileClass(p){
 
 function summaryPctileText(p){ return p===null||p===undefined ? '—' : cftcOrdinal(p); }
 
+function getNextSeasonalEntry(productName){
+  if(typeof SEASONALS_WEEKS === 'undefined' || typeof SEASONALS_DATA === 'undefined') return null;
+  const vals = SEASONALS_DATA[productName];
+  if(!vals) return null;
+  const monthMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  const today = new Date(); today.setHours(0,0,0,0);
+  const year = today.getFullYear();
+  let best = null;
+  SEASONALS_WEEKS.forEach((w,i)=>{
+    const parts = w.split(' ');
+    const d = new Date(year, monthMap[parts[0]], parseInt(parts[1],10));
+    if(d>=today && (best===null || d<best.date)){
+      best = {date:d, label:w, value:vals[i]};
+    }
+  });
+  return best;
+}
+
 function buildSummaryTable(){
   const groups = [
+    {label:'Seasonality', cols:['Next Wk']},
     {label:'Positioning', cols:['Net % OI','Pctile']},
     {label:'Production YoY', cols:['Domestic','Exporters']},
     {label:'Stocks/Use % Rank', cols:['Domestic','World','Exporters','Importers']},
   ];
+  const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
 
   let html = `<table class="cftc-table"><thead><tr><th rowspan="2">Product</th>`;
   groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
@@ -801,12 +830,15 @@ function buildSummaryTable(){
   SUMMARY_ROWS.forEach(row=>{
     if(row.section !== curSection){
       curSection = row.section;
-      html += `<tr class="cftc-row-section"><td colspan="9">${curSection}</td></tr>`;
+      html += `<tr class="cftc-row-section"><td colspan="${totalCols}">${curSection}</td></tr>`;
     }
 
     const countries = DATA[row.usdaComm] || {};
     const expList = (EXPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
     const impList = (IMPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
+
+    // Seasonality (next upcoming week)
+    const seas = getNextSeasonalEntry(row.seasonalName);
 
     // Positioning (CFTC)
     const hist = (CFTC_DATA.codes && CFTC_DATA.codes[row.cftcCode]) ? CFTC_DATA.codes[row.cftcCode].history : null;
@@ -821,6 +853,12 @@ function buildSummaryTable(){
     const impStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, impList, y));
 
     html += `<tr><td>${row.label}</td>`;
+    if(!seas){
+      html += `<td style="color:var(--text3)">—</td>`;
+    } else {
+      const text = (seas.value>0?'+':'')+seas.value;
+      html += `<td style="background:${seasonalColor(seas.value)};color:#111;font-weight:800" title="Week of ${seas.label}">${text}</td>`;
+    }
     if(!m){
       html += `<td colspan="2" style="text-align:left;color:var(--text3)">No CFTC data</td>`;
     } else {
@@ -849,6 +887,114 @@ function renderSummary(){
     ' — Domestic column uses United States, except Canola which uses Canada.';
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 }
+</script>
+
+<style>
+.seas-table{border-collapse:collapse;background:#fff}
+.seas-table th{padding:5px 6px;text-align:center;font-size:11px;font-weight:800;color:#333;background:#f2f2f2;border:1px solid #ccc;white-space:nowrap}
+.seas-table td{padding:4px 8px;text-align:center;font-size:12px;font-weight:700;color:#111;border:1px solid #ddd;white-space:nowrap}
+.seas-table td.seas-label{text-align:left;font-weight:700;color:#222;background:#fff;position:sticky;left:0;z-index:1}
+.seas-table th.seas-label-h{text-align:left;position:sticky;left:0;z-index:2;background:#f2f2f2}
+.seas-section-row td{background:#e8e8e8 !important;color:#333 !important;font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.08em;text-align:left;position:sticky;left:0}
+</style>
+<script>
+const SEASONALS_WEEKS = ["Feb 02","Feb 09","Feb 16","Feb 23","Mar 02","Mar 09","Mar 16","Mar 23","Mar 30","Apr 06","Apr 13","Apr 20","Apr 27","May 04","May 11","May 18","May 25","Jun 01","Jun 08","Jun 15","Jun 22","Jun 29","Jul 06","Jul 13","Jul 20","Jul 27","Aug 03","Aug 10","Aug 17","Aug 24","Aug 31","Sep 07","Sep 14","Sep 21","Sep 28","Oct 05","Oct 12","Oct 19","Oct 26","Nov 02","Nov 09","Nov 16"];
+
+const SEASONALS_SECTIONS = [
+  {label:'Grains', products:['Corn','Chicago Wheat','Kansas Wheat','Spring Wheat','Matif Wheat']},
+  {label:'Oilseeds', products:['Soybeans','Soybean Meal','Soybean Oil','Canola Seed','Matif Rapeseed','Palm Oil']},
+  {label:'Meats', products:['Cattle','Hogs','Feeder Cattle']},
+  {label:'Softs', products:['Cotton','Sugar No. 11','White Sugar','Arabica Coffee','Robusta Coffee','NY Cocoa','London Cocoa']},
+];
+
+const SEASONALS_DATA = {
+  'Corn': [3,4,-5,4,2,-2,-2,1,-1,4,3,1,-1,2,4,1,-1,1,-1,-5,-5,-1,4,-1,-2,-4,-4,-2,-2,-3,-2,-1,-4,-4,-4,5,4,2,-2,-3,-4,-4],
+  'Chicago Wheat': [-4,2,-1,2,1,-2,1,-1,3,2,3,1,3,1,3,1,-3,-5,-5,-5,-5,-3,2,-1,-4,-4,-2,-4,-3,-3,-1,-1,1,4,4,2,1,-2,-3,-4,-3,-1],
+  'Kansas Wheat': [-1,-1,0,1,2,-2,2,2,2,4,4,3,4,-1,0,-3,-2,-4,-4,-3,-3,-1,2,-3,-4,-3,-1,-4,-3,-3,-1,0,0,2,3,2,1,-2,-1,-4,-3,-2],
+  'Spring Wheat': [-2,2,-1,1,0,1,-5,-1,-1,4,2,0,-1,4,1,2,-5,-2,-3,0,-4,1,4,3,-4,0,-4,-4,-1,-4,-4,0,5,5,5,1,-1,-2,-1,0,0,1],
+  'Matif Wheat': [-3,-3,3,1,-1,1,2,1,-3,4,4,2,-1,1,5,2,-5,-4,-5,-5,-3,2,4,3,-5,4,-4,-4,-4,-4,-4,0,3,5,5,3,1,-2,-1,-1,1,-1],
+  'Soybeans': [5,4,3,4,-3,-2,-3,0,-1,3,5,0,-2,3,1,-1,2,-1,-3,-4,-3,-5,-4,-4,-5,-5,-4,5,4,0,-2,-5,-5,-4,2,4,5,2,2,-2,-3,-3],
+  'Soybean Meal': [4,-2,4,-3,-2,-1,2,-3,4,0,4,0,0,2,1,-3,-1,-3,-4,-3,-1,0,-3,1,-5,-5,-1,-4,-1,-1,-5,-4,-4,-5,-4,3,4,3,-3,-2,-3,-3],
+  'Soybean Oil': [3,3,3,-3,1,-2,-4,2,-4,1,5,-3,1,-1,4,-4,-2,2,-3,-4,4,-3,-5,-1,-4,4,-3,1,4,-3,-4,-5,-5,-4,0,4,4,2,0,-2,-2,-2],
+  'Canola Seed': [3,1,5,-3,0,4,4,5,4,5,4,5,5,5,-1,2,-3,-4,-3,3,2,-3,1,-5,-5,-4,1,1,-1,-3,-5,-5,-5,-4,3,4,2,0,-2,-2,-3,-3],
+  'Matif Rapeseed': [-3,1,3,-1,-2,1,4,1,1,1,1,1,1,-1,-2,-3,-5,-4,-2,3,-2,-1,-3,1,-1,4,-3,1,-1,-1,-5,-3,-3,1,3,2,4,1,-2,-3,1,-3],
+  'Palm Oil': [5,4,2,3,-4,-1,-3,2,-2,-1,-4,-1,-3,-3,1,-3,-5,-4,-2,5,-4,1,2,-1,-2,-1,3,4,0,0,-1,-1,-1,-2,-3,2,-2,-1,0,-1,2,-1],
+  'Cattle': [1,-2,-5,1,4,-1,-1,0,0,-5,0,2,1,1,-4,-4,-3,5,-1,5,1,4,1,-1,5,-1,-4,-4,2,-3,1,4,4,2,-1,-1,0,-1,-2,-3,-4,-1],
+  'Hogs': [2,-1,4,1,1,3,0,-2,-3,0,2,0,-1,3,-4,3,2,1,4,5,4,-5,-4,-2,-1,2,5,2,2,4,4,4,4,-1,-3,3,-1,-2,-2,-3,-3,-1],
+  'Feeder Cattle': [-1,-4,-1,0,2,4,-3,2,1,-4,1,3,2,4,-5,-4,4,4,4,2,4,3,-1,-4,2,0,2,4,-3,3,-4,4,4,2,4,-1,-2,-5,4,2,-1,-1],
+  'Cotton': [-3,-1,-1,-1,-3,-4,-4,-1,-5,-2,-2,-2,2,1,-4,0,-5,-3,-2,-4,-4,-1,1,-3,3,-2,2,1,1,4,1,5,5,1,1,-2,-2,-3,-1,-1,-1,0],
+  'Sugar No. 11': [2,-4,-3,-2,-4,-4,-4,-2,0,1,1,1,2,3,-1,-1,3,2,-3,1,-1,1,-1,-3,-1,3,2,1,1,1,5,0,0,1,-2,-2,-2,-2,-2,-3,-4,-2],
+  'White Sugar': [3,3,-4,2,-4,-4,-2,-1,-2,1,1,-3,-1,2,1,0,1,1,2,0,-4,-2,1,1,5,-3,-3,-1,-2,1,0,5,-1,5,-1,1,-1,-3,-2,-3,3,1],
+  'Arabica Coffee': [5,5,-1,3,-1,-1,-5,0,1,5,-2,-5,-2,-3,1,1,-3,-1,1,4,-1,-1,-3,-3,1,2,3,5,5,4,5,5,2,-3,-3,-2,-3,-4,4,-4,-3,4],
+  'Robusta Coffee': [-3,1,3,-1,0,3,-1,-1,-4,-3,1,-1,-3,-1,-1,-1,1,0,2,4,-1,-4,-4,5,-5,-1,2,4,-2,4,-3,4,-3,2,-1,-3,-1,-3,-3,-1,4,4],
+  'NY Cocoa': [-1,4,5,1,-1,-1,4,-2,4,5,5,1,2,-1,-3,1,-5,-3,-3,-5,-1,5,-1,-2,-4,-3,-1,5,-1,-1,2,-2,2,-2,-3,-3,4,-2,5,5,3,-3],
+  'London Cocoa': [4,-3,-1,-1,1,-3,4,2,-2,-3,1,-1,4,2,4,4,-4,-3,-1,0,2,-2,4,-4,1,-3,1,-1,-3,-1,-3,2,-1,-4,1,-3,-5,-3,2,3,4,4],
+};
+
+function seasonalColor(v){
+  if(v===null||v===undefined) return '#fff';
+  const t = Math.min(Math.abs(v),5)/5;
+  if(v>=0){
+    const r = Math.round(255+(46-255)*t), g = Math.round(255+(143-255)*t), b = Math.round(255+(82-255)*t);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const r = Math.round(255+(184-255)*t), g = Math.round(255+(56-255)*t), b = Math.round(255+(56-255)*t);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+let seasonalsMonth = null;
+
+function getSeasonalsMonths(){
+  const months = [];
+  SEASONALS_WEEKS.forEach(w=>{ const m=w.split(' ')[0]; if(!months.includes(m)) months.push(m); });
+  return months;
+}
+
+function defaultSeasonalsMonth(){
+  const months = getSeasonalsMonths();
+  const nowAbbr = new Date().toLocaleString('en-US',{month:'short'});
+  return months.includes(nowAbbr) ? nowAbbr : months[0];
+}
+
+function buildSeasonalsTable(month){
+  const cols = SEASONALS_WEEKS.map((w,i)=>({w,i})).filter(o=>o.w.split(' ')[0]===month);
+  let html = `<table class="seas-table"><thead><tr><th class="seas-label-h">Product</th>`;
+  cols.forEach(o=>{ html += `<th>${o.w}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  SEASONALS_SECTIONS.forEach(section=>{
+    html += `<tr class="seas-section-row"><td colspan="${cols.length+1}">${section.label}</td></tr>`;
+    section.products.forEach(p=>{
+      const vals = SEASONALS_DATA[p] || [];
+      html += `<tr><td class="seas-label">${p}</td>`;
+      cols.forEach(o=>{
+        const v = vals[o.i];
+        const text = (v===null||v===undefined) ? '—' : (v>0?'+':'')+v;
+        html += `<td style="background:${seasonalColor(v)}">${text}</td>`;
+      });
+      html += `</tr>`;
+    });
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderSeasonals(){
+  if(!seasonalsMonth) seasonalsMonth = defaultSeasonalsMonth();
+  const months = getSeasonalsMonths();
+  const root = document.getElementById('seasonals-root');
+  let selHtml = `<div class="toggle" style="margin-bottom:16px;display:inline-flex">`;
+  months.forEach(m=>{
+    selHtml += `<button class="tbtn seas-month-btn${m===seasonalsMonth?' active':''}" data-m="${m}">${m}</button>`;
+  });
+  selHtml += `</div><br>`;
+  root.innerHTML = selHtml + buildSeasonalsTable(seasonalsMonth);
+  root.querySelectorAll('.seas-month-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{ seasonalsMonth = b.dataset.m; renderSeasonals(); });
+  });
+}
+renderSeasonals();
 </script>
 </body>
 </html>
