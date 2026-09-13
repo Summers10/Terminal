@@ -63,7 +63,7 @@ td.dn{color:var(--red) !important}
 #err{padding:40px;text-align:center;color:var(--red);font-size:16px}
 </style>
 </head>
-<body class="dark">
+<body class="light">
 <div id="pw-gate" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column">
   <div style="text-align:center">
     <div style="font-size:20px;font-weight:900;letter-spacing:.14em;color:#f5a623;margin-bottom:20px">SPEISS/SUMMERS</div>
@@ -89,8 +89,8 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <button class="page-tab active" data-page="usda" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#f5a623;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">USDA REPORT</button>
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
-    <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
-    <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
+    <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
+    <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
   </div>
 </div>
 <script>
@@ -129,17 +129,17 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     <button class="tbtn" data-u="mt">MT</button>
     <button class="tbtn" data-u="bu">BU</button>
   </div>
-  <div class="toggle" id="theme-toggle">
-    <button class="tbtn" data-t="dark">Dark</button>
-    <button class="tbtn" data-t="light">Light</button>
-  </div>
   <div id="conv-label"></div>
   <div id="meta">Loading...</div>
 </div>
 <div id="root"></div>
 </div>
 <div id="cftc-page" style="display:none">
-  <div id="cftc-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
+<div id="cftc-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">CFTC Commitment of Traders</h1>
+  <div id="cftc-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
+</div>
+  <div id="cftc-root" style="max-width:100%;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
@@ -166,7 +166,7 @@ const IMPORTERS = {
 let DATA = null;
 let currentComm = "Wheat";
 let currentUnit = "mt";
-let currentTheme = "dark";
+let currentTheme = "light";
 
 function fmt(v){
   if(v===null || v===undefined || isNaN(v)) return '—';
@@ -483,16 +483,6 @@ function initToggles(){
       render();
     });
   });
-
-  const tt = document.getElementById('theme-toggle');
-  tt.querySelectorAll('.tbtn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.t===currentTheme);
-    b.addEventListener('click', ()=>{
-      if(typeof setGlobalTheme === 'function') setGlobalTheme(b.dataset.t);
-      currentTheme = b.dataset.t;
-      tt.querySelectorAll('.tbtn').forEach(x=>x.classList.toggle('active', x===b));
-    });
-  });
 }
 
 fetch('data/psd_data.json?_=' + Date.now())
@@ -509,18 +499,15 @@ fetch('data/psd_data.json?_=' + Date.now())
 </script>
 
 <style>
-.cftc-sec-hdr{font-size:15px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);padding:16px 0 9px;border-bottom:2px solid var(--amber);margin:32px 0 14px}
-.cftc-sec-hdr:first-child{margin-top:0}
-.cftc-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg);margin-bottom:20px}
-.cftc-table th{background:var(--th-bg);padding:8px 8px;text-align:right;font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
-.cftc-table th:first-child{text-align:left}
-.cftc-table td{padding:5px 8px;text-align:right;font-size:14px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.cftc-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.cftc-table th{background:var(--th-bg);padding:6px 4px;text-align:right;font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap;overflow:hidden}
+.cftc-table th:first-child{text-align:left;width:15%}
+.cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .cftc-up{color:var(--green) !important}
 .cftc-dn{color:var(--red) !important}
 .cftc-extreme-hi{background:rgba(46,143,82,.22) !important;font-weight:800 !important}
 .cftc-extreme-lo{background:rgba(184,56,56,.22) !important;font-weight:800 !important}
-#cftc-meta{font-size:12px;color:var(--text3);margin-bottom:14px}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 </style>
 <script>
@@ -566,10 +553,15 @@ let cftcLoaded = false;
 
 function cftcFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
 function cftcPct(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : v.toFixed(1)+'%'; }
-function cftcSigned(v, dec){
+function cftcSignedPct(v, dec){
   if(v===null||v===undefined||isNaN(v)) return '—';
   const s = v>=0?'+':'';
-  return s+v.toFixed(dec===undefined?0:dec)+(dec!==undefined?'%':'');
+  return s+v.toFixed(dec===undefined?1:dec)+'%';
+}
+function cftcSignedNum(v){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  const s = v>=0?'+':'';
+  return s+Math.round(v).toLocaleString();
 }
 function cftcOrdinal(n){
   const r = Math.round(n), mod100 = r%100;
@@ -621,43 +613,51 @@ function extremeClass(p){
   return '';
 }
 
-function buildCftcGroupTable(group){
-  const cols = [
-    {label:'Fund Net Position'},
-    {label:'Weekly Change'},
-    {label:'Net % of OI'},
-    {label:'Net % of OI Pctile'},
-    {label:'Gross Long'},
-    {label:'Gross Short'},
-    {label:'Gross Long % of OI'},
-    {label:'Gross Short % of OI'},
-    {label:'Open Interest'},
-    {label:'OI Change'},
-  ];
+const CFTC_COL_GROUPS = [
+  {label:'Position', cols:['Net Position','Wkly Chg']},
+  {label:'Net Exposure', cols:['Net % OI','Pctile']},
+  {label:'Gross Positions', cols:['Gross Long','Gross Short']},
+  {label:'Gross % of OI', cols:['Long % OI','Short % OI']},
+  {label:'Open Interest', cols:['OI','OI Chg']},
+];
 
-  let html = `<table class="cftc-table"><thead><tr><th>Product</th>`;
-  cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
+function buildCftcRow(entry, hist){
+  const m = computeLatestMetrics(entry, hist);
+  let html = `<tr><td>${entry.label}</td>`;
+  if(!m){
+    html += `<td colspan="10" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
+  } else {
+    html += `<td class="${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
+    html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.weeklyChange)}</td>`;
+    html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(m.netPctOi,1)}</td>`;
+    html += `<td class="${extremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
+    html += `<td>${cftcFmt(m.mmL)}</td>`;
+    html += `<td>${cftcFmt(m.mmS)}</td>`;
+    html += `<td class="${extremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
+    html += `<td class="${extremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
+    html += `<td>${cftcFmt(m.oi)}</td>`;
+    html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.oiChg)}</td>`;
+  }
+  html += `</tr>`;
+  return html;
+}
+
+function buildCftcMasterTable(){
+  let html = `<table class="cftc-table"><thead>`;
+  html += `<tr><th rowspan="2">Product</th>`;
+  CFTC_COL_GROUPS.forEach(g=>{ html += `<th colspan="2" style="text-align:center;border-left:1px solid var(--border2)">${g.label}</th>`; });
+  html += `</tr><tr>`;
+  CFTC_COL_GROUPS.forEach(g=>{
+    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c}</th>`; });
+  });
   html += `</tr></thead><tbody>`;
 
-  group.codes.forEach(entry=>{
-    const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
-    const m = computeLatestMetrics(entry, hist);
-    html += `<tr><td>${entry.label}</td>`;
-    if(!m){
-      html += `<td colspan="${cols.length}" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
-    } else {
-      html += `<td class="${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
-      html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSigned(m.weeklyChange,0)}</td>`;
-      html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcSigned(m.netPctOi,1)}</td>`;
-      html += `<td class="${extremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
-      html += `<td>${cftcFmt(m.mmL)}</td>`;
-      html += `<td>${cftcFmt(m.mmS)}</td>`;
-      html += `<td class="${extremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
-      html += `<td class="${extremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
-      html += `<td>${cftcFmt(m.oi)}</td>`;
-      html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSigned(m.oiChg,0)}</td>`;
-    }
-    html += `</tr>`;
+  CFTC_GROUPS.forEach(group=>{
+    html += `<tr class="row-section"><td colspan="11">${group.label}</td></tr>`;
+    group.codes.forEach(entry=>{
+      const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
+      html += buildCftcRow(entry, hist);
+    });
   });
   html += `</tbody></table>`;
   return html;
@@ -666,15 +666,9 @@ function buildCftcGroupTable(group){
 function renderCftc(){
   const root = document.getElementById('cftc-root');
   root.innerHTML = '';
-  const meta = document.createElement('div');
-  meta.id = 'cftc-meta';
-  meta.textContent = 'Last updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') + ' — Managed Money (Fund) category, CFTC Disaggregated report. Highlighted cells are within the top/bottom 10% of that series\' own history.';
-  root.appendChild(meta);
-
-  CFTC_GROUPS.forEach(group=>{
-    root.insertAdjacentHTML('beforeend', `<div class="cftc-sec-hdr">${group.label}</div>`);
-    root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCftcGroupTable(group)}</div>`);
-  });
+  const yrs = CFTC_DATA._meta?.years_history;
+  document.getElementById('cftc-meta').textContent = 'Last updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') + ' — Managed Money (Fund) category — ' + (yrs ? yrs+'yr lookback' : '') + ' — highlighted cells are top/bottom 10% of that lookback window.';
+  root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
 }
 
 function loadCftc(){
