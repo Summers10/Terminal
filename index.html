@@ -996,6 +996,17 @@ function renderSummary(){
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
+
+  // Force the calendar to exactly match the summary table's actual rendered width,
+  // rather than relying on both tables' independent width math staying in sync.
+  requestAnimationFrame(()=>{
+    const summaryTable = root.querySelector('.summary-table');
+    const calTable = root.querySelector('.cal-table');
+    if(summaryTable && calTable){
+      const w = summaryTable.getBoundingClientRect().width;
+      calTable.style.width = w + 'px';
+    }
+  });
 }
 </script>
 
