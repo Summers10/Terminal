@@ -98,6 +98,22 @@ def to_qty(v):
     return None if n is None else n * 1000
  
  
+def parse_period_date(s):
+    """Parse USDA's MM/DD/YYYY period-ending date into a sortable tuple.
+    Used instead of the marketing-year week number to pick the latest record:
+    week numbers reset to 1 at each marketing-year rollover (e.g. Sept 1 for
+    corn/soybeans, vs June 1 for wheat) and are NOT safely comparable across
+    that boundary — a new marketing year's week 1 would otherwise lose to the
+    prior marketing year's week 52. Calendar dates are always comparable."""
+    if not s:
+        return None
+    try:
+        mm, dd, yyyy = s.strip().split("/")
+        return (int(yyyy), int(mm), int(dd))
+    except (ValueError, AttributeError):
+        return None
+ 
+ 
 def yoy_pct(cur, prev):
     if cur is None or prev is None or prev == 0:
         return None
@@ -173,6 +189,7 @@ def main():
         matched_commodities.add(commodity_name)
  
         period = get_field(attrib, FIELD_CANDIDATES["period_ending"])
+        period_key = parse_period_date(period)
         week_num = to_num(get_field(attrib, FIELD_CANDIDATES["mkt_year_week"]))
  
         net_sales = to_qty(get_field(attrib, FIELD_CANDIDATES["net_sales"]))
@@ -210,8 +227,10 @@ def main():
         # Capture it separately as the summary total; keep it out of the per-country list.
         if country_name.strip().upper() == "TOTAL KNOWN AND UNKNOWN":
             existing_total = comm.get("total")
-            if existing_total is None or (week_num is not None and week_num > (existing_total.get("mkt_year_week") or -1)):
+            existing_key = comm.get("_total_period_key")
+            if existing_total is None or (period_key is not None and (existing_key is None or period_key > existing_key)):
                 comm["total"] = record
+                comm["_total_period_key"] = period_key
                 comm["_total_raw_attrib"] = dict(attrib)  # diagnostic only, stripped before writing output
             continue
  
@@ -221,9 +240,12 @@ def main():
             continue
  
         existing = comm["countries"].get(country_name)
-        # Keep only the latest period per country (report includes 2 weeks; take the newer).
-        if existing is None or (week_num is not None and week_num > (existing.get("mkt_year_week") or -1)):
+        # Keep only the latest period per country (report includes 2 weeks; take the newer by
+        # actual calendar date, not marketing-year week number — see parse_period_date).
+        existing_key = comm.get("_country_period_keys", {}).get(country_name)
+        if existing is None or (period_key is not None and (existing_key is None or period_key > existing_key)):
             comm["countries"][country_name] = record
+            comm.setdefault("_country_period_keys", {})[country_name] = period_key
  
     if not matched_commodities:
         print("ERROR: No commodities matched the expected keywords (WHEAT, CORN, SOYBEAN, OATS).", file=sys.stderr)
@@ -264,9 +286,11 @@ def main():
             print(f"  {k} = {v!r}", file=sys.stderr)
         sys.exit(1)
  
-    # Diagnostic-only field — never persisted to the output file.
+    # Diagnostic-only fields — never persisted to the output file.
     for data in result["commodities"].values():
         data.pop("_total_raw_attrib", None)
+        data.pop("_total_period_key", None)
+        data.pop("_country_period_keys", None)
  
     result["_meta"] = {
         "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -280,7 +304,8 @@ def main():
     size = os.path.getsize(OUT)
     print(f"\nCommodities matched ({len(result['commodities'])}):")
     for name, data in result["commodities"].items():
-        print(f"  {name}: {len(data['countries'])} countries, YTD accum exports={data['total']['accumulated_exports']}")
+        t = data['total']
+        print(f"  {name}: {len(data['countries'])} countries, MY={t['mkt_year']}, period ending={t['period_ending']}, YTD accum exports={t['accumulated_exports']:,.0f} MT")
     print(f"\nSaved {OUT} ({size:,} bytes)")
  
  
