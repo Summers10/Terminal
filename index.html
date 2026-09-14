@@ -829,8 +829,7 @@ function buildSummaryTable(){
   const groups = [
     {label:'Seasonality', cols:['Next Wk']},
     {label:'Positioning', cols:['Net % OI','Pctile']},
-    {label:'Production YoY', cols:['Domestic','Exporters']},
-    {label:'Export Sales', cols:['Total Commit. YoY']},
+    {label:'Production & Export YoY', cols:['Domestic Prod.','Exporters Prod.','Total Commit.']},
     {label:'Stocks/Use % Rank', cols:['Domestic','World','Exporters','Importers']},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
@@ -903,6 +902,62 @@ function buildSummaryTable(){
   return html;
 }
 
+// Crop calendar — standard planting/harvest windows for major origins.
+// Static reference data (not sourced from a live feed): standard agronomic windows
+// published by USDA-FAS, IGC, and general trade references.
+const CROP_CALENDAR = [
+  {section:'Wheat', origin:'United States (Winter Wheat: HRW/SRW)', plant:[9,10,11], harvest:[5,6,7]},
+  {section:'Wheat', origin:'United States (Spring Wheat)', plant:[4,5,6], harvest:[8,9]},
+  {section:'Wheat', origin:'Canada', plant:[4,5,6], harvest:[8,9,10]},
+  {section:'Wheat', origin:'European Union (mostly winter)', plant:[9,10,11], harvest:[6,7,8]},
+  {section:'Wheat', origin:'Russia (winter + spring)', plant:[8,9,10,4,5], harvest:[7,8,9]},
+  {section:'Wheat', origin:'Ukraine', plant:[9,10], harvest:[6,7,8]},
+  {section:'Wheat', origin:'Australia', plant:[4,5,6], harvest:[11,12,1]},
+  {section:'Wheat', origin:'Argentina', plant:[5,6,7], harvest:[11,12,1]},
+  {section:'Corn', origin:'United States', plant:[4,5,6], harvest:[9,10,11]},
+  {section:'Corn', origin:'Brazil (1st crop)', plant:[9,10,11], harvest:[2,3,4]},
+  {section:'Corn', origin:'Brazil (Safrinha / 2nd crop)', plant:[1,2,3], harvest:[6,7,8]},
+  {section:'Corn', origin:'Argentina', plant:[9,10,11,12], harvest:[3,4,5,6]},
+  {section:'Corn', origin:'Ukraine', plant:[4,5], harvest:[9,10,11]},
+  {section:'Corn', origin:'European Union', plant:[4,5], harvest:[9,10]},
+  {section:'Soybeans', origin:'United States', plant:[4,5,6], harvest:[9,10,11]},
+  {section:'Soybeans', origin:'Brazil', plant:[9,10,11,12], harvest:[1,2,3,4]},
+  {section:'Soybeans', origin:'Argentina', plant:[10,11,12], harvest:[3,4,5]},
+  {section:'Soybeans', origin:'Paraguay', plant:[9,10,11], harvest:[2,3,4]},
+  {section:'Canola', origin:'Canada', plant:[4,5,6], harvest:[8,9,10]},
+  {section:'Canola', origin:'Australia', plant:[4,5,6], harvest:[10,11,12]},
+  {section:'Canola', origin:'European Union (mostly winter)', plant:[8,9], harvest:[6,7]},
+  {section:'Canola', origin:'Ukraine', plant:[8,9], harvest:[6,7]},
+];
+const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function buildCropCalendarTable(){
+  let html = `<table class="cftc-table"><thead><tr><th style="text-align:left">Origin</th>`;
+  CAL_MONTHS.forEach((m,i)=>{ html += `<th>${m}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  let curSection = null;
+  CROP_CALENDAR.forEach(row=>{
+    if(row.section !== curSection){
+      curSection = row.section;
+      html += `<tr class="cftc-row-section"><td colspan="13">${curSection}</td></tr>`;
+    }
+    html += `<tr><td>${row.origin}</td>`;
+    for(let m=1; m<=12; m++){
+      const isPlant = row.plant.includes(m);
+      const isHarvest = row.harvest.includes(m);
+      let bg = 'transparent', label = '';
+      if(isPlant && isHarvest){ bg = 'linear-gradient(135deg, rgba(46,143,82,.35) 50%, rgba(230,180,20,.4) 50%)'; label = 'P/H'; }
+      else if(isPlant){ bg = 'rgba(46,143,82,.30)'; label = 'P'; }
+      else if(isHarvest){ bg = 'rgba(230,180,20,.40)'; label = 'H'; }
+      html += `<td style="background:${bg};color:var(--text);font-weight:700">${label}</td>`;
+    }
+    html += `</tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
 function renderSummary(){
   const root = document.getElementById('summary-root');
   root.innerHTML = '';
@@ -912,6 +967,10 @@ function renderSummary(){
     ' — Export sales updated: ' + (EXPORTS_DATA && EXPORTS_DATA._meta?.fetched_at || 'unavailable') +
     ' — Domestic column uses United States, except Canola which uses Canada. Canola has no US export data.';
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
+
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
+  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
 }
 </script>
 
