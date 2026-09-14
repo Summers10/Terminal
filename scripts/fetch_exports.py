@@ -78,12 +78,24 @@ def get_field(attrib, candidates):
  
  
 def to_num(v):
+    """Parse a plain numeric attribute with no scaling (e.g. week numbers)."""
     if v is None or v == "":
         return None
     try:
         return float(v)
     except (ValueError, TypeError):
         return None
+ 
+ 
+def to_qty(v):
+    """Parse a quantity attribute. USDA's file expresses these values in
+    THOUSANDS of the reporting unit (confirmed in the report's own title
+    text); multiply by 1000 here so downstream figures are in actual
+    metric tons, matching how external sources (USDA's own press tables,
+    Hightower, etc.) display these figures — avoids a silent 1000x
+    mismatch when cross-checking against them."""
+    n = to_num(v)
+    return None if n is None else n * 1000
  
  
 def yoy_pct(cur, prev):
@@ -163,12 +175,12 @@ def main():
         period = get_field(attrib, FIELD_CANDIDATES["period_ending"])
         week_num = to_num(get_field(attrib, FIELD_CANDIDATES["mkt_year_week"]))
  
-        net_sales = to_num(get_field(attrib, FIELD_CANDIDATES["net_sales"]))
-        outstanding = to_num(get_field(attrib, FIELD_CANDIDATES["outstanding_sales"]))
-        accum_exports = to_num(get_field(attrib, FIELD_CANDIDATES["accumulated_exports"]))
-        total_commit = to_num(get_field(attrib, FIELD_CANDIDATES["total_commitment"]))
-        prev_accum = to_num(get_field(attrib, FIELD_CANDIDATES["prev_accumulated_exports"]))
-        prev_outstanding = to_num(get_field(attrib, FIELD_CANDIDATES["prev_outstanding_sales"]))
+        net_sales = to_qty(get_field(attrib, FIELD_CANDIDATES["net_sales"]))
+        outstanding = to_qty(get_field(attrib, FIELD_CANDIDATES["outstanding_sales"]))
+        accum_exports = to_qty(get_field(attrib, FIELD_CANDIDATES["accumulated_exports"]))
+        total_commit = to_qty(get_field(attrib, FIELD_CANDIDATES["total_commitment"]))
+        prev_accum = to_qty(get_field(attrib, FIELD_CANDIDATES["prev_accumulated_exports"]))
+        prev_outstanding = to_qty(get_field(attrib, FIELD_CANDIDATES["prev_outstanding_sales"]))
  
         comm = result["commodities"].setdefault(commodity_name, {
             "code": get_field(attrib, FIELD_CANDIDATES["commodity_code"]),
