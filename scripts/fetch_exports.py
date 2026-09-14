@@ -16,7 +16,7 @@ defensively: if the expected attributes aren't found, it prints every
 attribute actually present on a sample record and exits non-zero, so a
 mismatch is caught and fixed in one pass rather than shipped silently.
 """
-import os, sys, json, urllib.request, urllib.error
+import os, sys, json, urllib.request, urllib.error, re
 import xml.etree.ElementTree as ET
 from datetime import datetime
  
@@ -99,12 +99,7 @@ def to_qty(v):
  
  
 def parse_period_date(s):
-    """Parse USDA's MM/DD/YYYY period-ending date into a sortable tuple.
-    Used instead of the marketing-year week number to pick the latest record:
-    week numbers reset to 1 at each marketing-year rollover (e.g. Sept 1 for
-    corn/soybeans, vs June 1 for wheat) and are NOT safely comparable across
-    that boundary — a new marketing year's week 1 would otherwise lose to the
-    prior marketing year's week 52. Calendar dates are always comparable."""
+    """Parse USDA's MM/DD/YYYY period-ending date into a sortable tuple."""
     if not s:
         return None
     try:
@@ -112,6 +107,31 @@ def parse_period_date(s):
         return (int(yyyy), int(mm), int(dd))
     except (ValueError, AttributeError):
         return None
+ 
+ 
+def parse_mkt_year_start(s):
+    """Extract the starting year from a MarketingYear string like
+    'Sep 2026/Aug 2027' -> 2026. Returns None if unparseable."""
+    if not s:
+        return None
+    m = re.search(r"(\d{4})", s)
+    return int(m.group(1)) if m else None
+ 
+ 
+def record_sort_key(mkt_year_str, period_key):
+    """Sort key for picking the 'latest' record. USDA's file can contain
+    BOTH the closing snapshot of an ending marketing year and the opening
+    snapshot of the new one on the SAME calendar date, right at a
+    commodity's marketing-year rollover (e.g. corn/soybeans roll over
+    Sept 1). Confirmed directly: on 09/03/2026, corn had both a
+    'Sep 2025/Aug 2026' (MY Ending) record and a 'Sep 2026/Aug 2027'
+    (MY Starting) record for the identical date. Comparing by date alone
+    ties in that case and silently keeps whichever the file lists first —
+    which turned out to be the stale, closing-out marketing year, not the
+    one everyone else reports as current. Marketing year start must be
+    compared FIRST, date only as a tiebreaker within the same year."""
+    my_start = parse_mkt_year_start(mkt_year_str)
+    return (my_start if my_start is not None else -1, period_key if period_key is not None else (0, 0, 0))
  
  
 def yoy_pct(cur, prev):
@@ -207,9 +227,12 @@ def main():
  
         prev_total_commit = (prev_accum + prev_outstanding) if (prev_accum is not None and prev_outstanding is not None) else None
  
+        mkt_year_str = get_field(attrib, FIELD_CANDIDATES["mkt_year"])
+        sort_key = record_sort_key(mkt_year_str, period_key)
+ 
         record = {
             "period_ending": period,
-            "mkt_year": get_field(attrib, FIELD_CANDIDATES["mkt_year"]),
+            "mkt_year": mkt_year_str,
             "mkt_year_week": week_num,
             "net_sales": net_sales,
             "outstanding_sales": outstanding,
@@ -227,10 +250,10 @@ def main():
         # Capture it separately as the summary total; keep it out of the per-country list.
         if country_name.strip().upper() == "TOTAL KNOWN AND UNKNOWN":
             existing_total = comm.get("total")
-            existing_key = comm.get("_total_period_key")
-            if existing_total is None or (period_key is not None and (existing_key is None or period_key > existing_key)):
+            existing_key = comm.get("_total_sort_key")
+            if existing_total is None or existing_key is None or sort_key > existing_key:
                 comm["total"] = record
-                comm["_total_period_key"] = period_key
+                comm["_total_sort_key"] = sort_key
                 comm["_total_raw_attrib"] = dict(attrib)  # diagnostic only, stripped before writing output
             continue
  
@@ -240,12 +263,13 @@ def main():
             continue
  
         existing = comm["countries"].get(country_name)
-        # Keep only the latest period per country (report includes 2 weeks; take the newer by
-        # actual calendar date, not marketing-year week number — see parse_period_date).
-        existing_key = comm.get("_country_period_keys", {}).get(country_name)
-        if existing is None or (period_key is not None and (existing_key is None or period_key > existing_key)):
+        # Keep only the latest record per country: marketing year first, calendar date as
+        # tiebreaker within the same year (see record_sort_key for why — the file can carry
+        # both the old and new marketing year's data on the identical date at a rollover).
+        existing_key = comm.get("_country_sort_keys", {}).get(country_name)
+        if existing is None or existing_key is None or sort_key > existing_key:
             comm["countries"][country_name] = record
-            comm.setdefault("_country_period_keys", {})[country_name] = period_key
+            comm.setdefault("_country_sort_keys", {})[country_name] = sort_key
  
     if not matched_commodities:
         print("ERROR: No commodities matched the expected keywords (WHEAT, CORN, SOYBEAN, OATS).", file=sys.stderr)
@@ -289,8 +313,8 @@ def main():
     # Diagnostic-only fields — never persisted to the output file.
     for data in result["commodities"].values():
         data.pop("_total_raw_attrib", None)
-        data.pop("_total_period_key", None)
-        data.pop("_country_period_keys", None)
+        data.pop("_total_sort_key", None)
+        data.pop("_country_sort_keys", None)
  
     result["_meta"] = {
         "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
