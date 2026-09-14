@@ -176,6 +176,8 @@ def main():
             "total": None,
         })
  
+        prev_total_commit = (prev_accum + prev_outstanding) if (prev_accum is not None and prev_outstanding is not None) else None
+ 
         record = {
             "period_ending": period,
             "mkt_year": get_field(attrib, FIELD_CANDIDATES["mkt_year"]),
@@ -186,8 +188,10 @@ def main():
             "total_commitment": total_commit,
             "prev_yr_accumulated_exports": prev_accum,
             "prev_yr_outstanding_sales": prev_outstanding,
+            "prev_yr_total_commitment": prev_total_commit,
             "yoy_accum_exports_pct": yoy_pct(accum_exports, prev_accum),
             "yoy_outstanding_sales_pct": yoy_pct(outstanding, prev_outstanding),
+            "yoy_total_commitment_pct": yoy_pct(total_commit, prev_total_commit),
         }
  
         # "Total Known and Unknown" is the authoritative commodity-wide total (all destinations).
