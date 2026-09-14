@@ -1201,7 +1201,7 @@ function buildExportsCountryTable(commName){
 function renderExports(){
   const root = document.getElementById('exports-root');
   root.innerHTML = '';
-  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in thousands.';
+  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in metric tons — current marketing year only (excludes forward sales already booked against next marketing year).';
 
   const commodities = Object.keys(EXPORTS_DATA.commodities || {});
   if(!exportsCommodity || !commodities.includes(exportsCommodity)){
