@@ -545,6 +545,13 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-extreme-lo{background:rgba(184,56,56,.22) !important;font-weight:800 !important}
 .cftc-extreme-yellow{background:rgba(230,180,20,.32) !important;font-weight:800 !important}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
+.cal-table{border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.cal-table th{background:var(--th-bg);padding:7px 6px;text-align:center;font-size:12px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
+.cal-table th:first-child{text-align:left}
+.cal-table td{padding:5px 6px;text-align:center;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.cal-table td:first-child{text-align:left;color:var(--text);font-weight:700;white-space:normal}
+.cal-cur-month{box-shadow:inset 0 0 0 2px var(--amber) !important}
+th.cal-cur-month{color:var(--amber) !important}
 </style>
 <script>
 const CFTC_GROUPS = [
@@ -932,8 +939,15 @@ const CROP_CALENDAR = [
 const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function buildCropCalendarTable(){
-  let html = `<table class="cftc-table"><thead><tr><th style="text-align:left">Origin</th>`;
-  CAL_MONTHS.forEach((m,i)=>{ html += `<th>${m}</th>`; });
+  const curMonth = new Date().getMonth() + 1; // 1-12
+
+  let html = `<table class="cal-table"><colgroup><col style="width:220px">`;
+  CAL_MONTHS.forEach(()=>{ html += `<col style="width:56px">`; });
+  html += `</colgroup><thead><tr><th style="text-align:left">Origin</th>`;
+  CAL_MONTHS.forEach((m,i)=>{
+    const isCur = (i+1)===curMonth;
+    html += `<th class="${isCur?'cal-cur-month':''}">${m}</th>`;
+  });
   html += `</tr></thead><tbody>`;
 
   let curSection = null;
@@ -946,11 +960,13 @@ function buildCropCalendarTable(){
     for(let m=1; m<=12; m++){
       const isPlant = row.plant.includes(m);
       const isHarvest = row.harvest.includes(m);
+      const isCur = m===curMonth;
       let bg = 'transparent', label = '';
       if(isPlant && isHarvest){ bg = 'linear-gradient(135deg, rgba(46,143,82,.35) 50%, rgba(230,180,20,.4) 50%)'; label = 'P/H'; }
       else if(isPlant){ bg = 'rgba(46,143,82,.30)'; label = 'P'; }
       else if(isHarvest){ bg = 'rgba(230,180,20,.40)'; label = 'H'; }
-      html += `<td style="background:${bg};color:var(--text);font-weight:700">${label}</td>`;
+      const curCls = isCur ? ' cal-cur-month' : '';
+      html += `<td class="${curCls}" style="background:${bg};color:var(--text);font-weight:700">${label}</td>`;
     }
     html += `</tr>`;
   });
