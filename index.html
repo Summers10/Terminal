@@ -161,9 +161,15 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <div id="seasonals-root" style="max-width:100%;margin:0 auto;padding:22px"></div>
 </div>
 <div id="exports-page" style="display:none">
-<div id="exports-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
-  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">USDA Export Sales</h1>
-  <div id="exports-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
+<div id="exports-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:flex-start;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap;padding-top:2px">USDA Export Sales</h1>
+  <div id="exports-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em">Loading...</div>
+  <div id="exports-legend" style="margin-left:auto;font-size:11px;color:var(--text3);line-height:1.6;text-align:right;white-space:nowrap">
+    <div><b>Net Sales</b> — new sales this week, net of cancellations</div>
+    <div><b>Outstanding Sales</b> — sold but not yet shipped</div>
+    <div><b>Accum. Exports (YTD)</b> — shipped so far this marketing year</div>
+    <div><b>Total Commitment</b> — Accum. Exports + Outstanding Sales</div>
+  </div>
 </div>
   <div id="exports-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
 </div>
@@ -582,8 +588,9 @@ let CFTC_DATA = null;
 let cftcLoaded = false;
 let usdaReady = false;
 let cftcReady = false;
+let exportsReady = false;
 function checkSummaryReady(){
-  if(usdaReady && cftcReady && typeof renderSummary === 'function') renderSummary();
+  if(usdaReady && cftcReady && exportsReady && typeof renderSummary === 'function') renderSummary();
 }
 
 function cftcFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
@@ -740,12 +747,12 @@ loadCftc();
 // ---------------- SUMMARY PAGE ----------------
 
 const SUMMARY_ROWS = [
-  {section:'Grains',   label:'Wheat (Chicago SRW)', cftcCode:'001602', usdaComm:'Wheat', domestic:'United States', seasonalName:'Chicago Wheat'},
-  {section:'Grains',   label:'Wheat (KC HRW)',       cftcCode:'001612', usdaComm:'Wheat', domestic:'United States', seasonalName:'Kansas Wheat'},
-  {section:'Grains',   label:'Wheat (Mpls Spring)',  cftcCode:'001626', usdaComm:'Wheat', domestic:'United States', seasonalName:'Spring Wheat'},
-  {section:'Grains',   label:'Corn',                 cftcCode:'002602', usdaComm:'Corn', domestic:'United States', seasonalName:'Corn'},
-  {section:'Oilseeds', label:'Soybeans',             cftcCode:'005602', usdaComm:'Soybeans', domestic:'United States', seasonalName:'Soybeans'},
-  {section:'Oilseeds', label:'Canola',               cftcCode:'135731', usdaComm:'Rapeseed/Canola', domestic:'Canada', seasonalName:'Canola Seed'},
+  {section:'Grains',   label:'Wheat (Chicago SRW)', cftcCode:'001602', usdaComm:'Wheat', domestic:'United States', seasonalName:'Chicago Wheat', exportName:'WHEAT - SOFT RED WINTER'},
+  {section:'Grains',   label:'Wheat (KC HRW)',       cftcCode:'001612', usdaComm:'Wheat', domestic:'United States', seasonalName:'Kansas Wheat', exportName:'WHEAT - HARD RED WINTER'},
+  {section:'Grains',   label:'Wheat (Mpls Spring)',  cftcCode:'001626', usdaComm:'Wheat', domestic:'United States', seasonalName:'Spring Wheat', exportName:'WHEAT - HARD RED SPRING'},
+  {section:'Grains',   label:'Corn',                 cftcCode:'002602', usdaComm:'Corn', domestic:'United States', seasonalName:'Corn', exportName:'CORN - UNMILLED'},
+  {section:'Oilseeds', label:'Soybeans',             cftcCode:'005602', usdaComm:'Soybeans', domestic:'United States', seasonalName:'Soybeans', exportName:'SOYBEANS'},
+  {section:'Oilseeds', label:'Canola',               cftcCode:'135731', usdaComm:'Rapeseed/Canola', domestic:'Canada', seasonalName:'Canola Seed', exportName:null},
 ];
 
 function summaryYearsSorted(usdaComm){
@@ -823,6 +830,7 @@ function buildSummaryTable(){
     {label:'Seasonality', cols:['Next Wk']},
     {label:'Positioning', cols:['Net % OI','Pctile']},
     {label:'Production YoY', cols:['Domestic','Exporters']},
+    {label:'Export Sales', cols:['Total Commit. YoY']},
     {label:'Stocks/Use % Rank', cols:['Domestic','World','Exporters','Importers']},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
@@ -861,6 +869,13 @@ function buildSummaryTable(){
     const expStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, expList, y));
     const impStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, impList, y));
 
+    // Export Sales — Total Commitment YoY
+    let totalCommitYoY = null;
+    if(row.exportName && EXPORTS_DATA && EXPORTS_DATA.commodities && EXPORTS_DATA.commodities[row.exportName]){
+      const t = EXPORTS_DATA.commodities[row.exportName].total;
+      if(t) totalCommitYoY = t.yoy_total_commitment_pct;
+    }
+
     html += `<tr><td>${row.label}</td>`;
     if(!seas){
       html += `<td style="color:var(--text3)">—</td>`;
@@ -876,6 +891,7 @@ function buildSummaryTable(){
     }
     html += `<td class="${domesticYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(domesticYoY,1)}</td>`;
     html += `<td class="${exportersYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(exportersYoY,1)}</td>`;
+    html += `<td class="${totalCommitYoY>=0?'cftc-up':'cftc-dn'}">${totalCommitYoY===null?'—':cftcSignedPct(totalCommitYoY,1)}</td>`;
     html += `<td class="${summaryPctileClass(domesticStu)}">${summaryPctileText(domesticStu)}</td>`;
     html += `<td class="${summaryPctileClass(worldStu)}">${summaryPctileText(worldStu)}</td>`;
     html += `<td class="${summaryPctileClass(expStu)}">${summaryPctileText(expStu)}</td>`;
@@ -893,7 +909,8 @@ function renderSummary(){
   document.getElementById('summary-meta').textContent =
     'USDA data updated: ' + (DATA._meta?.fetched_at || 'unknown') +
     ' — CFTC data updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') +
-    ' — Domestic column uses United States, except Canola which uses Canada.';
+    ' — Export sales updated: ' + (EXPORTS_DATA && EXPORTS_DATA._meta?.fetched_at || 'unavailable') +
+    ' — Domestic column uses United States, except Canola which uses Canada. Canola has no US export data.';
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 }
 </script>
@@ -1037,7 +1054,7 @@ function buildExportsSummaryTable(){
     {label:'Accum. Exports (YTD)'},
     {label:'Total Commitment'},
     {label:'Accum. Exports YoY'},
-    {label:'Outstanding Sales YoY'},
+    {label:'Total Commitment YoY'},
   ];
   let html = `<table class="exp-table"><thead><tr><th>Commodity</th>`;
   cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
@@ -1053,7 +1070,7 @@ function buildExportsSummaryTable(){
     html += `<td>${expFmt(t.accumulated_exports)}</td>`;
     html += `<td>${expFmt(t.total_commitment)}</td>`;
     html += `<td class="${t.yoy_accum_exports_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(t.yoy_accum_exports_pct)}</td>`;
-    html += `<td class="${t.yoy_outstanding_sales_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(t.yoy_outstanding_sales_pct)}</td>`;
+    html += `<td class="${t.yoy_total_commitment_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(t.yoy_total_commitment_pct)}</td>`;
     html += `</tr>`;
   });
   html += `</tbody></table>`;
@@ -1067,7 +1084,7 @@ function buildExportsCountryTable(commName){
     {label:'Accum. Exports (YTD)'},
     {label:'Total Commitment'},
     {label:'Accum. Exports YoY'},
-    {label:'Outstanding Sales YoY'},
+    {label:'Total Commitment YoY'},
   ];
   let html = `<table class="exp-table"><thead><tr><th>Country</th>`;
   cols.forEach(c=>{ html += `<th>${c.label}</th>`; });
@@ -1089,7 +1106,7 @@ function buildExportsCountryTable(commName){
       html += `<td>${expFmt(d.accumulated_exports)}</td>`;
       html += `<td>${expFmt(d.total_commitment)}</td>`;
       html += `<td class="${d.yoy_accum_exports_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(d.yoy_accum_exports_pct)}</td>`;
-      html += `<td class="${d.yoy_outstanding_sales_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(d.yoy_outstanding_sales_pct)}</td>`;
+      html += `<td class="${d.yoy_total_commitment_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(d.yoy_total_commitment_pct)}</td>`;
       html += `</tr>`;
     });
   }
@@ -1100,7 +1117,7 @@ function buildExportsCountryTable(commName){
 function renderExports(){
   const root = document.getElementById('exports-root');
   root.innerHTML = '';
-  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in thousands, YoY vs. prior marketing year (no 5-yr avg or USDA-estimate-pace data available from this source).';
+  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in thousands.';
 
   const commodities = Object.keys(EXPORTS_DATA.commodities || {});
   if(!exportsCommodity || !commodities.includes(exportsCommodity)){
@@ -1135,9 +1152,13 @@ fetch('data/export_sales.json?_=' + Date.now())
   .then(data=>{
     EXPORTS_DATA = data;
     renderExports();
+    exportsReady = true;
+    checkSummaryReady();
   })
   .catch(e=>{
     document.getElementById('exports-root').innerHTML = `<div id="exports-err">Error loading export sales data: ${e.message}</div>`;
+    exportsReady = true; // don't block the Summary tab forever if this one source fails
+    checkSummaryReady();
   });
 </script>
 </body>
