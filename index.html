@@ -545,16 +545,16 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-extreme-lo{background:rgba(184,56,56,.22) !important;font-weight:800 !important}
 .cftc-extreme-yellow{background:rgba(230,180,20,.32) !important;font-weight:800 !important}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
-.cal-table{border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
-.summary-table{border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.cal-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.summary-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
 .summary-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
 .summary-table th:first-child{text-align:left}
 .summary-table td{padding:5px 6px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
-.summary-table td:first-child{text-align:left;color:var(--text);font-weight:700;white-space:normal}
+.summary-table td:first-child{text-align:left;color:var(--text);font-weight:700;white-space:nowrap}
 .cal-table th{background:var(--th-bg);padding:7px 6px;text-align:center;font-size:12px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
 .cal-table th:first-child{text-align:left}
 .cal-table td{padding:5px 6px;text-align:center;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
-.cal-table td:first-child{text-align:left;color:var(--text);font-weight:700;white-space:normal}
+.cal-table td:first-child{text-align:left;color:var(--text);font-weight:700;white-space:nowrap}
 .cal-cur-month{box-shadow:inset 0 0 0 2px var(--amber) !important}
 th.cal-cur-month{color:var(--amber) !important}
 </style>
@@ -840,13 +840,13 @@ function getNextSeasonalEntry(productName){
 function buildSummaryTable(){
   const groups = [
     {label:'Seasonality', cols:[{l:'Next Wk', w:70}]},
-    {label:'Positioning', cols:[{l:'Net % OI', w:80}, {l:'Pctile', w:65}]},
+    {label:'Positioning', cols:[{l:'Net % OI', w:80}, {l:'Pctile', w:66}]},
     {label:'Production YoY', cols:[{l:'Domestic', w:85}, {l:'Exporters', w:85}]},
     {label:'Export Sales YoY', cols:[{l:'Total Commit.', w:100}]},
     {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:85}, {l:'World', w:75}, {l:'Exporters', w:85}, {l:'Importers', w:85}]},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
-  const productWidth = 210;
+  const productWidth = 228; // matches crop calendar's Origin column width, so both tables align
 
   let html = `<table class="summary-table"><colgroup><col style="width:${productWidth}px">`;
   groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
@@ -922,17 +922,17 @@ function buildSummaryTable(){
 // Static reference data (not sourced from a live feed): standard agronomic windows
 // published by USDA-FAS, IGC, and general trade references.
 const CROP_CALENDAR = [
-  {section:'Wheat', origin:'United States (Winter Wheat: HRW/SRW)', plant:[9,10,11], harvest:[5,6,7]},
-  {section:'Wheat', origin:'United States (Spring Wheat)', plant:[4,5,6], harvest:[8,9]},
+  {section:'Wheat', origin:'United States (Winter)', plant:[9,10,11], harvest:[5,6,7]},
+  {section:'Wheat', origin:'United States (Spring)', plant:[4,5,6], harvest:[8,9]},
   {section:'Wheat', origin:'Canada', plant:[4,5,6], harvest:[8,9,10]},
-  {section:'Wheat', origin:'European Union (mostly winter)', plant:[9,10,11], harvest:[6,7,8]},
-  {section:'Wheat', origin:'Russia (winter + spring)', plant:[8,9,10,4,5], harvest:[7,8,9]},
+  {section:'Wheat', origin:'European Union', plant:[9,10,11], harvest:[6,7,8]},
+  {section:'Wheat', origin:'Russia', plant:[8,9,10,4,5], harvest:[7,8,9]},
   {section:'Wheat', origin:'Ukraine', plant:[9,10], harvest:[6,7,8]},
   {section:'Wheat', origin:'Australia', plant:[4,5,6], harvest:[11,12,1]},
   {section:'Wheat', origin:'Argentina', plant:[5,6,7], harvest:[11,12,1]},
   {section:'Corn', origin:'United States', plant:[4,5,6], harvest:[9,10,11]},
   {section:'Corn', origin:'Brazil (1st crop)', plant:[9,10,11], harvest:[2,3,4]},
-  {section:'Corn', origin:'Brazil (Safrinha / 2nd crop)', plant:[1,2,3], harvest:[6,7,8]},
+  {section:'Corn', origin:'Brazil (Safrinha)', plant:[1,2,3], harvest:[6,7,8]},
   {section:'Corn', origin:'Argentina', plant:[9,10,11,12], harvest:[3,4,5,6]},
   {section:'Corn', origin:'Ukraine', plant:[4,5], harvest:[9,10,11]},
   {section:'Corn', origin:'European Union', plant:[4,5], harvest:[9,10]},
@@ -942,7 +942,7 @@ const CROP_CALENDAR = [
   {section:'Soybeans', origin:'Paraguay', plant:[9,10,11], harvest:[2,3,4]},
   {section:'Canola', origin:'Canada', plant:[4,5,6], harvest:[8,9,10]},
   {section:'Canola', origin:'Australia', plant:[4,5,6], harvest:[10,11,12]},
-  {section:'Canola', origin:'European Union (mostly winter)', plant:[8,9], harvest:[6,7]},
+  {section:'Canola', origin:'European Union', plant:[8,9], harvest:[6,7]},
   {section:'Canola', origin:'Ukraine', plant:[8,9], harvest:[6,7]},
 ];
 const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -950,8 +950,8 @@ const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct',
 function buildCropCalendarTable(){
   const curMonth = new Date().getMonth() + 1; // 1-12
 
-  let html = `<table class="cal-table"><colgroup><col style="width:221px">`;
-  CAL_MONTHS.forEach(()=>{ html += `<col style="width:67px">`; });
+  let html = `<table class="cal-table"><colgroup><col style="width:228px">`;
+  CAL_MONTHS.forEach(()=>{ html += `<col style="width:68px">`; });
   html += `</colgroup><thead><tr><th style="text-align:left">Origin</th>`;
   CAL_MONTHS.forEach((m,i)=>{
     const isCur = (i+1)===curMonth;
