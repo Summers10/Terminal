@@ -546,6 +546,11 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-extreme-yellow{background:rgba(230,180,20,.32) !important;font-weight:800 !important}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 .cal-table{border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.summary-table{border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.summary-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
+.summary-table th:first-child{text-align:left}
+.summary-table td{padding:5px 6px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.summary-table td:first-child{text-align:left;color:var(--text);font-weight:700;white-space:normal}
 .cal-table th{background:var(--th-bg);padding:7px 6px;text-align:center;font-size:12px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
 .cal-table th:first-child{text-align:left}
 .cal-table td{padding:5px 6px;text-align:center;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
@@ -834,18 +839,22 @@ function getNextSeasonalEntry(productName){
 
 function buildSummaryTable(){
   const groups = [
-    {label:'Seasonality', cols:['Next Wk']},
-    {label:'Positioning', cols:['Net % OI','Pctile']},
-    {label:'Production & Export YoY', cols:['Domestic Prod.','Exporters Prod.','Total Commit.']},
-    {label:'Stocks/Use % Rank', cols:['Domestic','World','Exporters','Importers']},
+    {label:'Seasonality', cols:[{l:'Next Wk', w:70}]},
+    {label:'Positioning', cols:[{l:'Net % OI', w:80}, {l:'Pctile', w:65}]},
+    {label:'Production YoY', cols:[{l:'Domestic', w:85}, {l:'Exporters', w:85}]},
+    {label:'Export Sales YoY', cols:[{l:'Total Commit.', w:100}]},
+    {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:85}, {l:'World', w:75}, {l:'Exporters', w:85}, {l:'Importers', w:85}]},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
+  const productWidth = 210;
 
-  let html = `<table class="cftc-table"><thead><tr><th rowspan="2">Product</th>`;
+  let html = `<table class="summary-table"><colgroup><col style="width:${productWidth}px">`;
+  groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
+  html += `</colgroup><thead><tr><th rowspan="2">Product</th>`;
   groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
   html += `</tr><tr>`;
   groups.forEach(g=>{
-    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c}</th>`; });
+    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c.l}</th>`; });
   });
   html += `</tr></thead><tbody>`;
 
@@ -941,8 +950,8 @@ const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct',
 function buildCropCalendarTable(){
   const curMonth = new Date().getMonth() + 1; // 1-12
 
-  let html = `<table class="cal-table"><colgroup><col style="width:220px">`;
-  CAL_MONTHS.forEach(()=>{ html += `<col style="width:56px">`; });
+  let html = `<table class="cal-table"><colgroup><col style="width:221px">`;
+  CAL_MONTHS.forEach(()=>{ html += `<col style="width:67px">`; });
   html += `</colgroup><thead><tr><th style="text-align:left">Origin</th>`;
   CAL_MONTHS.forEach((m,i)=>{
     const isCur = (i+1)===curMonth;
