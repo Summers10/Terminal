@@ -68,7 +68,7 @@ def download_zip(filename):
         return resp.read()
  
  
-def parse_csv_zip(zipdata, result, world_by_country):
+def parse_csv_zip(zipdata, result, world_by_country, unmapped_attrs):
     count = 0
     unseen = set()
     zf = zipfile.ZipFile(io.BytesIO(zipdata))
@@ -93,6 +93,10 @@ def parse_csv_zip(zipdata, result, world_by_country):
                 attr = row.get("Attribute_Description", "")
                 short = ATTR_MAP.get(attr)
                 if not short:
+                    # Track attributes we're dropping, per mapped commodity, so a commodity
+                    # reporting a field under an unexpected name (like Cotton's consumption
+                    # figure) is actually visible instead of silently discarded.
+                    unmapped_attrs.setdefault(comm_name, set()).add(attr)
                     continue
  
                 year = row.get("Market_Year", "")
@@ -135,6 +139,7 @@ def main():
  
     result = {}
     world_by_country = {}
+    unmapped_attrs = {}
     downloaded = []
  
     for filename in files_to_try:
@@ -142,7 +147,7 @@ def main():
             print(f"  {filename}...", end=" ", flush=True)
             data = download_zip(filename)
             print(f"OK ({len(data):,} bytes)")
-            count = parse_csv_zip(data, result, world_by_country)
+            count = parse_csv_zip(data, result, world_by_country, unmapped_attrs)
             if count > 0:
                 downloaded.append(filename)
             if filename == "psd_alldata_csv.zip" and count > 0:
@@ -151,6 +156,11 @@ def main():
             print(f"{e.code} {e.reason}")
         except Exception as e:
             print(f"error: {e}")
+ 
+    if unmapped_attrs:
+        print("\nUnmapped attributes per commodity (dropped — not in ATTR_MAP):")
+        for comm_name, attrs in sorted(unmapped_attrs.items()):
+            print(f"  {comm_name}: {sorted(attrs)}")
  
     if not result:
         print("\nERROR: No data fetched from any source.", file=sys.stderr)
