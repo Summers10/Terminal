@@ -91,6 +91,7 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
   <button class="page-tab" data-page="seasonals" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SEASONALS</button>
   <button class="page-tab" data-page="exports" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">EXPORTS</button>
+  <button class="page-tab" data-page="vegoils" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">VEGOILS</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
     <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
     <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
@@ -123,6 +124,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
     document.getElementById('seasonals-page').style.display = btn.dataset.page === 'seasonals' ? '' : 'none';
     document.getElementById('exports-page').style.display = btn.dataset.page === 'exports' ? '' : 'none';
+    document.getElementById('vegoils-page').style.display = btn.dataset.page === 'vegoils' ? '' : 'none';
   });
 });
 </script>
@@ -172,6 +174,13 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   </div>
 </div>
   <div id="exports-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
+</div>
+<div id="vegoils-page" style="display:none">
+<div id="vegoils-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Vegetable Oils</h1>
+  <div id="vegoils-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
+</div>
+  <div id="vegoils-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
@@ -526,6 +535,7 @@ fetch('data/psd_data.json?_=' + Date.now())
     render();
     usdaReady = true;
     if(typeof checkSummaryReady === 'function') checkSummaryReady();
+    if(typeof renderVegoils === 'function') renderVegoils();
   })
   .catch(e=>{
     document.getElementById('root').innerHTML = `<div id="err">Error loading data: ${e.message}</div>`;
@@ -1011,12 +1021,12 @@ function renderSummary(){
 </script>
 
 <style>
-.seas-table{border-collapse:collapse;background:#fff}
-.seas-table th{padding:8px 16px;text-align:center;font-size:12px;font-weight:800;color:#333;background:#f2f2f2;border:1px solid #ccc;white-space:nowrap}
-.seas-table td{padding:7px 16px;text-align:center;font-size:13px;font-weight:700;color:#111;border:1px solid #ddd;white-space:nowrap}
-.seas-table td.seas-label{text-align:left;font-weight:700;color:#222;background:#fff;position:sticky;left:0;z-index:1}
-.seas-table th.seas-label-h{text-align:left;position:sticky;left:0;z-index:2;background:#f2f2f2}
-.seas-section-row td{background:#e8e8e8 !important;color:#333 !important;font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.08em;text-align:left;position:sticky;left:0}
+.seas-table{border-collapse:collapse;background:var(--bg)}
+.seas-table th{padding:8px 16px;text-align:center;font-size:12px;font-weight:800;color:var(--text);background:var(--th-bg);border:1px solid var(--border2);white-space:nowrap}
+.seas-table td{padding:7px 16px;text-align:center;font-size:13px;font-weight:700;color:#111;border:1px solid var(--border);white-space:nowrap}
+.seas-table td.seas-label{text-align:left;font-weight:700;color:var(--text);background:var(--bg);position:sticky;left:0;z-index:1}
+.seas-table th.seas-label-h{text-align:left;position:sticky;left:0;z-index:2;background:var(--th-bg)}
+.seas-section-row td{background:var(--section-bg) !important;color:var(--amber) !important;font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.08em;text-align:left;position:sticky;left:0}
 </style>
 <script>
 const SEASONALS_WEEKS = ["Dec 29","Jan 05","Jan 12","Jan 19","Jan 26","Feb 02","Feb 09","Feb 16","Feb 23","Mar 02","Mar 09","Mar 16","Mar 23","Mar 30","Apr 06","Apr 13","Apr 20","Apr 27","May 04","May 11","May 18","May 25","Jun 01","Jun 08","Jun 15","Jun 22","Jun 29","Jul 06","Jul 13","Jul 20","Jul 27","Aug 03","Aug 10","Aug 17","Aug 24","Aug 31","Sep 07","Sep 14","Sep 21","Sep 28","Oct 05","Oct 12","Oct 19","Oct 26","Nov 02","Nov 09","Nov 16"];
@@ -1255,6 +1265,189 @@ fetch('data/export_sales.json?_=' + Date.now())
     exportsReady = true; // don't block the Summary tab forever if this one source fails
     checkSummaryReady();
   });
+</script>
+
+<style>
+.oil-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.oil-table th{background:var(--th-bg);padding:8px 10px;text-align:right;font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
+.oil-table th:first-child{text-align:left;font-size:14px;letter-spacing:.08em}
+.oil-table th.latest{color:var(--amber);font-weight:900;border-bottom:2px solid var(--amber)}
+.oil-table th.yoy{color:var(--text3);font-style:italic}
+.oil-table td{padding:5px 10px;text-align:right;font-size:15px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.oil-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+#vegoils-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
+</style>
+<script>
+const VEGOILS = ["Palm Oil", "Soybean Oil", "Rapeseed Oil", "Sunflower Oil"];
+const VEGOIL_EXPORTERS = ["Indonesia", "Malaysia", "Argentina", "Brazil", "United States", "Canada", "European Union", "Ukraine", "Russia"];
+const VEGOIL_IMPORTERS = ["India", "China", "Pakistan", "Bangladesh"];
+const VEGOIL_PANELS = [
+  {oil:"Palm Oil",       country:"Indonesia"},
+  {oil:"Palm Oil",       country:"Malaysia"},
+  {oil:"Soybean Oil",    country:"Argentina"},
+  {oil:"Soybean Oil",    country:"Brazil"},
+  {oil:"Soybean Oil",    country:"United States"},
+  {oil:"Rapeseed Oil",   country:"Canada"},
+  {oil:"Rapeseed Oil",   country:"European Union"},
+  {oil:"Sunflower Oil",  country:"Ukraine"},
+  {oil:"Sunflower Oil",  country:"Russia"},
+];
+const VEGOIL_HIST_YEARS = 7;
+
+function vegoilAllYears(){
+  const years = new Set();
+  VEGOILS.forEach(oil=>{
+    const countries = DATA[oil];
+    if(!countries) return;
+    Object.values(countries).forEach(yrs=>Object.keys(yrs).forEach(y=>years.add(y)));
+  });
+  return [...years].sort();
+}
+
+// Sums a given "entity" (e.g. World, or a country/aggregate) across all 4 oils for one year.
+// entityFn(oil, year) must return the raw {bs,pr,im,dc,ex,es} object (or null/undefined).
+function sumAcrossOils(entityFn, year){
+  const keys = ['bs','pr','im','dc','ex','es'];
+  const out = {}; let any = false;
+  keys.forEach(k=>{
+    let s = 0, has = false;
+    VEGOILS.forEach(oil=>{
+      const yd = entityFn(oil, year);
+      const v = yd ? yd[k] : undefined;
+      if(v !== undefined && !isNaN(v)){ s += v; has = true; any = true; }
+    });
+    out[k] = has ? s : undefined;
+  });
+  return any ? out : null;
+}
+
+function buildOilBalanceTable(yearDataFn, years, includeYoy, allYearsFull){
+  const latestYear = years[years.length-1];
+  const prevYear = years.length>1 ? years[years.length-2] : null;
+  const fullYears = allYearsFull || years;
+  const stuHistory = fullYears.map(y => getStu(yearDataFn(y))).filter(v => v!==null);
+  function stuPctile(y){
+    const v = getStu(yearDataFn(y));
+    if(v===null || stuHistory.length===0) return null;
+    const countLE = stuHistory.filter(x => x<=v).length;
+    return (countLE/stuHistory.length)*100;
+  }
+
+  const ROWS = [
+    {type:'section', label:'Supply'},
+    {type:'row', key:'bs', label:'Beginning stocks'},
+    {type:'row', key:'pr', label:'Production'},
+    {type:'row', key:'im', label:'Imports'},
+    {type:'total', keys:['bs','pr','im'], label:'Total supply'},
+    {type:'section', label:'Use'},
+    {type:'row', key:'dc', label:'Dom. consumption'},
+    {type:'row', key:'ex', label:'Exports'},
+    {type:'total', keys:['dc','ex'], label:'Total demand'},
+    {type:'section', label:'Balance'},
+    {type:'row', key:'es', label:'Ending stocks', cls:'row-ending'},
+    {type:'stu', label:'Stocks / Use %', cls:'row-stu'},
+    {type:'stu_pctile', label:'S/U Percentile Rank (' + fullYears.length + 'yr hist)', cls:'row-pctile'},
+  ];
+
+  function displayVal(row, y){
+    const yd = yearDataFn(y);
+    if(row.type==='total') return getTotalRaw(yd, row.keys);
+    if(row.type==='stu') return getStu(yd);
+    if(row.type==='stu_pctile') return stuPctile(y);
+    return getRaw(yd, row.key);
+  }
+
+  let html = `<div class="tbl-wrap"><table class="oil-table"><colgroup><col style="width:190px">`;
+  years.forEach(()=>{ html += '<col>'; });
+  if(includeYoy) html += '<col style="width:75px">';
+  html += `</colgroup><thead><tr><th>ITEM</th>`;
+  years.forEach(y=>{ html += `<th class="${y===latestYear?'latest':''}">${y}</th>`; });
+  if(includeYoy) html += `<th class="yoy">YoY Δ</th>`;
+  html += `</tr></thead><tbody>`;
+
+  let alt = false;
+  ROWS.forEach(row=>{
+    if(row.type==='section'){
+      html += `<tr class="row-section"><td colspan="${years.length+1+(includeYoy?1:0)}">${row.label}</td></tr>`;
+      alt = false; return;
+    }
+    const cls = [row.cls||'', alt?'row-alt':''].filter(Boolean).join(' ');
+    html += `<tr class="${cls}"><td>${row.label}</td>`;
+    alt = !alt;
+    const vals = years.map(y=>displayVal(row,y));
+    for(let i=0;i<years.length;i++){
+      const v = vals[i], prev = i>0?vals[i-1]:null;
+      let tdCls = years[i]===latestYear ? 'latest' : '';
+      if(row.type!=='stu' && row.type!=='stu_pctile' && v!==null && prev!==null){
+        if(v>prev) tdCls += ' up'; else if(v<prev) tdCls += ' dn';
+      }
+      if(row.type==='stu_pctile' && v!==null){
+        tdCls += v<=25 ? ' pctile-tight' : (v>=75 ? ' pctile-loose' : ' pctile-mid');
+      }
+      const text = row.type==='stu' ? fmtStu(v) : (row.type==='stu_pctile' ? (v===null?'—':ordinal(v)) : fmt(v));
+      html += `<td class="${tdCls.trim()}">${text}</td>`;
+    }
+    if(includeYoy){
+      const cur = displayVal(row, latestYear);
+      const prev = prevYear ? displayVal(row, prevYear) : null;
+      if(row.type==='stu_pctile'){
+        html += `<td class="latest">—</td>`;
+      } else {
+        const yoy = row.type==='stu' ? (cur!==null&&prev!==null?cur-prev:null) : yoyPct(cur,prev);
+        let cls = 'latest';
+        if(yoy!==null){ cls += yoy>0?' up':(yoy<0?' dn':''); }
+        const text = row.type==='stu' ? (yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(1)+'pp') : fmtYoy(yoy);
+        html += `<td class="${cls}">${text}</td>`;
+      }
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function vegoilPanelWrap(title, sub, innerHtml){
+  return `<div class="panel"><div class="panel-hdr"><span class="panel-title">${title}</span><span class="panel-sub">${sub}</span></div>${innerHtml}</div>`;
+}
+
+function renderVegoils(){
+  const root = document.getElementById('vegoils-root');
+  root.innerHTML = '';
+  document.getElementById('vegoils-meta').textContent = 'Last updated: ' + (DATA._meta?.fetched_at || 'unknown') + ' — 1000 MT. Combines Palm, Soybean, Rapeseed, and Sunflower oil.';
+
+  const yearsAll = vegoilAllYears();
+  const years7 = yearsAll.slice(-VEGOIL_HIST_YEARS);
+  if(!years7.length){ root.innerHTML = '<div id="vegoils-err">No vegetable oil data available — has the fetcher picked up Oil, Palm / Oil, Soybean / Oil, Rapeseed / Oil, Sunflowerseed yet?</div>'; return; }
+
+  // World — combined across all 4 oils
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">World Balance Sheet — Vegetable Oils (Combined)</div>`);
+  root.insertAdjacentHTML('beforeend', vegoilPanelWrap('WORLD', '1000 MT — Palm + Soybean + Rapeseed + Sunflower',
+    buildOilBalanceTable(y=>sumAcrossOils((oil,yr)=>(DATA[oil]&&DATA[oil]['World'])?DATA[oil]['World'][yr]:undefined, y), years7, true, yearsAll)));
+
+  // Major Exporters — combined
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Aggregate (Combined)</div>`);
+  root.insertAdjacentHTML('beforeend', vegoilPanelWrap('MAJOR EXPORTERS', VEGOIL_EXPORTERS.join(', '),
+    buildOilBalanceTable(y=>sumAcrossOils((oil,yr)=>sumCountries(DATA[oil]||{}, VEGOIL_EXPORTERS, yr), y), years7, true, yearsAll)));
+
+  // Major Importers — combined
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — Aggregate (Combined)</div>`);
+  root.insertAdjacentHTML('beforeend', vegoilPanelWrap('MAJOR IMPORTERS', VEGOIL_IMPORTERS.join(', '),
+    buildOilBalanceTable(y=>sumAcrossOils((oil,yr)=>sumCountries(DATA[oil]||{}, VEGOIL_IMPORTERS, yr), y), years7, true, yearsAll)));
+
+  // Individual oil/country panels — single oil each, not combined
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Individual Exporters — By Oil</div>`);
+  const stack = document.createElement('div');
+  stack.className = 'stack-wrap';
+  VEGOIL_PANELS.forEach(p=>{
+    const countries = DATA[p.oil] || {};
+    const oilYears = (()=>{ const ys=new Set(); Object.values(countries).forEach(yrs=>Object.keys(yrs).forEach(y=>ys.add(y))); return [...ys].sort(); })();
+    const oilYears7 = oilYears.slice(-VEGOIL_HIST_YEARS);
+    if(!oilYears7.length) return;
+    stack.insertAdjacentHTML('beforeend', vegoilPanelWrap(`${p.country.toUpperCase()} — ${p.oil.toUpperCase()}`, '1000 MT',
+      buildOilBalanceTable(y=>(countries[p.country]||{})[y], oilYears7, true, oilYears)));
+  });
+  root.appendChild(stack);
+}
 </script>
 </body>
 </html>
