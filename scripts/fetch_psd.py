@@ -35,6 +35,7 @@ COMM_MAP = {
     "Meal, Soybean": "Soybean Meal",
     "Meal, Rapeseed": "Rapeseed Meal",
     "Meal, Sunflowerseed": "Sunflower Meal",
+    "Cotton": "Cotton",
 }
  
 COUNTRIES = {
@@ -164,7 +165,9 @@ def main():
                 for attr, countries in attrs.items()
             }
  
-    # Sanity check against known plausible production ranges (1000 MT, latest complete MY)
+    # Sanity check against known plausible production ranges (latest complete MY).
+    # Units are commodity-specific: 1000 MT for grains/oils/meals, 1000 bales for cotton
+    # (kept in cotton's native USDA unit rather than force-converting to MT).
     SANITY_RANGES = {
         "Wheat":            (700_000, 900_000),
         "Corn":             (1_100_000, 1_400_000),
@@ -178,10 +181,13 @@ def main():
         "Soybean Meal":     (220_000, 320_000),
         "Rapeseed Meal":    (36_000, 58_000),
         "Sunflower Meal":   (18_000, 34_000),
+        "Cotton":           (100_000, 145_000),
     }
+    SANITY_UNITS = {"Cotton": "k bales"}
     print("\nSanity checking World production...")
     warnings = []
     for comm, (lo, hi) in SANITY_RANGES.items():
+        unit = SANITY_UNITS.get(comm, "kMT")
         world = result.get(comm, {}).get("World", {})
         if not world:
             warnings.append(f"  {comm}: NO World rollup (missing data)")
@@ -197,7 +203,7 @@ def main():
         elif not (lo <= latest_pr <= hi):
             warnings.append(f"  {comm} {latest_yr}: production = {latest_pr:,} out of expected range [{lo:,}, {hi:,}] — POSSIBLE BUG")
         else:
-            print(f"  OK {comm} {latest_yr}: {latest_pr:,} kMT (within [{lo:,}, {hi:,}])")
+            print(f"  OK {comm} {latest_yr}: {latest_pr:,} {unit} (within [{lo:,}, {hi:,}])")
  
     if warnings:
         print("\nSANITY CHECK WARNINGS:")
