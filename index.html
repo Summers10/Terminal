@@ -91,7 +91,6 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
   <button class="page-tab" data-page="seasonals" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SEASONALS</button>
   <button class="page-tab" data-page="exports" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">EXPORTS</button>
-  <button class="page-tab" data-page="vegoils" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">VEGOILS</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
     <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
     <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
@@ -124,7 +123,6 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
     document.getElementById('seasonals-page').style.display = btn.dataset.page === 'seasonals' ? '' : 'none';
     document.getElementById('exports-page').style.display = btn.dataset.page === 'exports' ? '' : 'none';
-    document.getElementById('vegoils-page').style.display = btn.dataset.page === 'vegoils' ? '' : 'none';
   });
 });
 </script>
@@ -175,16 +173,9 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
 </div>
   <div id="exports-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
 </div>
-<div id="vegoils-page" style="display:none">
-<div id="vegoils-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
-  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Vegetable Oils</h1>
-  <div id="vegoils-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
-</div>
-  <div id="vegoils-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
-</div>
 
 <script>
-const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats"];
+const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Vegoils"];
 const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924, Oats:68.8955};
 const ACRES_PER_HA = 2.47105;
 const HIST_YEARS = 7;
@@ -436,9 +427,23 @@ function render(){
   const root = document.getElementById('root');
   root.innerHTML = '';
   const comm = currentComm;
-  const countries = DATA[comm];
 
   const convLabel = document.getElementById('conv-label');
+  const unitToggleEl = document.getElementById('unit-toggle');
+
+  // Vegoils: a different shape entirely — combines 4 separate oil commodities
+  // rather than showing one commodity's own data, so it's handled as its own
+  // render path rather than the shared World/Exporters/Importers/breakout template.
+  if(comm === 'Vegoils'){
+    if(unitToggleEl) unitToggleEl.style.display = 'none';
+    convLabel.textContent = '1000 MT — Palm + Soybean + Rapeseed + Sunflower oil (no bushel conversion; oils have no acreage)';
+    renderVegoilsInto(root);
+    return;
+  }
+  if(unitToggleEl) unitToggleEl.style.display = '';
+
+  const countries = DATA[comm];
+
   const buPerMt = BU_PER_MT[comm] || 36.7437;
   convLabel.textContent = `1 MT = ${buPerMt.toFixed(2)} bu (${comm==='Rapeseed/Canola'?'Canola':comm})`;
 
@@ -535,7 +540,6 @@ fetch('data/psd_data.json?_=' + Date.now())
     render();
     usdaReady = true;
     if(typeof checkSummaryReady === 'function') checkSummaryReady();
-    if(typeof renderVegoils === 'function') renderVegoils();
   })
   .catch(e=>{
     document.getElementById('root').innerHTML = `<div id="err">Error loading data: ${e.message}</div>`;
@@ -1410,11 +1414,7 @@ function vegoilPanelWrap(title, sub, innerHtml){
   return `<div class="panel"><div class="panel-hdr"><span class="panel-title">${title}</span><span class="panel-sub">${sub}</span></div>${innerHtml}</div>`;
 }
 
-function renderVegoils(){
-  const root = document.getElementById('vegoils-root');
-  root.innerHTML = '';
-  document.getElementById('vegoils-meta').textContent = 'Last updated: ' + (DATA._meta?.fetched_at || 'unknown') + ' — 1000 MT. Combines Palm, Soybean, Rapeseed, and Sunflower oil.';
-
+function renderVegoilsInto(root){
   const yearsAll = vegoilAllYears();
   const years7 = yearsAll.slice(-VEGOIL_HIST_YEARS);
   if(!years7.length){ root.innerHTML = '<div id="vegoils-err">No vegetable oil data available — has the fetcher picked up Oil, Palm / Oil, Soybean / Oil, Rapeseed / Oil, Sunflowerseed yet?</div>'; return; }
