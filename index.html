@@ -574,6 +574,11 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-extreme-yellow{background:rgba(230,180,20,.32) !important;font-weight:800 !important}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 .cal-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.weather-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.weather-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12px;font-weight:900;letter-spacing:.02em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
+.weather-table th:first-child{text-align:left}
+.weather-table td{padding:5px 6px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.weather-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .summary-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
 .summary-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
 .summary-table th:first-child{text-align:left}
@@ -629,9 +634,23 @@ let cftcLoaded = false;
 let usdaReady = false;
 let cftcReady = false;
 let exportsReady = false;
+let WEATHER_DATA = null;
+let weatherReady = false;
 function checkSummaryReady(){
-  if(usdaReady && cftcReady && exportsReady && typeof renderSummary === 'function') renderSummary();
+  if(usdaReady && cftcReady && exportsReady && weatherReady && typeof renderSummary === 'function') renderSummary();
 }
+
+fetch('data/weather_data.json?_=' + Date.now())
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(data=>{
+    WEATHER_DATA = data;
+    weatherReady = true;
+    checkSummaryReady();
+  })
+  .catch(e=>{
+    weatherReady = true; // don't block the Summary tab forever if this one source fails
+    checkSummaryReady();
+  });
 
 function cftcFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
 function cftcPct(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : v.toFixed(1)+'%'; }
@@ -1046,6 +1065,49 @@ const CROP_CALENDAR = [
 ];
 const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+function fmtPctNormal(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v)+'%'; }
+function fmtTempDep(v){
+  if(v===null||v===undefined||isNaN(v)) return '—';
+  const s = v>=0?'+':'';
+  return s+v.toFixed(1)+'°C';
+}
+function weatherDirClass(v, isPct){
+  if(v===null||v===undefined||isNaN(v)) return '';
+  const baseline = isPct ? 100 : 0;
+  if(v>baseline) return 'cftc-up';
+  if(v<baseline) return 'cftc-dn';
+  return '';
+}
+
+function buildWeatherTable(){
+  const cols = [
+    {l:'30D Precip vs Normal', w:150},
+    {l:'90D Precip vs Normal', w:150},
+    {l:'7D Temp Dep (Actual)', w:150},
+    {l:'14D Temp Dep (Fcst)', w:150},
+    {l:'14D Precip Fcst vs Normal', w:170},
+  ];
+  let html = `<table class="weather-table"><colgroup><col style="width:220px">`;
+  cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; });
+  html += `</colgroup><thead><tr><th style="text-align:left">Region</th>`;
+  cols.forEach(c=>{ html += `<th>${c.l}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  const regions = (WEATHER_DATA && WEATHER_DATA.regions) || {};
+  Object.keys(regions).forEach(name=>{
+    const d = regions[name];
+    html += `<tr><td>${name}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true)}">${fmtPctNormal(d.precip_30d_pct_normal)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true)}">${fmtPctNormal(d.precip_90d_pct_normal)}</td>`;
+    html += `<td class="${weatherDirClass(d.temp_dep_7d_c, false)}">${fmtTempDep(d.temp_dep_7d_c)}</td>`;
+    html += `<td class="${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true)}">${fmtPctNormal(d.precip_14d_forecast_pct_normal)}</td>`;
+    html += `</tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
 function buildCropCalendarTable(){
   const curMonth = new Date().getMonth() + 1; // 1-12
 
@@ -1091,20 +1153,28 @@ function renderSummary(){
     ' — Exports: ' + (EXPORTS_DATA && EXPORTS_DATA._meta?.fetched_at || 'unavailable');
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Weather — Major Growing Regions</div>`);
+  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0">Green/red show direction vs. the 10-year normal for that calendar window (wetter/warmer = green, drier/cooler = red) — not an agronomic judgment of good or bad. Precip % of normal: 100% = exactly average. Temp departure in °C.${WEATHER_DATA?'':' Weather data unavailable.'}</div>`);
+  if(WEATHER_DATA){
+    root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildWeatherTable()}</div>`);
+  }
+
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
 
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada — Canola has no US export data. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada — Canola has no US export data. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed. Weather is sourced from Open-Meteo (no API key) — 10-year historical normals computed from the same calendar window in each of the past 10 years.</div>`);
 
-  // Force the calendar to exactly match the summary table's actual rendered width,
-  // rather than relying on both tables' independent width math staying in sync.
+  // Force the calendar (and weather table, if present) to exactly match the summary
+  // table's actual rendered width, rather than relying on independent width math staying in sync.
   requestAnimationFrame(()=>{
     const summaryTable = root.querySelector('.summary-table');
     const calTable = root.querySelector('.cal-table');
-    if(summaryTable && calTable){
+    const wxTable = root.querySelector('.weather-table');
+    if(summaryTable){
       const w = summaryTable.getBoundingClientRect().width;
-      calTable.style.width = w + 'px';
+      if(calTable) calTable.style.width = w + 'px';
+      if(wxTable) wxTable.style.width = w + 'px';
     }
   });
 }
