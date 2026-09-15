@@ -18,6 +18,7 @@ ATTR_MAP = {
     "TY Exports": "te", "TY Imports": "ti",
     "Total Distribution": "td", "Total Supply": "ts",
     "Feed Domestic Consumption": "fd",
+    "Total Dom. Consumption": "dc",  # cotton reports consumption under this label, not "Domestic Consumption"
 }
  
 SUM_ATTRS = {"ah", "bs", "dc", "es", "ex", "fd", "fi", "im", "pr", "te", "ti", "td", "ts"}
@@ -204,6 +205,21 @@ def main():
             warnings.append(f"  {comm} {latest_yr}: production = {latest_pr:,} out of expected range [{lo:,}, {hi:,}] — POSSIBLE BUG")
         else:
             print(f"  OK {comm} {latest_yr}: {latest_pr:,} {unit} (within [{lo:,}, {hi:,}])")
+ 
+    # Domestic consumption is required to compute Stocks/Use % — check it isn't entirely
+    # missing (e.g. a commodity reporting its consumption under an attribute name not yet
+    # in ATTR_MAP), separately from the production-range check above.
+    print("\nSanity checking World consumption (dc) is populated...")
+    for comm in COMM_MAP.values():
+        world = result.get(comm, {}).get("World", {})
+        if not world:
+            continue
+        recent_years = sorted(world.keys(), reverse=True)[:3]
+        dc_values = [world[yr].get("dc") for yr in recent_years]
+        if all(v is None or v == 0 for v in dc_values):
+            warnings.append(f"  {comm}: World 'Domestic Consumption' (dc) is 0/missing for all of the last "
+                             f"{len(recent_years)} years — Stocks/Use % will be blank. This commodity likely "
+                             f"reports consumption under an attribute name not in ATTR_MAP.")
  
     if warnings:
         print("\nSANITY CHECK WARNINGS:")
