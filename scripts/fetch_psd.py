@@ -18,7 +18,8 @@ ATTR_MAP = {
     "TY Exports": "te", "TY Imports": "ti",
     "Total Distribution": "td", "Total Supply": "ts",
     "Feed Domestic Consumption": "fd",
-    "Total Dom. Consumption": "dc",  # cotton reports consumption under this label, not "Domestic Consumption"
+    "Total Dom. Consumption": "dc",
+    "Domestic Use": "dc",  # confirmed: this is what Cotton actually uses (not "Domestic Consumption")
 }
  
 SUM_ATTRS = {"ah", "bs", "dc", "es", "ex", "fd", "fi", "im", "pr", "te", "ti", "td", "ts"}
