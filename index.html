@@ -156,26 +156,19 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
 <div id="seasonals-page" style="display:none">
 <div id="seasonals-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
   <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Seasonals</h1>
-  <div id="seasonals-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Forward-looking weekly seasonal score (-5 to +5), 15-year lookback. Static — manually entered, not auto-updating.</div>
 </div>
   <div id="seasonals-root" style="max-width:100%;margin:0 auto;padding:22px"></div>
 </div>
 <div id="exports-page" style="display:none">
-<div id="exports-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:flex-start;gap:20px">
-  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap;padding-top:2px">USDA Export Sales</h1>
-  <div id="exports-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em">Loading...</div>
-  <div id="exports-legend" style="margin-left:auto;font-size:11px;color:var(--text3);line-height:1.6;text-align:right;white-space:nowrap">
-    <div><b>Net Sales</b> — new sales this week, net of cancellations</div>
-    <div><b>Outstanding Sales</b> — sold but not yet shipped</div>
-    <div><b>Accum. Exports (YTD)</b> — shipped so far this marketing year</div>
-    <div><b>Total Commitment</b> — Accum. Exports + Outstanding Sales</div>
-  </div>
+<div id="exports-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">USDA Export Sales</h1>
+  <div id="exports-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
   <div id="exports-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
-const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Vegoils"];
+const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Vegoils","Meal"];
 const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924, Oats:68.8955};
 const ACRES_PER_HA = 2.47105;
 const HIST_YEARS = 7;
@@ -438,6 +431,12 @@ function render(){
     if(unitToggleEl) unitToggleEl.style.display = 'none';
     convLabel.textContent = '1000 MT — Palm + Soybean + Rapeseed + Sunflower oil (no bushel conversion; oils have no acreage)';
     renderVegoilsInto(root);
+    return;
+  }
+  if(comm === 'Meal'){
+    if(unitToggleEl) unitToggleEl.style.display = 'none';
+    convLabel.textContent = '1000 MT — Soybean + Rapeseed + Sunflower meal (no bushel conversion; meal has no acreage)';
+    renderMealInto(root);
     return;
   }
   if(unitToggleEl) unitToggleEl.style.display = '';
@@ -748,8 +747,9 @@ function renderCftc(){
   const root = document.getElementById('cftc-root');
   root.innerHTML = '';
   const yrs = CFTC_DATA._meta?.years_history;
-  document.getElementById('cftc-meta').textContent = 'Last updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') + ' — Managed Money (Fund) category — ' + (yrs ? yrs+'yr lookback' : '') + ' — highlighted cells are top/bottom 10% of that lookback window.';
+  document.getElementById('cftc-meta').textContent = 'Last updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown');
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window.</div>`);
 }
 
 function loadCftc(){
@@ -779,6 +779,10 @@ const SUMMARY_ROWS = [
   {section:'Grains',   label:'Corn',                 cftcCode:'002602', usdaComm:'Corn', domestic:'United States', seasonalName:'Corn', exportName:'CORN - UNMILLED'},
   {section:'Oilseeds', label:'Soybeans',             cftcCode:'005602', usdaComm:'Soybeans', domestic:'United States', seasonalName:'Soybeans', exportName:'SOYBEANS'},
   {section:'Oilseeds', label:'Canola',               cftcCode:'135731', usdaComm:'Rapeseed/Canola', domestic:'Canada', seasonalName:'Canola Seed', exportName:null},
+  // Vegoils: Seasonality/Positioning/Export Sales YoY use Soybean Oil (the only vegoil with a
+  // tracked CFTC future, seasonal series, and US export data) as the representative instrument.
+  // Production YoY and Stocks/Use % Rank are genuinely combined across all 4 tracked oils.
+  {section:'Oilseeds', label:'Vegoils (Combined)',   cftcCode:'007601', usdaComm:null, isVegoil:true, domestic:'United States', seasonalName:'Soybean Oil', exportName:'SOYBEAN OIL'},
 ];
 
 function summaryYearsSorted(usdaComm){
@@ -820,6 +824,37 @@ function summaryStuPctile(usdaComm, yearDataFn){
   const hist = years.map(y=>getStu(yearDataFn(y))).filter(v=>v!==null);
   const latestYear = years[years.length-1];
   const v = getStu(yearDataFn(latestYear));
+  if(v===null || !hist.length) return null;
+  return hist.filter(x=>x<=v).length/hist.length*100;
+}
+
+// Vegoils-combined equivalents of the above — sum across all 4 tracked oils instead of one commodity.
+function summaryProdYoYCombined(commList, country){
+  const years = commodityGroupAllYears(commList);
+  if(years.length<2) return null;
+  const latest = years[years.length-1], prev = years[years.length-2];
+  const curAgg = sumAcrossOils((m,yr)=>(DATA[m]&&DATA[m][country])?DATA[m][country][yr]:undefined, latest, commList);
+  const prevAgg = sumAcrossOils((m,yr)=>(DATA[m]&&DATA[m][country])?DATA[m][country][yr]:undefined, prev, commList);
+  const cur = (curAgg && curAgg.pr!==undefined) ? curAgg.pr : null;
+  const pr0 = (prevAgg && prevAgg.pr!==undefined) ? prevAgg.pr : null;
+  return yoyPct(cur, pr0);
+}
+function summaryProdYoYAggCombined(commList, countryList){
+  const years = commodityGroupAllYears(commList);
+  if(years.length<2 || !countryList || !countryList.length) return null;
+  const latest = years[years.length-1], prev = years[years.length-2];
+  const curAgg = sumAcrossOils((m,yr)=>sumCountries(DATA[m]||{}, countryList, yr), latest, commList);
+  const prevAgg = sumAcrossOils((m,yr)=>sumCountries(DATA[m]||{}, countryList, yr), prev, commList);
+  const cur = (curAgg && curAgg.pr!==undefined) ? curAgg.pr : null;
+  const pr0 = (prevAgg && prevAgg.pr!==undefined) ? prevAgg.pr : null;
+  return yoyPct(cur, pr0);
+}
+function summaryStuPctileCombined(commList, entityFn){
+  const years = commodityGroupAllYears(commList);
+  if(!years.length) return null;
+  const hist = years.map(y=>getStu(sumAcrossOils(entityFn, y, commList))).filter(v=>v!==null);
+  const latestYear = years[years.length-1];
+  const v = getStu(sumAcrossOils(entityFn, latestYear, commList));
   if(v===null || !hist.length) return null;
   return hist.filter(x=>x<=v).length/hist.length*100;
 }
@@ -880,8 +915,8 @@ function buildSummaryTable(){
     }
 
     const countries = DATA[row.usdaComm] || {};
-    const expList = (EXPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
-    const impList = (IMPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
+    const expList = row.isVegoil ? VEGOIL_EXPORTERS : (EXPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
+    const impList = row.isVegoil ? VEGOIL_IMPORTERS : (IMPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
 
     // Seasonality (next upcoming week)
     const seas = getNextSeasonalEntry(row.seasonalName);
@@ -891,12 +926,22 @@ function buildSummaryTable(){
     const m = computeLatestMetrics({code:row.cftcCode, label:row.label}, hist);
 
     // Fundamentals
-    const domesticYoY = summaryProdYoY(row.usdaComm, row.domestic);
-    const exportersYoY = summaryProdYoYAgg(row.usdaComm, expList);
-    const domesticStu = summaryStuPctile(row.usdaComm, y=>(countries[row.domestic]||{})[y]);
-    const worldStu = summaryStuPctile(row.usdaComm, y=>(countries['World']||{})[y]);
-    const expStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, expList, y));
-    const impStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, impList, y));
+    let domesticYoY, exportersYoY, domesticStu, worldStu, expStu, impStu;
+    if(row.isVegoil){
+      domesticYoY = summaryProdYoYCombined(VEGOILS, row.domestic);
+      exportersYoY = summaryProdYoYAggCombined(VEGOILS, expList);
+      domesticStu = summaryStuPctileCombined(VEGOILS, (oil,yr)=>(DATA[oil]&&DATA[oil][row.domestic])?DATA[oil][row.domestic][yr]:undefined);
+      worldStu = summaryStuPctileCombined(VEGOILS, (oil,yr)=>(DATA[oil]&&DATA[oil]['World'])?DATA[oil]['World'][yr]:undefined);
+      expStu = summaryStuPctileCombined(VEGOILS, (oil,yr)=>sumCountries(DATA[oil]||{}, expList, yr));
+      impStu = summaryStuPctileCombined(VEGOILS, (oil,yr)=>sumCountries(DATA[oil]||{}, impList, yr));
+    } else {
+      domesticYoY = summaryProdYoY(row.usdaComm, row.domestic);
+      exportersYoY = summaryProdYoYAgg(row.usdaComm, expList);
+      domesticStu = summaryStuPctile(row.usdaComm, y=>(countries[row.domestic]||{})[y]);
+      worldStu = summaryStuPctile(row.usdaComm, y=>(countries['World']||{})[y]);
+      expStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, expList, y));
+      impStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, impList, y));
+    }
 
     // Export Sales — Total Commitment YoY
     let totalCommitYoY = null;
@@ -1001,15 +1046,16 @@ function renderSummary(){
   const root = document.getElementById('summary-root');
   root.innerHTML = '';
   document.getElementById('summary-meta').textContent =
-    'USDA data updated: ' + (DATA._meta?.fetched_at || 'unknown') +
-    ' — CFTC data updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') +
-    ' — Export sales updated: ' + (EXPORTS_DATA && EXPORTS_DATA._meta?.fetched_at || 'unavailable') +
-    ' — Domestic column uses United States, except Canola which uses Canada. Canola has no US export data.';
+    'USDA: ' + (DATA._meta?.fetched_at || 'unknown') +
+    ' — CFTC: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') +
+    ' — Exports: ' + (EXPORTS_DATA && EXPORTS_DATA._meta?.fetched_at || 'unavailable');
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
+
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada — Canola has no US export data. Vegoils (Combined) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil.</div>`);
 
   // Force the calendar to exactly match the summary table's actual rendered width,
   // rather than relying on both tables' independent width math staying in sync.
@@ -1023,6 +1069,10 @@ function renderSummary(){
   });
 }
 </script>
+
+<style>
+.page-footnote{font-size:11px;color:var(--text3);line-height:1.6;margin:28px 0 4px;padding-top:14px;border-top:1px solid var(--border2)}
+</style>
 
 <style>
 .seas-table{border-collapse:collapse;background:var(--bg)}
@@ -1128,7 +1178,7 @@ function renderSeasonals(){
     selHtml += `<button class="tbtn seas-month-btn${m===seasonalsMonth?' active':''}" data-m="${m}">${m}</button>`;
   });
   selHtml += `</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">Showing ${seasonalsMonth} through the following 2 months</div>`;
-  root.innerHTML = selHtml + buildSeasonalsTable(seasonalsMonth);
+  root.innerHTML = selHtml + buildSeasonalsTable(seasonalsMonth) + `<div class="page-footnote">Forward-looking weekly seasonal score (-5 to +5), 15-year lookback. Static — manually entered, not auto-updating.</div>`;
   root.querySelectorAll('.seas-month-btn').forEach(b=>{
     b.addEventListener('click', ()=>{ seasonalsMonth = b.dataset.m; renderSeasonals(); });
   });
@@ -1226,7 +1276,7 @@ function buildExportsCountryTable(commName){
 function renderExports(){
   const root = document.getElementById('exports-root');
   root.innerHTML = '';
-  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown') + ' — figures in metric tons — current marketing year only (excludes forward sales already booked against next marketing year).';
+  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown');
 
   const commodities = Object.keys(EXPORTS_DATA.commodities || {});
   if(!exportsCommodity || !commodities.includes(exportsCommodity)){
@@ -1254,6 +1304,7 @@ function renderExports(){
   root.appendChild(selWrap);
 
   root.insertAdjacentHTML('beforeend', buildExportsCountryTable(exportsCommodity));
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Figures in metric tons — current marketing year only (excludes forward sales already booked against next marketing year). Net Sales — new sales this week, net of cancellations. Outstanding Sales — sold but not yet shipped. Accum. Exports (YTD) — shipped so far this marketing year. Total Commitment — Accum. Exports + Outstanding Sales.</div>`);
 }
 
 fetch('data/export_sales.json?_=' + Date.now())
@@ -1298,24 +1349,26 @@ const VEGOIL_PANELS = [
 ];
 const VEGOIL_HIST_YEARS = 7;
 
-function vegoilAllYears(){
+function commodityGroupAllYears(commList){
   const years = new Set();
-  VEGOILS.forEach(oil=>{
+  commList.forEach(oil=>{
     const countries = DATA[oil];
     if(!countries) return;
     Object.values(countries).forEach(yrs=>Object.keys(yrs).forEach(y=>years.add(y)));
   });
   return [...years].sort();
 }
+function vegoilAllYears(){ return commodityGroupAllYears(VEGOILS); }
 
 // Sums a given "entity" (e.g. World, or a country/aggregate) across all 4 oils for one year.
 // entityFn(oil, year) must return the raw {bs,pr,im,dc,ex,es} object (or null/undefined).
-function sumAcrossOils(entityFn, year){
+function sumAcrossOils(entityFn, year, commList){
+  const list = commList || VEGOILS;
   const keys = ['bs','pr','im','dc','ex','es'];
   const out = {}; let any = false;
   keys.forEach(k=>{
     let s = 0, has = false;
-    VEGOILS.forEach(oil=>{
+    list.forEach(oil=>{
       const yd = entityFn(oil, year);
       const v = yd ? yd[k] : undefined;
       if(v !== undefined && !isNaN(v)){ s += v; has = true; any = true; }
@@ -1445,6 +1498,52 @@ function renderVegoilsInto(root){
     if(!oilYears7.length) return;
     stack.insertAdjacentHTML('beforeend', vegoilPanelWrap(`${p.country.toUpperCase()} — ${p.oil.toUpperCase()}`, '1000 MT',
       buildOilBalanceTable(y=>(countries[p.country]||{})[y], oilYears7, true, oilYears)));
+  });
+  root.appendChild(stack);
+}
+
+// ---------------- MEAL COMPLEX (Soybean / Rapeseed / Sunflower meal) ----------------
+const MEALS = ["Soybean Meal", "Rapeseed Meal", "Sunflower Meal"];
+const MEAL_EXPORTERS = ["Argentina", "Brazil", "United States", "Canada", "European Union", "Ukraine", "Russia"];
+const MEAL_IMPORTERS = ["European Union", "Indonesia", "Vietnam", "Philippines"];
+const MEAL_PANELS = [
+  {oil:"Soybean Meal",    country:"Argentina"},
+  {oil:"Soybean Meal",    country:"Brazil"},
+  {oil:"Soybean Meal",    country:"United States"},
+  {oil:"Rapeseed Meal",   country:"Canada"},
+  {oil:"Rapeseed Meal",   country:"European Union"},
+  {oil:"Sunflower Meal",  country:"Ukraine"},
+  {oil:"Sunflower Meal",  country:"Russia"},
+];
+const MEAL_HIST_YEARS = 7;
+
+function renderMealInto(root){
+  const yearsAll = commodityGroupAllYears(MEALS);
+  const years7 = yearsAll.slice(-MEAL_HIST_YEARS);
+  if(!years7.length){ root.innerHTML = '<div id="vegoils-err">No meal data available — has the fetcher picked up Meal, Soybean / Meal, Rapeseed / Meal, Sunflowerseed yet?</div>'; return; }
+
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">World Balance Sheet — Meal (Combined)</div>`);
+  root.insertAdjacentHTML('beforeend', vegoilPanelWrap('WORLD', '1000 MT — Soybean + Rapeseed + Sunflower meal',
+    buildOilBalanceTable(y=>sumAcrossOils((m,yr)=>(DATA[m]&&DATA[m]['World'])?DATA[m]['World'][yr]:undefined, y, MEALS), years7, true, yearsAll)));
+
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Exporters — Aggregate (Combined)</div>`);
+  root.insertAdjacentHTML('beforeend', vegoilPanelWrap('MAJOR EXPORTERS', MEAL_EXPORTERS.join(', '),
+    buildOilBalanceTable(y=>sumAcrossOils((m,yr)=>sumCountries(DATA[m]||{}, MEAL_EXPORTERS, yr), y, MEALS), years7, true, yearsAll)));
+
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Major Importers — Aggregate (Combined)</div>`);
+  root.insertAdjacentHTML('beforeend', vegoilPanelWrap('MAJOR IMPORTERS', MEAL_IMPORTERS.join(', '),
+    buildOilBalanceTable(y=>sumAcrossOils((m,yr)=>sumCountries(DATA[m]||{}, MEAL_IMPORTERS, yr), y, MEALS), years7, true, yearsAll)));
+
+  root.insertAdjacentHTML('beforeend', `<div class="sec-hdr">Individual Exporters — By Meal</div>`);
+  const stack = document.createElement('div');
+  stack.className = 'stack-wrap';
+  MEAL_PANELS.forEach(p=>{
+    const countries = DATA[p.oil] || {};
+    const mealYears = commodityGroupAllYears([p.oil]);
+    const mealYears7 = mealYears.slice(-MEAL_HIST_YEARS);
+    if(!mealYears7.length) return;
+    stack.insertAdjacentHTML('beforeend', vegoilPanelWrap(`${p.country.toUpperCase()} — ${p.oil.toUpperCase()}`, '1000 MT',
+      buildOilBalanceTable(y=>(countries[p.country]||{})[y], mealYears7, true, mealYears)));
   });
   root.appendChild(stack);
 }
