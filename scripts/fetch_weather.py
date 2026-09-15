@@ -33,7 +33,7 @@ REGIONS = {
 }
  
 HISTORY_YEARS = 10
-PAST_DAYS = 95       # covers the 90-day trailing window with a few days' margin
+PAST_DAYS = 92       # Open-Meteo's documented max for this parameter; still covers the 90-day trailing window
 FORECAST_DAYS = 16   # Open-Meteo's max; we only use the first 14
  
  
@@ -142,6 +142,10 @@ def main():
         fc_blocks = fetch_forecast_block(names, lats, lons)
     except urllib.error.HTTPError as e:
         print(f"HTTP {e.code} {e.reason}", file=sys.stderr)
+        try:
+            print("Response body:", e.read(2000).decode("utf-8", errors="replace"), file=sys.stderr)
+        except Exception:
+            pass
         sys.exit(1)
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
@@ -155,6 +159,10 @@ def main():
         hist_blocks = fetch_archive_block(names, lats, lons, archive_start, archive_end)
     except urllib.error.HTTPError as e:
         print(f"HTTP {e.code} {e.reason}", file=sys.stderr)
+        try:
+            print("Response body:", e.read(2000).decode("utf-8", errors="replace"), file=sys.stderr)
+        except Exception:
+            pass
         sys.exit(1)
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)
