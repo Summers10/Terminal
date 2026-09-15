@@ -32,6 +32,9 @@ COMM_MAP = {
     "Oil, Soybean": "Soybean Oil",
     "Oil, Rapeseed": "Rapeseed Oil",
     "Oil, Sunflowerseed": "Sunflower Oil",
+    "Meal, Soybean": "Soybean Meal",
+    "Meal, Rapeseed": "Rapeseed Meal",
+    "Meal, Sunflowerseed": "Sunflower Meal",
 }
  
 COUNTRIES = {
@@ -172,6 +175,9 @@ def main():
         "Soybean Oil":      (60_000, 82_000),
         "Rapeseed Oil":     (28_000, 42_000),
         "Sunflower Oil":    (18_000, 28_000),
+        "Soybean Meal":     (220_000, 320_000),
+        "Rapeseed Meal":    (36_000, 58_000),
+        "Sunflower Meal":   (18_000, 34_000),
     }
     print("\nSanity checking World production...")
     warnings = []
