@@ -200,6 +200,11 @@ def main():
             continue
         if any(excl in commodity_name.upper() for excl in EXCLUDE_COMMODITIES):
             continue
+        # Cotton: USDA's export sales report breaks cotton into several staple-length
+        # subcategories plus Pima (ELS) cotton. Only the aggregate "All Upland Cotton"
+        # line is wanted here — drop everything else cotton-related.
+        if "COTTON" in commodity_name.upper() and "ALL UPLAND" not in commodity_name.upper():
+            continue
  
         country_name = get_field(attrib, FIELD_CANDIDATES["country_name"])
         if not country_name:
