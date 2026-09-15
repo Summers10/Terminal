@@ -26,7 +26,7 @@ URL = "https://apps.fas.usda.gov/esrqs/StaticReports/CWRCountryCommoditySummary.
 # Only keep commodities whose name contains one of these keywords.
 # Matching by keyword (not hardcoded numeric code) since exact codes for
 # every class weren't independently confirmed this session.
-COMMODITY_KEYWORDS = ["WHEAT", "CORN", "SOYBEAN", "OATS"]
+COMMODITY_KEYWORDS = ["WHEAT", "CORN", "SOYBEAN", "OATS", "COTTON"]
  
 # Excluded even if they match a keyword above.
 EXCLUDE_COMMODITIES = ["WHEAT PRODUCTS", "OATS"]
