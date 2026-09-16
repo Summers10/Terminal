@@ -1,71 +1,71 @@
 {
   "regions": {
     "US Midwest (Iowa)": {
-      "precip_30d_pct_normal": 152.60947810437915,
-      "precip_90d_pct_normal": 128.61904450689494,
-      "temp_dep_7d_c": -0.6885714285714286,
-      "temp_dep_14d_forecast_c": -1.8657142857142794,
-      "precip_14d_forecast_pct_normal": 281.9760884277013
+      "precip_30d_pct_normal": 149.41052877319947,
+      "precip_90d_pct_normal": 126.03285541657141,
+      "temp_dep_7d_c": -2.1814285714285724,
+      "temp_dep_14d_forecast_c": -0.1528571428571439,
+      "precip_14d_forecast_pct_normal": 54.73120895159329
     },
     "US Southern Plains (Kansas)": {
-      "precip_30d_pct_normal": 5.866425992779783,
-      "precip_90d_pct_normal": 18.09498773221171,
-      "temp_dep_7d_c": 4.132857142857148,
-      "temp_dep_14d_forecast_c": 0.240000000000002,
-      "precip_14d_forecast_pct_normal": 95.13108614232212
+      "precip_30d_pct_normal": 5.776494112419463,
+      "precip_90d_pct_normal": 12.056706266837432,
+      "temp_dep_7d_c": 2.6378571428571433,
+      "temp_dep_14d_forecast_c": 4.594999999999992,
+      "precip_14d_forecast_pct_normal": 30.254777070063692
     },
     "US Cotton Belt (Texas)": {
-      "precip_30d_pct_normal": 6.822356336919444,
-      "precip_90d_pct_normal": 49.632560768795926,
-      "temp_dep_7d_c": 5.450714285714284,
-      "temp_dep_14d_forecast_c": 2.458571428571428,
-      "precip_14d_forecast_pct_normal": 38.165137614678905
+      "precip_30d_pct_normal": 6.550768455530361,
+      "precip_90d_pct_normal": 56.9078947368421,
+      "temp_dep_7d_c": 4.956428571428571,
+      "temp_dep_14d_forecast_c": 2.855357142857148,
+      "precip_14d_forecast_pct_normal": 123.66912366912368
     },
     "Brazil (Mato Grosso)": {
-      "precip_30d_pct_normal": 469.4589877835951,
-      "precip_90d_pct_normal": 443.7340153452686,
-      "temp_dep_7d_c": -0.7850000000000001,
-      "temp_dep_14d_forecast_c": 3.2157142857142844,
-      "precip_14d_forecast_pct_normal": 36.123174101855504
+      "precip_30d_pct_normal": 422.11838006230533,
+      "precip_90d_pct_normal": 407.71028037383184,
+      "temp_dep_7d_c": -0.66357142857143,
+      "temp_dep_14d_forecast_c": 3.1407142857142816,
+      "precip_14d_forecast_pct_normal": 71.7624521072797
     },
     "Argentina (Pampas)": {
-      "precip_30d_pct_normal": 21.979865771812076,
-      "precip_90d_pct_normal": 66.429418742586,
-      "temp_dep_7d_c": -2.7385714285714293,
-      "temp_dep_14d_forecast_c": 1.5664285714285704,
-      "precip_14d_forecast_pct_normal": 66.93617021276594
+      "precip_30d_pct_normal": 11.359724612736658,
+      "precip_90d_pct_normal": 67.24303554274734,
+      "temp_dep_7d_c": -2.918571428571429,
+      "temp_dep_14d_forecast_c": 0.6353571428571421,
+      "precip_14d_forecast_pct_normal": 58.459743290548424
     },
     "Ukraine": {
-      "precip_30d_pct_normal": 235.54687499999994,
-      "precip_90d_pct_normal": 76.37358461889201,
-      "temp_dep_7d_c": -0.5064285714285681,
-      "temp_dep_14d_forecast_c": -1.0017857142857167,
-      "precip_14d_forecast_pct_normal": 158.3922261484099
+      "precip_30d_pct_normal": 232.54917084458157,
+      "precip_90d_pct_normal": 78.09464604864404,
+      "temp_dep_7d_c": -0.9500000000000028,
+      "temp_dep_14d_forecast_c": 0.7067857142857132,
+      "precip_14d_forecast_pct_normal": 23.828435266084192
     },
     "Southern Russia": {
-      "precip_30d_pct_normal": 50.53314789058877,
-      "precip_90d_pct_normal": 50.21878155503199,
-      "temp_dep_7d_c": -0.9342857142857142,
-      "temp_dep_14d_forecast_c": 0.01999999999999602,
-      "precip_14d_forecast_pct_normal": 62.40117130307469
+      "precip_30d_pct_normal": 52.644288819125805,
+      "precip_90d_pct_normal": 50.19512851567758,
+      "temp_dep_7d_c": -0.8871428571428588,
+      "temp_dep_14d_forecast_c": 1.3585714285714268,
+      "precip_14d_forecast_pct_normal": 62.87970838396111
     },
     "France": {
-      "precip_30d_pct_normal": 81.90689489681654,
-      "precip_90d_pct_normal": 32.36423477783874,
-      "temp_dep_7d_c": 0.3714285714285701,
-      "temp_dep_14d_forecast_c": 3.1246428571428524,
-      "precip_14d_forecast_pct_normal": 1.2277470841006755
+      "precip_30d_pct_normal": 90.02989273782312,
+      "precip_90d_pct_normal": 32.60749419697138,
+      "temp_dep_7d_c": 0.7392857142857139,
+      "temp_dep_14d_forecast_c": 0.990000000000002,
+      "precip_14d_forecast_pct_normal": 18.91472868217054
     },
     "Western Australia": {
-      "precip_30d_pct_normal": 142.7666983222539,
-      "precip_90d_pct_normal": 70.27925531914894,
-      "temp_dep_7d_c": 1.4385714285714286,
-      "temp_dep_14d_forecast_c": 2.6507142857142885,
-      "precip_14d_forecast_pct_normal": 195.50858652575963
+      "precip_30d_pct_normal": 144.7994561522774,
+      "precip_90d_pct_normal": 71.28473620620218,
+      "temp_dep_7d_c": 2.765000000000004,
+      "temp_dep_14d_forecast_c": 1.3599999999999994,
+      "precip_14d_forecast_pct_normal": 208.43989769820976
     }
   },
   "_meta": {
-    "fetched_at": "2026-09-15T18:25:29Z",
+    "fetched_at": "2026-09-16T15:19:34Z",
     "source": "Open-Meteo (no API key)",
     "history_years": 10
   }
