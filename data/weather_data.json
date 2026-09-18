@@ -3,69 +3,69 @@
     "US Midwest (Iowa)": {
       "precip_30d_pct_normal": 177.6531089294063,
       "precip_90d_pct_normal": 138.50724099517265,
-      "temp_dep_7d_c": -2.4064285714285703,
-      "temp_dep_14d_forecast_c": -2.455714285714283,
-      "precip_14d_forecast_pct_normal": 99.54604409857328
+      "temp_dep_7d_c": -2.4349999999999987,
+      "temp_dep_14d_forecast_c": -3.1057142857142814,
+      "precip_14d_forecast_pct_normal": 19.239083441418074
     },
     "US Southern Plains (Kansas)": {
       "precip_30d_pct_normal": 2.9269390971518634,
       "precip_90d_pct_normal": 12.164149177917391,
-      "temp_dep_7d_c": 3.2528571428571453,
-      "temp_dep_14d_forecast_c": 1.2342857142857113,
-      "precip_14d_forecast_pct_normal": 301.30434782608694
+      "temp_dep_7d_c": 3.224285714285717,
+      "temp_dep_14d_forecast_c": -0.10500000000000398,
+      "precip_14d_forecast_pct_normal": 146.08695652173913
     },
     "US Cotton Belt (Texas)": {
       "precip_30d_pct_normal": 6.563998990154002,
       "precip_90d_pct_normal": 57.386112339672714,
-      "temp_dep_7d_c": 4.309999999999999,
-      "temp_dep_14d_forecast_c": 3.2560714285714276,
-      "precip_14d_forecast_pct_normal": 42.74465691788527
+      "temp_dep_7d_c": 4.317142857142851,
+      "temp_dep_14d_forecast_c": 2.7560714285714276,
+      "precip_14d_forecast_pct_normal": 67.11661042369703
     },
     "Brazil (Mato Grosso)": {
-      "precip_30d_pct_normal": 272.4077328646748,
-      "precip_90d_pct_normal": 284.0409956076135,
-      "temp_dep_7d_c": -0.29571428571428626,
-      "temp_dep_14d_forecast_c": 1.4385714285714357,
-      "precip_14d_forecast_pct_normal": 193.26958440603167
+      "precip_30d_pct_normal": 254.8330404217926,
+      "precip_90d_pct_normal": 269.39970717423137,
+      "temp_dep_7d_c": -0.21714285714286063,
+      "temp_dep_14d_forecast_c": 1.7171428571428642,
+      "precip_14d_forecast_pct_normal": 217.35932328061787
     },
     "Argentina (Pampas)": {
       "precip_30d_pct_normal": 13.038079470198674,
       "precip_90d_pct_normal": 65.81524719893441,
-      "temp_dep_7d_c": -2.58357142857143,
-      "temp_dep_14d_forecast_c": -0.19000000000000128,
-      "precip_14d_forecast_pct_normal": 120.75741336191498
+      "temp_dep_7d_c": -2.5550000000000015,
+      "temp_dep_14d_forecast_c": 0.006428571428571672,
+      "precip_14d_forecast_pct_normal": 312.6116470167917
     },
     "Ukraine": {
       "precip_30d_pct_normal": 188.9228678219504,
       "precip_90d_pct_normal": 75.26962252846016,
       "temp_dep_7d_c": -1.8057142857142878,
-      "temp_dep_14d_forecast_c": -0.00928571428571523,
+      "temp_dep_14d_forecast_c": 1.5228571428571431,
       "precip_14d_forecast_pct_normal": 67.96246648793567
     },
     "Southern Russia": {
       "precip_30d_pct_normal": 57.454545454545446,
       "precip_90d_pct_normal": 51.1094822416206,
       "temp_dep_7d_c": -0.9849999999999994,
-      "temp_dep_14d_forecast_c": 0.5082142857142848,
-      "precip_14d_forecast_pct_normal": 18.066242890598865
+      "temp_dep_14d_forecast_c": 2.708214285714284,
+      "precip_14d_forecast_pct_normal": 72.26497156239546
     },
     "France": {
       "precip_30d_pct_normal": 69.95884773662553,
       "precip_90d_pct_normal": 33.30698882240036,
       "temp_dep_7d_c": 1.0621428571428595,
-      "temp_dep_14d_forecast_c": 2.4089285714285715,
-      "precip_14d_forecast_pct_normal": 13.307457721097867
+      "temp_dep_14d_forecast_c": 4.244642857142857,
+      "precip_14d_forecast_pct_normal": 3.3268644302744668
     },
     "Western Australia": {
-      "precip_30d_pct_normal": 158.63817457442957,
-      "precip_90d_pct_normal": 73.88823974156298,
-      "temp_dep_7d_c": 4.234285714285711,
-      "temp_dep_14d_forecast_c": 1.2589285714285676,
-      "precip_14d_forecast_pct_normal": 206.87936191425723
+      "precip_30d_pct_normal": 179.64505613908005,
+      "precip_90d_pct_normal": 77.87476802529383,
+      "temp_dep_7d_c": 4.219999999999999,
+      "temp_dep_14d_forecast_c": 0.7160714285714267,
+      "precip_14d_forecast_pct_normal": 21.934197407776672
     }
   },
   "_meta": {
-    "fetched_at": "2026-09-18T16:55:31Z",
+    "fetched_at": "2026-09-18T23:29:47Z",
     "source": "Open-Meteo (no API key)",
     "history_years": 10
   }
