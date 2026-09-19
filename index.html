@@ -373,6 +373,28 @@ function panelWrap(title, sub, innerHtml){
   return `<div class="panel"><div class="panel-hdr"><span class="panel-title">${title}</span><span class="panel-sub">${sub}</span></div>${innerHtml}</div>`;
 }
 
+// Looks up CROP_CALENDAR (defined later in the file, safe since this only runs after full page load)
+// for a country's harvest months for a given USDA commodity, so panel headers can show a quick
+// "when does this country harvest" hint without needing to check the separate calendar table.
+function getHarvestMonthsLabel(comm, country){
+  if(typeof CROP_CALENDAR === 'undefined') return '';
+  const sectionMap = {'Wheat':'Wheat','Corn':'Corn','Soybeans':'Soybeans','Rapeseed/Canola':'Canola','Cotton':'Cotton'};
+  const section = sectionMap[comm];
+  if(!section) return '';
+  const matches = CROP_CALENDAR.filter(r=>r.section===section && (r.origin===country || r.origin.indexOf(country+' (')===0));
+  if(!matches.length) return '';
+  const months = new Set();
+  matches.forEach(m=>m.harvest.forEach(mo=>months.add(mo)));
+  if(!months.size) return '';
+  const MONNAMES=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return [...months].sort((a,b)=>a-b).map(m=>MONNAMES[m]).join('/');
+}
+function panelTitleWithHarvest(comm, country){
+  const months = getHarvestMonthsLabel(comm, country);
+  const base = country.toUpperCase();
+  return months ? `${base} <span style="color:var(--text3);font-weight:600;font-size:11px;letter-spacing:.02em;text-transform:none">(harvest: ${months})</span>` : base;
+}
+
 // Multi-year, country-by-year breakout table for a single metric (e.g. Acres across N years), plus YoY change.
 function buildMetricByCountryTable(countryList, countries, years, metric){
   const latestYear = years[years.length-1];
@@ -501,7 +523,7 @@ function render(){
   const stack = document.createElement('div');
   stack.className = 'stack-wrap';
   expList.forEach(c=>{
-    stack.insertAdjacentHTML('beforeend', panelWrap(c.toUpperCase(), unitLabel(),
+    stack.insertAdjacentHTML('beforeend', panelWrap(panelTitleWithHarvest(comm, c), unitLabel(),
       buildBalanceTable(comm, y=>(countries[c]||{})[y], years10, true, yearsAll)));
   });
   root.appendChild(stack);
@@ -1079,29 +1101,51 @@ function weatherDirClass(v, isPct){
   return '';
 }
 
+function fmtPctNormalWithMm(v, mm){
+  const pct = fmtPctNormal(v);
+  if(mm===null||mm===undefined||isNaN(mm)) return pct;
+  return `${pct} <span style="color:var(--text3);font-size:10px">(${Math.round(mm)}mm)</span>`;
+}
+function fmtHiLo(hi, lo){
+  if((hi===null||hi===undefined||isNaN(hi)) && (lo===null||lo===undefined||isNaN(lo))) return '—';
+  const hiTxt = (hi===null||hi===undefined||isNaN(hi)) ? '—' : Math.round(hi)+'°';
+  const loTxt = (lo===null||lo===undefined||isNaN(lo)) ? '—' : Math.round(lo)+'°';
+  return `${hiTxt} / ${loTxt}`;
+}
+
 function buildWeatherTable(){
-  const cols = [
-    {l:'30D Precip vs Normal', w:150},
-    {l:'90D Precip vs Normal', w:150},
-    {l:'7D Temp Dep (Actual)', w:150},
-    {l:'14D Temp Dep (Fcst)', w:150},
-    {l:'14D Precip Fcst vs Normal', w:170},
+  const groups = [
+    {label:'Historical', cols:[
+      {l:'30D Precip vs Normal', w:150},
+      {l:'90D Precip vs Normal', w:150},
+      {l:'7D Temp Dep (Actual)', w:140},
+    ]},
+    {label:'Forecast', cols:[
+      {l:'14D Temp Dep', w:120},
+      {l:'14D Hi/Lo (°C)', w:120},
+      {l:'14D Precip vs Normal', w:160},
+    ]},
   ];
-  let html = `<table class="weather-table"><colgroup><col style="width:220px">`;
-  cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; });
-  html += `</colgroup><thead><tr><th style="text-align:left">Region</th>`;
-  cols.forEach(c=>{ html += `<th>${c.l}</th>`; });
+  let html = `<table class="weather-table"><colgroup><col style="width:200px">`;
+  groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
+  html += `</colgroup><thead><tr><th rowspan="2" style="text-align:left">Region</th>`;
+  groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:12px;letter-spacing:.08em">${g.label}</th>`; });
+  html += `</tr><tr>`;
+  groups.forEach(g=>{
+    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c.l}</th>`; });
+  });
   html += `</tr></thead><tbody>`;
 
   const regions = (WEATHER_DATA && WEATHER_DATA.regions) || {};
   Object.keys(regions).forEach(name=>{
     const d = regions[name];
     html += `<tr><td>${name}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true)}">${fmtPctNormal(d.precip_30d_pct_normal)}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true)}">${fmtPctNormal(d.precip_90d_pct_normal)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_7d_c, false)}">${fmtTempDep(d.temp_dep_7d_c)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true)}">${fmtPctNormal(d.precip_14d_forecast_pct_normal)}</td>`;
+    html += `<td>${fmtHiLo(d.temp_14d_forecast_hi_c, d.temp_14d_forecast_lo_c)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_14d_forecast_pct_normal, d.precip_14d_forecast_mm)}</td>`;
     html += `</tr>`;
   });
   html += `</tbody></table>`;
@@ -1433,12 +1477,12 @@ fetch('data/export_sales.json?_=' + Date.now())
 </script>
 
 <style>
-.oil-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
-.oil-table th{background:var(--th-bg);padding:8px 10px;text-align:right;font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
+.oil-table{width:100%;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.oil-table th{background:var(--th-bg);padding:8px 8px;text-align:right;font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--text2);border-bottom:2px solid var(--border2);white-space:nowrap}
 .oil-table th:first-child{text-align:left;font-size:14px;letter-spacing:.08em}
 .oil-table th.latest{color:var(--amber);font-weight:900;border-bottom:2px solid var(--amber)}
 .oil-table th.yoy{color:var(--text3);font-style:italic}
-.oil-table td{padding:5px 10px;text-align:right;font-size:15px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
+.oil-table td{padding:5px 8px;text-align:right;font-size:15px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
 .oil-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 #vegoils-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 </style>
