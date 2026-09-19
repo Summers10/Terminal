@@ -20,6 +20,7 @@ ATTR_MAP = {
     "Feed Domestic Consumption": "fd",
     "Total Dom. Consumption": "dc",
     "Domestic Use": "dc",  # confirmed: this is what Cotton actually uses (not "Domestic Consumption")
+    "Human Dom. Consumption": "dc",  # confirmed: this is what Sugar actually uses
 }
  
 SUM_ATTRS = {"ah", "bs", "dc", "es", "ex", "fd", "fi", "im", "pr", "te", "ti", "td", "ts"}
@@ -40,7 +41,9 @@ COMM_MAP = {
     "Cotton": "Cotton",
     "Coffee, Green": "Coffee",        # confirmed exact string from a prior fetch log
     "Sugar, Centrifugal": "Sugar",    # confirmed exact string from a prior fetch log
-    "Cocoa Beans": "Cocoa",           # best-guess string — not independently confirmed this session
+    # Note: Cocoa is NOT tracked by USDA PSD at all (confirmed — no cocoa-related string
+    # showed up anywhere in the "Unmapped" commodity list either). That's ICCO's domain,
+    # not USDA's. Don't re-add a Cocoa entry here.
 }
  
 COUNTRIES = {
@@ -198,11 +201,10 @@ def main():
         "Rapeseed Meal":    (36_000, 58_000),
         "Sunflower Meal":   (18_000, 34_000),
         "Cotton":           (100_000, 145_000),
-        "Cocoa":            (4_000, 6_500),
-        "Coffee":           (8_000, 13_000),  # unit not independently confirmed — may be MT or 60kg bags, see below
+        "Coffee":           (150_000, 200_000),  # confirmed: reported in thousands of 60kg bags, not MT
         "Sugar":            (165_000, 200_000),
     }
-    SANITY_UNITS = {"Cotton": "k bales"}
+    SANITY_UNITS = {"Cotton": "k bales", "Coffee": "k bags (60kg)"}
     print("\nSanity checking World production...")
     warnings = []
     for comm, (lo, hi) in SANITY_RANGES.items():
