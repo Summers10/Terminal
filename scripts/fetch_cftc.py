@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """
-CFTC Commitments of Traders fetcher — Disaggregated Futures-Only report.
+CFTC Commitments of Traders fetcher — Disaggregated Futures-and-Options Combined report.
 Pulls Managed Money ("Fund") positioning for a fixed set of contracts via
 CFTC's public Socrata Open Data API (no API key required).
 Saves data/cftc_data.json.
  
-Source: https://publicreporting.cftc.gov/resource/72hh-3qpy.json
-Dataset: Disaggregated Commitments of Traders — Futures Only
+Source: https://publicreporting.cftc.gov/resource/kh3c-gbw2.json
+Dataset: Disaggregated Commitments of Traders — Futures and Options Combined
+ 
+NOTE: this was originally built against the Futures-Only dataset (72hh-3qpy).
+Cross-checked against two independent professional sources (both showing
+noticeably higher Open Interest and different weekly-change figures than
+what Futures-Only produced), confirmed via CFTC's own API documentation that
+those sources use the Combined report — switched to match, since that's the
+convention most trade desks reference as "the" COT numbers.
 """
 import os, sys, json, urllib.request, urllib.parse, urllib.error
 from datetime import datetime, timedelta
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cftc_data.json")
-BASE = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
+BASE = "https://publicreporting.cftc.gov/resource/kh3c-gbw2.json"
  
 # CFTC contract_market_code -> display label. Codes are the stable identifier;
 # names on the report can vary in formatting, codes do not.
