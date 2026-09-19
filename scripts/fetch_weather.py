@@ -21,6 +21,9 @@ FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
  
 REGIONS = {
+    "Alberta (Calgary area)": (51.0, -114.1),
+    "Saskatchewan (Regina area)": (50.5, -104.6),
+    "Manitoba": (49.8, -99.9),
     "US Midwest (Iowa)": (42.0, -93.5),
     "US Southern Plains (Kansas)": (38.5, -98.0),
     "US Cotton Belt (Texas)": (33.5, -101.5),
@@ -123,6 +126,19 @@ def window_avg_temp(series, start, end):
     return (sum(vals) / len(vals)) if vals else None
  
  
+def window_extreme_temps(series, start, end):
+    """Highest daily max and lowest daily min actually seen/forecast over the window."""
+    tmaxes, tmins = [], []
+    d = start
+    while d <= end:
+        rec = series.get(d.isoformat())
+        if rec:
+            if rec.get("tmax") is not None: tmaxes.append(rec["tmax"])
+            if rec.get("tmin") is not None: tmins.append(rec["tmin"])
+        d += timedelta(days=1)
+    return (max(tmaxes) if tmaxes else None, min(tmins) if tmins else None)
+ 
+ 
 def pct_of_normal(actual, normal):
     if actual is None or normal is None or normal == 0:
         return None
@@ -217,12 +233,20 @@ def main():
         temp_14d_fwd_normal = avg(temp_14d_fwd_normals)
         precip_14d_fwd_normal = avg(precip_14d_fwd_normals)
  
+        # 14-day forecast temperature extremes (actual forecast hi/lo, not an average)
+        temp_14d_hi, temp_14d_lo = window_extreme_temps(fc_series, today + timedelta(days=1), today + timedelta(days=14))
+ 
         result["regions"][name] = {
             "precip_30d_pct_normal": pct_of_normal(precip_30d, precip_30d_normal),
+            "precip_30d_mm": precip_30d,
             "precip_90d_pct_normal": pct_of_normal(precip_90d, precip_90d_normal),
+            "precip_90d_mm": precip_90d,
             "temp_dep_7d_c": (temp_7d_actual - temp_7d_normal) if (temp_7d_actual is not None and temp_7d_normal is not None) else None,
             "temp_dep_14d_forecast_c": (temp_14d_forecast - temp_14d_fwd_normal) if (temp_14d_forecast is not None and temp_14d_fwd_normal is not None) else None,
+            "temp_14d_forecast_hi_c": temp_14d_hi,
+            "temp_14d_forecast_lo_c": temp_14d_lo,
             "precip_14d_forecast_pct_normal": pct_of_normal(precip_14d_forecast, precip_14d_fwd_normal),
+            "precip_14d_forecast_mm": precip_14d_forecast,
         }
  
     if missing_regions:
