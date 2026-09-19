@@ -38,12 +38,16 @@ COMM_MAP = {
     "Meal, Rapeseed": "Rapeseed Meal",
     "Meal, Sunflowerseed": "Sunflower Meal",
     "Cotton": "Cotton",
+    "Coffee, Green": "Coffee",        # confirmed exact string from a prior fetch log
+    "Sugar, Centrifugal": "Sugar",    # confirmed exact string from a prior fetch log
+    "Cocoa Beans": "Cocoa",           # best-guess string — not independently confirmed this session
 }
  
 COUNTRIES = {
-    "Algeria", "Argentina", "Australia", "Bangladesh", "Brazil", "Canada",
-    "China", "Colombia", "Egypt", "European Union", "India", "Indonesia",
-    "Iran", "Japan", "Kazakhstan", "Malaysia", "Mexico", "Morocco",
+    "Algeria", "Argentina", "Australia", "Bangladesh", "Brazil", "Cameroon", "Canada",
+    "China", "Colombia", "Cote d'Ivoire", "Ecuador", "Egypt", "Ethiopia", "European Union",
+    "Ghana", "Honduras", "India", "Indonesia",
+    "Iran", "Japan", "Kazakhstan", "Malaysia", "Mexico", "Morocco", "Nigeria",
     "Pakistan", "Paraguay", "Philippines", "Russia", "South Korea", "Taiwan",
     "Thailand", "Turkey", "Ukraine", "United States", "Vietnam",
 }
@@ -194,6 +198,9 @@ def main():
         "Rapeseed Meal":    (36_000, 58_000),
         "Sunflower Meal":   (18_000, 34_000),
         "Cotton":           (100_000, 145_000),
+        "Cocoa":            (4_000, 6_500),
+        "Coffee":           (8_000, 13_000),  # unit not independently confirmed — may be MT or 60kg bags, see below
+        "Sugar":            (165_000, 200_000),
     }
     SANITY_UNITS = {"Cotton": "k bales"}
     print("\nSanity checking World production...")
