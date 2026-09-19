@@ -168,7 +168,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
 </div>
 
 <script>
-const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Cotton","Vegoils","Meal"];
+const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Cotton","Cocoa","Coffee","Sugar","Vegoils","Meal"];
 const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924, Oats:68.8955};
 const ACRES_PER_HA = 2.47105;
 const HIST_YEARS = 7;
@@ -179,7 +179,10 @@ const EXPORTERS = {
   Soybeans: ["United States","Brazil","Argentina","Paraguay"],
   "Rapeseed/Canola": ["Canada","Australia","European Union","Ukraine"],
   Oats: ["Canada"],
-  Cotton: ["United States","Brazil","Australia","India"]
+  Cotton: ["United States","Brazil","Australia","India"],
+  Cocoa: ["Cote d'Ivoire","Ghana","Ecuador","Nigeria","Cameroon"],
+  Coffee: ["Brazil","Vietnam","Colombia","Indonesia","Ethiopia","Honduras"],
+  Sugar: ["Brazil","India","Thailand","Australia"]
 };
 const IMPORTERS = {
   Wheat: ["China","Indonesia","Egypt","Turkey","Algeria","Brazil","Japan","Philippines","Morocco","South Korea","Mexico","Bangladesh"],
@@ -187,7 +190,10 @@ const IMPORTERS = {
   Soybeans: ["China","European Union","Mexico","Japan","Egypt","Thailand","Indonesia","Turkey","Bangladesh","Taiwan"],
   "Rapeseed/Canola": ["China","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
   Oats: ["United States"],
-  Cotton: ["Bangladesh","Vietnam","China","Pakistan","Indonesia","Turkey"]
+  Cotton: ["Bangladesh","Vietnam","China","Pakistan","Indonesia","Turkey"],
+  Cocoa: ["European Union","United States","Malaysia"],
+  Coffee: ["European Union","United States","Japan"],
+  Sugar: ["China","Indonesia","United States","Bangladesh"]
 };
 
 let DATA = null;
@@ -240,9 +246,14 @@ function getStu(yearData){
   const denom=dom+(exp||0);
   return denom>0 ? (end/denom)*100 : null;
 }
+// Commodities with no bushel weight — no MT/BU toggle makes sense for these; Cotton also
+// stays in its native bales unit, while Cocoa/Coffee/Sugar stay in MT (just no bushel toggle).
+const NO_BUSHEL_COMMS = new Set(['Cotton', 'Cocoa', 'Coffee', 'Sugar']);
+
 function convertVal(raw, unit, comm){
   if(raw===null) return null;
   if(comm==='Cotton') return raw; // cotton stays in its native USDA unit (1000 480-lb bales), no bu/mt conversion applies
+  if(NO_BUSHEL_COMMS.has(comm)) return raw; // Cocoa/Coffee/Sugar: no bushel weight exists for these, stay in MT
   if(unit==='bu') return raw * (BU_PER_MT[comm]||36.7437) / 1000;
   return raw;
 }
@@ -257,6 +268,13 @@ function yieldLbAcCotton(prRaw, ahRaw){
   if(prRaw===null||ahRaw===null||ahRaw===0) return null;
   const balesPerHa = prRaw/ahRaw;
   return balesPerHa * 480 / ACRES_PER_HA;
+}
+// Cocoa/Coffee/Sugar: production is already in metric tons (unlike cotton's bales), so this is
+// a plain MT-to-lb conversion — no bushel weight applies to any of these three either.
+function yieldLbAc(prRaw, ahRaw){
+  if(prRaw===null||ahRaw===null||ahRaw===0) return null;
+  const mtPerHa = prRaw/ahRaw;
+  return mtPerHa * 2204.62 / ACRES_PER_HA;
 }
 function acresK(ahRaw){ return ahRaw===null ? null : ahRaw*ACRES_PER_HA; }
 
@@ -275,7 +293,11 @@ function sumCountries(countries, countryNames, year){
   return any ? out : null;
 }
 
-function unitLabel(){ return currentComm==='Cotton' ? '1000 Bales (480 lb)' : (currentUnit==='bu' ? 'Million Bu' : '1000 MT'); }
+function unitLabel(){
+  if(currentComm==='Cotton') return '1000 Bales (480 lb)';
+  if(NO_BUSHEL_COMMS.has(currentComm)) return '1000 MT'; // Cocoa/Coffee/Sugar: always MT, bu toggle doesn't apply
+  return currentUnit==='bu' ? 'Million Bu' : '1000 MT';
+}
 
 function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
   const latestYear = years[years.length-1];
@@ -292,9 +314,10 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
   }
 
   const isCotton = comm === 'Cotton';
+  const usesLbAcYield = NO_BUSHEL_COMMS.has(comm);
   const ROWS = [
     {type:'row', key:'ah', label:'Area harvested (1000 ac)', area:true},
-    {type:'row', key:'yl', label: isCotton ? 'Yield (lb lint/ac)' : 'Yield (bu/ac)', yield:true},
+    {type:'row', key:'yl', label: isCotton ? 'Yield (lb lint/ac)' : (usesLbAcYield ? 'Yield (lb/ac)' : 'Yield (bu/ac)'), yield:true},
     {type:'section', label:'Supply'},
     {type:'row', key:'bs', label:'Beginning stocks'},
     {type:'row', key:'pr', label:'Production'},
@@ -313,7 +336,11 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
   function displayVal(row, y){
     const yd = yearDataFn(y);
     if(row.area) return acresK(getRaw(yd,'ah'));
-    if(row.yield) return isCotton ? yieldLbAcCotton(getRaw(yd,'pr'), getRaw(yd,'ah')) : yieldBuAc(getRaw(yd,'pr'), getRaw(yd,'ah'), comm);
+    if(row.yield){
+      if(isCotton) return yieldLbAcCotton(getRaw(yd,'pr'), getRaw(yd,'ah'));
+      if(usesLbAcYield) return yieldLbAc(getRaw(yd,'pr'), getRaw(yd,'ah'));
+      return yieldBuAc(getRaw(yd,'pr'), getRaw(yd,'ah'), comm);
+    }
     if(row.type==='total') return convertVal(getTotalRaw(yd, row.keys), currentUnit, comm);
     if(row.type==='stu') return getStu(yd);
     if(row.type==='stu_pctile') return stuPctile(y);
@@ -378,7 +405,7 @@ function panelWrap(title, sub, innerHtml){
 // "when does this country harvest" hint without needing to check the separate calendar table.
 function getHarvestMonthsLabel(comm, country){
   if(typeof CROP_CALENDAR === 'undefined') return '';
-  const sectionMap = {'Wheat':'Wheat','Corn':'Corn','Soybeans':'Soybeans','Rapeseed/Canola':'Canola','Cotton':'Cotton'};
+  const sectionMap = {'Wheat':'Wheat','Corn':'Corn','Soybeans':'Soybeans','Rapeseed/Canola':'Canola','Cotton':'Cotton','Cocoa':'Cocoa','Coffee':'Coffee','Sugar':'Sugar'};
   const section = sectionMap[comm];
   if(!section) return '';
   const matches = CROP_CALENDAR.filter(r=>r.section===section && (r.origin===country || r.origin.indexOf(country+' (')===0));
@@ -472,12 +499,14 @@ function render(){
     renderMealInto(root);
     return;
   }
-  if(unitToggleEl) unitToggleEl.style.display = (comm === 'Cotton') ? 'none' : '';
+  if(unitToggleEl) unitToggleEl.style.display = NO_BUSHEL_COMMS.has(comm) ? 'none' : '';
 
   const countries = DATA[comm];
 
   if(comm === 'Cotton'){
     convLabel.textContent = 'Native USDA units — 1000 bales (480 lb), acres, lb lint/acre. No MT or bushel conversion (cotton isn\'t a bushel commodity).';
+  } else if(NO_BUSHEL_COMMS.has(comm)){
+    convLabel.textContent = '1000 MT, acres, lb/acre yield. No bushel conversion (' + comm + ' isn\'t a bushel commodity).';
   } else {
     const buPerMt = BU_PER_MT[comm] || 36.7437;
     convLabel.textContent = `1 MT = ${buPerMt.toFixed(2)} bu (${comm==='Rapeseed/Canola'?'Canola':comm})`;
@@ -854,6 +883,9 @@ const SUMMARY_ROWS = [
   // Stocks/Use % Rank are genuinely combined across Soybean, Rapeseed, and Sunflower meal.
   {section:'Oilseeds', label:'Soymeal (Meal)',        cftcCode:'026603', usdaComm:null, domestic:'United States', seasonalName:'Soybean Meal', exportName:'SOYBEAN CAKE AND MEAL', combinedList:MEALS, combinedExporters:MEAL_EXPORTERS, combinedImporters:MEAL_IMPORTERS},
   {section:'Softs',    label:'Cotton',                cftcCode:'033661', usdaComm:'Cotton', domestic:'United States', seasonalName:'Cotton', exportName:'ALL UPLAND COTTON'},
+  {section:'Softs',    label:'Cocoa',                 cftcCode:'073732', usdaComm:'Cocoa', domestic:"Cote d'Ivoire", seasonalName:'NY Cocoa', exportName:null},
+  {section:'Softs',    label:'Coffee',                cftcCode:'083731', usdaComm:'Coffee', domestic:'Brazil', seasonalName:'Arabica Coffee', exportName:null},
+  {section:'Softs',    label:'Sugar',                 cftcCode:'080732', usdaComm:'Sugar', domestic:'Brazil', seasonalName:'Sugar No. 11', exportName:null},
 ];
 
 function summaryYearsSorted(usdaComm){
@@ -1084,6 +1116,19 @@ const CROP_CALENDAR = [
   {section:'Cotton', origin:'Brazil', plant:[12,1,2], harvest:[6,7,8]},
   {section:'Cotton', origin:'Pakistan', plant:[4,5,6], harvest:[10,11,12]},
   {section:'Cotton', origin:'Australia', plant:[10,11,12], harvest:[3,4,5]},
+  {section:'Cocoa', origin:"Cote d'Ivoire (Main Crop)", plant:[], harvest:[10,11,12,1]},
+  {section:'Cocoa', origin:"Cote d'Ivoire (Mid Crop)", plant:[], harvest:[4,5,6,7]},
+  {section:'Cocoa', origin:'Ghana (Main Crop)', plant:[], harvest:[10,11,12,1]},
+  {section:'Cocoa', origin:'Ecuador', plant:[], harvest:[3,4,5,10,11,12]},
+  {section:'Coffee', origin:'Brazil (Arabica)', plant:[], harvest:[5,6,7,8,9]},
+  {section:'Coffee', origin:'Vietnam (Robusta)', plant:[], harvest:[10,11,12,1]},
+  {section:'Coffee', origin:'Colombia (Main)', plant:[], harvest:[10,11,12]},
+  {section:'Coffee', origin:'Colombia (Mitaca)', plant:[], harvest:[4,5,6]},
+  {section:'Coffee', origin:'Ethiopia', plant:[], harvest:[10,11,12,1]},
+  {section:'Sugar', origin:'Brazil (Center-South)', plant:[], harvest:[4,5,6,7,8,9,10,11]},
+  {section:'Sugar', origin:'India', plant:[], harvest:[10,11,12,1,2,3,4]},
+  {section:'Sugar', origin:'Thailand', plant:[], harvest:[11,12,1,2,3,4]},
+  {section:'Sugar', origin:'Australia', plant:[], harvest:[6,7,8,9,10,11,12]},
 ];
 const CAL_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -1207,7 +1252,7 @@ function renderSummary(){
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
 
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada — Canola has no US export data. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed. Weather is sourced from Open-Meteo (no API key) — 10-year historical normals computed from the same calendar window in each of the past 10 years.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada, and Cocoa/Coffee/Sugar which use Cote d'Ivoire/Brazil/Brazil (the actual major producers) — the US isn't a meaningful producer of any of these three, so they also have no Export Sales YoY data. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed. Weather is sourced from Open-Meteo (no API key) — 10-year historical normals computed from the same calendar window in each of the past 10 years.</div>`);
 
   // Force the calendar (and weather table, if present) to exactly match the summary
   // table's actual rendered width, rather than relying on independent width math staying in sync.
