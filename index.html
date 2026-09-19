@@ -168,7 +168,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
 </div>
 
 <script>
-const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Cotton","Cocoa","Coffee","Sugar","Vegoils","Meal"];
+const COMMS = ["Wheat","Corn","Soybeans","Rapeseed/Canola","Oats","Cotton","Coffee","Sugar","Vegoils","Meal"];
 const BU_PER_MT = {Wheat:36.7437, Corn:39.3680, Soybeans:36.7437, "Rapeseed/Canola":44.0924, Oats:68.8955};
 const ACRES_PER_HA = 2.47105;
 const HIST_YEARS = 7;
@@ -180,7 +180,6 @@ const EXPORTERS = {
   "Rapeseed/Canola": ["Canada","Australia","European Union","Ukraine"],
   Oats: ["Canada"],
   Cotton: ["United States","Brazil","Australia","India"],
-  Cocoa: ["Cote d'Ivoire","Ghana","Ecuador","Nigeria","Cameroon"],
   Coffee: ["Brazil","Vietnam","Colombia","Indonesia","Ethiopia","Honduras"],
   Sugar: ["Brazil","India","Thailand","Australia"]
 };
@@ -191,7 +190,6 @@ const IMPORTERS = {
   "Rapeseed/Canola": ["China","Japan","Bangladesh","Pakistan","Mexico","United States","South Korea"],
   Oats: ["United States"],
   Cotton: ["Bangladesh","Vietnam","China","Pakistan","Indonesia","Turkey"],
-  Cocoa: ["European Union","United States","Malaysia"],
   Coffee: ["European Union","United States","Japan"],
   Sugar: ["China","Indonesia","United States","Bangladesh"]
 };
@@ -269,8 +267,16 @@ function yieldLbAcCotton(prRaw, ahRaw){
   const balesPerHa = prRaw/ahRaw;
   return balesPerHa * 480 / ACRES_PER_HA;
 }
-// Cocoa/Coffee/Sugar: production is already in metric tons (unlike cotton's bales), so this is
-// a plain MT-to-lb conversion — no bushel weight applies to any of these three either.
+// Coffee: production is reported in thousands of 60kg bags (confirmed via sanity-check
+// log — 189,667 matches world coffee production only if read as bags, not MT). Same
+// treatment as cotton's bales — its own conversion, not the generic MT-based one below.
+function yieldLbAcCoffee(prRaw, ahRaw){
+  if(prRaw===null||ahRaw===null||ahRaw===0) return null;
+  const bagsPerHa = prRaw/ahRaw;
+  return bagsPerHa * 132.277 / ACRES_PER_HA; // 1 bag = 60kg = 132.277 lb
+}
+// Sugar: production IS in plain metric tons (confirmed — its sanity check passed cleanly
+// at MT scale), so this generic MT-to-lb conversion applies correctly.
 function yieldLbAc(prRaw, ahRaw){
   if(prRaw===null||ahRaw===null||ahRaw===0) return null;
   const mtPerHa = prRaw/ahRaw;
@@ -295,7 +301,8 @@ function sumCountries(countries, countryNames, year){
 
 function unitLabel(){
   if(currentComm==='Cotton') return '1000 Bales (480 lb)';
-  if(NO_BUSHEL_COMMS.has(currentComm)) return '1000 MT'; // Cocoa/Coffee/Sugar: always MT, bu toggle doesn't apply
+  if(currentComm==='Coffee') return '1000 Bags (60kg)';
+  if(NO_BUSHEL_COMMS.has(currentComm)) return '1000 MT'; // Sugar: MT, bu toggle just doesn't apply
   return currentUnit==='bu' ? 'Million Bu' : '1000 MT';
 }
 
@@ -338,6 +345,7 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
     if(row.area) return acresK(getRaw(yd,'ah'));
     if(row.yield){
       if(isCotton) return yieldLbAcCotton(getRaw(yd,'pr'), getRaw(yd,'ah'));
+      if(comm==='Coffee') return yieldLbAcCoffee(getRaw(yd,'pr'), getRaw(yd,'ah'));
       if(usesLbAcYield) return yieldLbAc(getRaw(yd,'pr'), getRaw(yd,'ah'));
       return yieldBuAc(getRaw(yd,'pr'), getRaw(yd,'ah'), comm);
     }
@@ -505,6 +513,8 @@ function render(){
 
   if(comm === 'Cotton'){
     convLabel.textContent = 'Native USDA units — 1000 bales (480 lb), acres, lb lint/acre. No MT or bushel conversion (cotton isn\'t a bushel commodity).';
+  } else if(comm === 'Coffee'){
+    convLabel.textContent = 'Native USDA units — 1000 bags (60kg), acres, lb/acre yield. No MT or bushel conversion (coffee isn\'t a bushel commodity).';
   } else if(NO_BUSHEL_COMMS.has(comm)){
     convLabel.textContent = '1000 MT, acres, lb/acre yield. No bushel conversion (' + comm + ' isn\'t a bushel commodity).';
   } else {
@@ -1252,7 +1262,7 @@ function renderSummary(){
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
 
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada, and Cocoa/Coffee/Sugar which use Cote d'Ivoire/Brazil/Brazil (the actual major producers) — the US isn't a meaningful producer of any of these three, so they also have no Export Sales YoY data. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed. Weather is sourced from Open-Meteo (no API key) — 10-year historical normals computed from the same calendar window in each of the past 10 years.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada, and Coffee/Sugar which use Brazil (the actual major producers) — the US isn't a meaningful producer of either, so they also have no Export Sales YoY data. Cocoa row shows Positioning and Seasonality only — USDA PSD doesn't track cocoa at all (it's ICCO's domain, not USDA's), so Production YoY and Stocks/Use % Rank aren't available for it. Coffee's balance sheet is in its native unit — 1000 bags (60kg), not metric tons. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed. Weather is sourced from Open-Meteo (no API key) — 10-year historical normals computed from the same calendar window in each of the past 10 years.</div>`);
 
   // Force the calendar (and weather table, if present) to exactly match the summary
   // table's actual rendered width, rather than relying on independent width math staying in sync.
