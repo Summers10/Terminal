@@ -15,7 +15,7 @@ what Futures-Only produced), confirmed via CFTC's own API documentation that
 those sources use the Combined report — switched to match, since that's the
 convention most trade desks reference as "the" COT numbers.
 """
-import os, sys, json, urllib.request, urllib.parse, urllib.error
+import os, sys, json, time, urllib.request, urllib.parse, urllib.error
 from datetime import datetime, timedelta
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cftc_data.json")
@@ -69,8 +69,23 @@ def fetch_page(where_clause, offset, limit=50000):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "application/json",
     })
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+ 
+    # Retry on transient server-side errors (503 Service Unavailable, 429 Too Many
+    # Requests) with backoff — these are temporary CFTC-side hiccups, not a real
+    # problem with the request. Any other HTTP error (404, 400 — an actually wrong
+    # URL or query) is NOT retried and fails loud immediately, same as before.
+    max_attempts = 4
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in (503, 429) and attempt < max_attempts:
+                wait = 10 * attempt
+                print(f"HTTP {e.code} (transient) — retrying in {wait}s (attempt {attempt}/{max_attempts})...")
+                time.sleep(wait)
+                continue
+            raise
  
  
 def main():
