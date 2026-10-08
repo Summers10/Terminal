@@ -125,12 +125,12 @@
       "precip_30d_mm": 42.3,
       "precip_90d_pct_normal": 54.159234635965625,
       "precip_90d_mm": 100.20000000000002,
-      "temp_dep_7d_c": 1.6657142857142837,
-      "temp_dep_14d_forecast_c": -1.1585714285714275,
+      "temp_dep_7d_c": 1.7014285714285702,
+      "temp_dep_14d_forecast_c": -1.1407142857142851,
       "temp_14d_forecast_hi_c": 21.9,
       "temp_14d_forecast_lo_c": 3.5,
-      "precip_14d_forecast_pct_normal": 97.45848864791597,
-      "precip_14d_forecast_mm": 28.76
+      "precip_14d_forecast_pct_normal": 99.15282954930532,
+      "precip_14d_forecast_mm": 29.26
     },
     "Western Australia": {
       "precip_30d_pct_normal": 200.92975206611564,
@@ -146,7 +146,7 @@
     }
   },
   "_meta": {
-    "fetched_at": "2026-10-08T19:08:26Z",
+    "fetched_at": "2026-10-08T19:42:13Z",
     "source": "Open-Meteo (no API key)",
     "history_years": 10
   }
