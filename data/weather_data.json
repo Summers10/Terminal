@@ -5,72 +5,72 @@
       "precip_30d_mm": 15.700000000000001,
       "precip_90d_pct_normal": 42.31824417009603,
       "precip_90d_mm": 61.70000000000001,
-      "temp_dep_7d_c": 4.201428571428572,
-      "temp_dep_14d_forecast_c": 0.5121428571428561,
-      "temp_14d_forecast_hi_c": 14.5,
-      "temp_14d_forecast_lo_c": -3.8,
-      "precip_14d_forecast_pct_normal": 37.0501058574453,
-      "precip_14d_forecast_mm": 5.25
+      "temp_dep_7d_c": 4.130000000000001,
+      "temp_dep_14d_forecast_c": 1.0478571428571426,
+      "temp_14d_forecast_hi_c": 18.7,
+      "temp_14d_forecast_lo_c": -4.0,
+      "precip_14d_forecast_pct_normal": 50.811573747353556,
+      "precip_14d_forecast_mm": 7.2
     },
     "Saskatchewan (Regina area)": {
       "precip_30d_pct_normal": 53.626373626373635,
       "precip_30d_mm": 24.4,
       "precip_90d_pct_normal": 107.57751376412634,
       "precip_90d_mm": 148.5,
-      "temp_dep_7d_c": 2.7421428571428574,
-      "temp_dep_14d_forecast_c": 1.7342857142857158,
-      "temp_14d_forecast_hi_c": 19.6,
-      "temp_14d_forecast_lo_c": -2.8,
-      "precip_14d_forecast_pct_normal": 54.803788903924215,
-      "precip_14d_forecast_mm": 8.1
+      "temp_dep_7d_c": 2.66357142857143,
+      "temp_dep_14d_forecast_c": 2.734285714285715,
+      "temp_14d_forecast_hi_c": 18.9,
+      "temp_14d_forecast_lo_c": -2.9,
+      "precip_14d_forecast_pct_normal": 12.855209742895804,
+      "precip_14d_forecast_mm": 1.9
     },
     "Manitoba": {
       "precip_30d_pct_normal": 134.07906834201654,
       "precip_30d_mm": 87.50000000000001,
       "precip_90d_pct_normal": 130.95102180614225,
       "precip_90d_mm": 229.4,
-      "temp_dep_7d_c": 1.5149999999999988,
-      "temp_dep_14d_forecast_c": 1.1749999999999998,
+      "temp_dep_7d_c": 1.5078571428571408,
+      "temp_dep_14d_forecast_c": 2.3249999999999993,
       "temp_14d_forecast_hi_c": 20.5,
-      "temp_14d_forecast_lo_c": -4.2,
-      "precip_14d_forecast_pct_normal": 126.61195779601407,
-      "precip_14d_forecast_mm": 21.599999999999998
+      "temp_14d_forecast_lo_c": -4.7,
+      "precip_14d_forecast_pct_normal": 111.37162954279016,
+      "precip_14d_forecast_mm": 19.0
     },
     "US Midwest (Iowa)": {
       "precip_30d_pct_normal": 123.57791462269073,
       "precip_30d_mm": 118.39999999999999,
       "precip_90d_pct_normal": 174.03304472758896,
       "precip_90d_mm": 460.29999999999995,
-      "temp_dep_7d_c": 1.1271428571428572,
-      "temp_dep_14d_forecast_c": 1.4182142857142885,
-      "temp_14d_forecast_hi_c": 28.5,
-      "temp_14d_forecast_lo_c": 0.5,
-      "precip_14d_forecast_pct_normal": 53.1016171856143,
-      "precip_14d_forecast_mm": 22.0
+      "temp_dep_7d_c": 1.1842857142857142,
+      "temp_dep_14d_forecast_c": 2.0467857142857167,
+      "temp_14d_forecast_hi_c": 28.1,
+      "temp_14d_forecast_lo_c": -0.2,
+      "precip_14d_forecast_pct_normal": 37.65387400434469,
+      "precip_14d_forecast_mm": 15.6
     },
     "US Southern Plains (Kansas)": {
       "precip_30d_pct_normal": 110.2023245802841,
       "precip_30d_mm": 76.79999999999998,
       "precip_90d_pct_normal": 50.36394050363939,
       "precip_90d_mm": 111.39999999999998,
-      "temp_dep_7d_c": 1.9657142857142844,
-      "temp_dep_14d_forecast_c": 2.4121428571428574,
-      "temp_14d_forecast_hi_c": 33.2,
-      "temp_14d_forecast_lo_c": 3.4,
-      "precip_14d_forecast_pct_normal": 482.8326180257512,
-      "precip_14d_forecast_mm": 45.0
+      "temp_dep_7d_c": 1.9728571428571406,
+      "temp_dep_14d_forecast_c": 2.487142857142853,
+      "temp_14d_forecast_hi_c": 33.0,
+      "temp_14d_forecast_lo_c": 4.1,
+      "precip_14d_forecast_pct_normal": 490.34334763948505,
+      "precip_14d_forecast_mm": 45.699999999999996
     },
     "US Cotton Belt (Texas)": {
       "precip_30d_pct_normal": 23.911028730305837,
       "precip_30d_mm": 12.9,
       "precip_90d_pct_normal": 20.963763991652435,
       "precip_90d_mm": 22.099999999999998,
-      "temp_dep_7d_c": 0.05142857142856627,
-      "temp_dep_14d_forecast_c": 1.2614285714285671,
-      "temp_14d_forecast_hi_c": 30.2,
-      "temp_14d_forecast_lo_c": 9.1,
-      "precip_14d_forecast_pct_normal": 93.72236958443857,
-      "precip_14d_forecast_mm": 10.600000000000001
+      "temp_dep_7d_c": 0.06571428571428228,
+      "temp_dep_14d_forecast_c": 0.38285714285714434,
+      "temp_14d_forecast_hi_c": 31.1,
+      "temp_14d_forecast_lo_c": 7.1,
+      "precip_14d_forecast_pct_normal": 209.54907161803717,
+      "precip_14d_forecast_mm": 23.7
     },
     "Brazil (Mato Grosso)": {
       "precip_30d_pct_normal": 164.79621972829298,
@@ -81,8 +81,8 @@
       "temp_dep_14d_forecast_c": 0.5060714285714276,
       "temp_14d_forecast_hi_c": 36.9,
       "temp_14d_forecast_lo_c": 22.1,
-      "precip_14d_forecast_pct_normal": 198.01470588235296,
-      "precip_14d_forecast_mm": 107.72
+      "precip_14d_forecast_pct_normal": 197.61029411764704,
+      "precip_14d_forecast_mm": 107.5
     },
     "Argentina (Pampas)": {
       "precip_30d_pct_normal": 244.38087454025333,
@@ -97,12 +97,12 @@
       "precip_14d_forecast_mm": 16.3
     },
     "Ukraine": {
-      "precip_30d_pct_normal": 125.0,
-      "precip_30d_mm": 67.6,
-      "precip_90d_pct_normal": 74.16457060725837,
-      "precip_90d_mm": 103.2,
-      "temp_dep_7d_c": 2.072857142857144,
-      "temp_dep_14d_forecast_c": 1.108214285714288,
+      "precip_30d_pct_normal": 124.81508875739647,
+      "precip_30d_mm": 67.5,
+      "precip_90d_pct_normal": 74.0927057132591,
+      "precip_90d_mm": 103.10000000000001,
+      "temp_dep_7d_c": 2.0585714285714296,
+      "temp_dep_14d_forecast_c": 1.051071428571431,
       "temp_14d_forecast_hi_c": 24.0,
       "temp_14d_forecast_lo_c": 2.9,
       "precip_14d_forecast_pct_normal": 80.62442607897155,
@@ -114,11 +114,11 @@
       "precip_90d_pct_normal": 71.05802047781572,
       "precip_90d_mm": 104.1,
       "temp_dep_7d_c": -3.4014285714285712,
-      "temp_dep_14d_forecast_c": 2.2499999999999982,
+      "temp_dep_14d_forecast_c": 2.235714285714284,
       "temp_14d_forecast_hi_c": 26.3,
       "temp_14d_forecast_lo_c": 7.4,
-      "precip_14d_forecast_pct_normal": 190.89537223340042,
-      "precip_14d_forecast_mm": 37.95
+      "precip_14d_forecast_pct_normal": 191.29778672032194,
+      "precip_14d_forecast_mm": 38.03
     },
     "France": {
       "precip_30d_pct_normal": 58.29959514170039,
@@ -146,7 +146,7 @@
     }
   },
   "_meta": {
-    "fetched_at": "2026-10-09T17:18:08Z",
+    "fetched_at": "2026-10-09T18:38:35Z",
     "source": "Open-Meteo (no API key)",
     "history_years": 10
   }
