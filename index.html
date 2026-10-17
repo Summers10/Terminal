@@ -1141,13 +1141,19 @@ function fmtTempDep(v){
   const s = v>=0?'+':'';
   return s+v.toFixed(1)+'°C';
 }
-function weatherDirClass(v, isPct){
+// band (optional): values within +/-band of normal are left uncoloured ("normal").
+// Without a band, anything above/below normal is coloured (used for the temp departures).
+function weatherDirClass(v, isPct, band){
   if(v===null||v===undefined||isNaN(v)) return '';
   const baseline = isPct ? 100 : 0;
-  if(v>baseline) return 'cftc-up';
-  if(v<baseline) return 'cftc-dn';
+  const dev = v - baseline;
+  if(band !== undefined && Math.abs(dev) <= band) return '';
+  if(dev>0) return 'cftc-up';
+  if(dev<0) return 'cftc-dn';
   return '';
 }
+
+function escHtml(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function fmtPctNormalWithMm(v, mm){
   const pct = fmtPctNormal(v);
@@ -1161,7 +1167,36 @@ function fmtHiLo(hi, lo){
   return `${hiTxt} / ${loTxt}`;
 }
 
+// Footnote under the weather table: which models were used, and when the weather run was pulled.
+// "As of" is when the fetcher pulled the data (shown in the viewer's local time); Open-Meteo blends several
+// models that each run on their own schedule, so there is no single model-initialisation time to quote.
+function buildWeatherFootnote(){
+  if(!WEATHER_DATA) return 'Weather data unavailable.';
+  const meta = WEATHER_DATA._meta || {};
+  const regions = WEATHER_DATA.regions || {};
+  const hasOutlook = Object.values(regions).some(r => 'outlook_temp_dep_c' in r);
+  let when = '';
+  if(meta.fetched_at){
+    const dt = new Date(meta.fetched_at);
+    when = isNaN(dt) ? String(meta.fetched_at)
+      : dt.toLocaleString('en-US', {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short'});
+  }
+  let txt = 'Weather models: Open-Meteo best-match blend of national weather models (incl. NOAA GFS/HRRR, ECMWF IFS, DWD ICON, GEM) for recent conditions and the 14-day forecast; normals from 10 years of ERA5 reanalysis';
+  if(hasOutlook) txt += '; outlook from the ECMWF SEAS5 seasonal ensemble (a lean, not a forecast)';
+  txt += '.';
+  if(when) txt += ' As of ' + escHtml(when) + ' weather run.';
+  if(meta.outlook_error) txt += ' Outlook incomplete: ' + escHtml(meta.outlook_error) + '.';
+  return txt;
+}
+
 function buildWeatherTable(){
+  const regions = (WEATHER_DATA && WEATHER_DATA.regions) || {};
+  const wxMeta = (WEATHER_DATA && WEATHER_DATA._meta) || {};
+  // The Outlook group appears whenever the data file carries outlook fields (they're null if the seasonal call failed).
+  const hasOutlook = Object.values(regions).some(r => 'outlook_temp_dep_c' in r);
+
+  // Precip is only coloured outside a "normal" band, wider for shorter (noisier) windows:
+  // 90D +/-15%, 30D +/-25%, 14-day forecast +/-35%, seasonal outlook +/-10% (the ensemble mean is damped).
   const groups = [
     {label:'Historical', cols:[
       {l:'90D Precip', w:112},
@@ -1174,6 +1209,12 @@ function buildWeatherTable(){
       {l:'Precip', w:106},
     ]},
   ];
+  if(hasOutlook){
+    groups.push({label:'Outlook ' + (wxMeta.outlook_label || '3 Mo'), cols:[
+      {l:'Temp Dep', w:80},
+      {l:'Precip', w:84},
+    ]});
+  }
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
   let html = `<table class="weather-table"><colgroup><col style="width:240px">`;
   groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
@@ -1187,7 +1228,6 @@ function buildWeatherTable(){
 
   // Rows are grouped under a division header (Canada / United States / South America / Europe / Asia).
   // The division comes from the data file itself (fetch_weather.py is the single place regions are defined).
-  const regions = (WEATHER_DATA && WEATHER_DATA.regions) || {};
   let curDiv = null;
   Object.keys(regions).forEach(name=>{
     const d = regions[name];
@@ -1196,12 +1236,16 @@ function buildWeatherTable(){
       html += `<tr class="cftc-row-section"><td colspan="${totalCols}">${curDiv}</td></tr>`;
     }
     html += `<tr><td>${name}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true, 15)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true, 25)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_7d_c, false)}">${fmtTempDep(d.temp_dep_7d_c)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
     html += `<td>${fmtHiLo(d.temp_14d_forecast_hi_c, d.temp_14d_forecast_lo_c)}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_14d_forecast_pct_normal, d.precip_14d_forecast_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true, 35)}">${fmtPctNormalWithMm(d.precip_14d_forecast_pct_normal, d.precip_14d_forecast_mm)}</td>`;
+    if(hasOutlook){
+      html += `<td class="${weatherDirClass(d.outlook_temp_dep_c, false, 0.3)}">${fmtTempDep(d.outlook_temp_dep_c)}</td>`;
+      html += `<td class="${weatherDirClass(d.outlook_precip_pct_normal, true, 10)}">${fmtPctNormal(d.outlook_precip_pct_normal)}</td>`;
+    }
     html += `</tr>`;
   });
   html += `</tbody></table>`;
@@ -1257,16 +1301,16 @@ function renderSummary(){
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Weather — Major Growing Regions</div>`);
-  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0">Precip is % of the 10-year normal for that calendar window (100% = average) with actual mm in brackets; Temp Dep is °C vs. that same normal. Green/red show direction only (wetter/warmer = green, drier/cooler = red), not an agronomic judgment of good or bad.${WEATHER_DATA?'':' Weather data unavailable.'}</div>`);
   if(WEATHER_DATA){
     root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildWeatherTable()}</div>`);
   }
+  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:8px 0 0">${buildWeatherFootnote()}</div>`);
 
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
 
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada, and Coffee/Sugar which use Brazil (the actual major producers) — the US isn't a meaningful producer of either, so they also have no Export Sales YoY data. Cocoa row shows Positioning and Seasonality only — USDA PSD doesn't track cocoa at all (it's ICCO's domain, not USDA's), so Production YoY and Stocks/Use % Rank aren't available for it. Coffee's balance sheet is in its native unit — 1000 bags (60kg), not metric tons. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed. Weather is sourced from Open-Meteo (no API key) — 10-year historical normals computed from the same calendar window in each of the past 10 years.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada, and Coffee/Sugar which use Brazil (the actual major producers) — the US isn't a meaningful producer of either, so they also have no Export Sales YoY data. Cocoa row shows Positioning and Seasonality only — USDA PSD doesn't track cocoa at all (it's ICCO's domain, not USDA's), so Production YoY and Stocks/Use % Rank aren't available for it. Coffee's balance sheet is in its native unit — 1000 bags (60kg), not metric tons. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed.</div>`);
 
   // Force the calendar (and weather table, if present) to exactly match the summary
   // table's actual rendered width, rather than relying on independent width math staying in sync.
