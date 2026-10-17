@@ -2,56 +2,87 @@
 """
 Weather fetcher for major grain-growing regions — Open-Meteo (no API key required).
  
-Two API calls total, both batched across all 9 regions in one request each:
-  1. Forecast API with past_days + forecast_days: gives ~95 days of recent
-     actuals plus a 16-day forward forecast in one continuous daily series.
-  2. Archive API: ~10 years of historical daily data, used to compute
-     "normal" for the same calendar window in each of the past 10 years,
-     then averaged — the baseline everything else is compared against.
+Calls (each batched across ALL regions in a single request):
+  1. Forecast API with past_days + forecast_days: ~92 days of recent actuals plus a
+     16-day forward forecast in one continuous daily series.
+  2. Archive API, one request per past year (10 total): only the ~104-day window around
+     today's calendar date that the "normal" calculations actually use (89 days back to
+     14 days forward). Averaged across the 10 years, this is the baseline everything is
+     compared against. Pulling just these windows instead of one continuous 10-year
+     block is roughly 4x cheaper in Open-Meteo's weighted API-call accounting (calls are
+     weighted by locations x days requested), which matters now that there are 17 regions.
  
-Soil moisture is intentionally NOT included in this version — the exact
-Open-Meteo daily variable name for a root-zone aggregate wasn't confirmed
-this session, and shipping a guessed field risked a silently-wrong column.
+Soil moisture is intentionally NOT included — the exact Open-Meteo daily variable name
+for a root-zone aggregate wasn't confirmed, and a guessed field risked a silently-wrong column.
 """
-import os, sys, json, urllib.request, urllib.error
-from datetime import date, timedelta
+import os, sys, json, time, urllib.request, urllib.error
+from datetime import date, datetime, timedelta
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "weather_data.json")
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
  
-REGIONS = {
-    "Alberta (Calgary area)": (51.0, -114.1),
-    "Saskatchewan (Regina area)": (50.5, -104.6),
-    "Manitoba": (49.8, -99.9),
-    "US Midwest (Iowa)": (42.0, -93.5),
-    "US Southern Plains (Kansas)": (38.5, -98.0),
-    "US Cotton Belt (Texas)": (33.5, -101.5),
-    "Brazil (Mato Grosso)": (-13.0, -56.0),
-    "Argentina (Pampas)": (-33.0, -61.0),
-    "Ukraine": (49.0, 32.0),
-    "Southern Russia": (45.0, 40.0),
-    "France": (48.5, 2.5),
-    "Western Australia": (-31.5, 117.0),
-}
+# (division, region name, lat, lon) — this order is the order shown on the Summary page.
+REGIONS = [
+    ("Canada", "Alberta (Calgary)", 51.0, -114.1),
+    ("Canada", "Saskatchewan (Regina)", 50.5, -104.6),
+    ("Canada", "Manitoba", 49.8, -99.9),
+    ("United States", "US Midwest (Iowa)", 42.0, -93.5),
+    ("United States", "US Southern Plains (Kansas)", 38.5, -98.0),
+    ("United States", "US Cotton Belt (Texas)", 33.5, -101.5),
+    ("South America", "Brazil (Mato Grosso)", -13.0, -56.0),
+    ("South America", "Brazil (Paraná)", -24.9, -53.5),
+    ("South America", "Argentina (Rosario)", -33.0, -61.0),
+    ("South America", "Argentina (S. Buenos Aires)", -38.0, -60.3),
+    ("Europe", "France", 48.5, 2.5),
+    ("Europe", "Ukraine", 49.0, 32.0),
+    ("Europe", "Southern Russia", 45.0, 40.0),
+    ("Asia", "China (Henan)", 34.5, 114.0),
+    ("Asia", "China (Heilongjiang)", 46.0, 126.5),
+    ("Asia", "Western Australia", -31.5, 117.0),
+    ("Asia", "New South Wales", -32.5, 148.5),
+]
  
 HISTORY_YEARS = 10
 PAST_DAYS = 92       # Open-Meteo's documented max for this parameter; still covers the 90-day trailing window
 FORECAST_DAYS = 16   # Open-Meteo's max; we only use the first 14
+NORMAL_LOOKBACK_DAYS = 89   # longest trailing window used (90-day, inclusive of the anchor day)
+NORMAL_LOOKAHEAD_DAYS = 14  # longest forward window used (14-day forecast)
  
  
-def http_get_json(url, params):
+def http_get_json(url, params, max_attempts=4):
     qs = "&".join(f"{k}={v}" for k, v in params.items())
     full_url = f"{url}?{qs}"
     req = urllib.request.Request(full_url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "application/json",
     })
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    # Retry transient errors (rate limiting / temporary server trouble) with backoff.
+    # Anything else (400 bad parameter, 404, ...) is a real problem: fail loud immediately.
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
+                wait = 15 * attempt
+                print(f"\n    HTTP {e.code} (transient) — retrying in {wait}s (attempt {attempt}/{max_attempts})...", flush=True)
+                time.sleep(wait)
+                continue
+            raise
  
  
-def fetch_forecast_block(names, lats, lons):
+def as_location_list(data, expected, label):
+    # Multi-location requests return a JSON array, one object per location, in request order.
+    if isinstance(data, dict):
+        data = [data]
+    if len(data) != expected:
+        print(f"ERROR: {label} returned {len(data)} locations, expected {expected}.", file=sys.stderr)
+        sys.exit(1)
+    return data
+ 
+ 
+def fetch_forecast_block(n, lats, lons):
     params = {
         "latitude": ",".join(str(x) for x in lats),
         "longitude": ",".join(str(x) for x in lons),
@@ -60,17 +91,10 @@ def fetch_forecast_block(names, lats, lons):
         "forecast_days": FORECAST_DAYS,
         "timezone": "UTC",
     }
-    data = http_get_json(FORECAST_URL, params)
-    # Multi-location requests return a JSON array, one object per location, in the same order requested.
-    if isinstance(data, dict):
-        data = [data]
-    if len(data) != len(names):
-        print(f"ERROR: Forecast API returned {len(data)} locations, expected {len(names)}.", file=sys.stderr)
-        sys.exit(1)
-    return data
+    return as_location_list(http_get_json(FORECAST_URL, params), n, "Forecast API")
  
  
-def fetch_archive_block(names, lats, lons, start_date, end_date):
+def fetch_archive_block(n, lats, lons, start_date, end_date):
     params = {
         "latitude": ",".join(str(x) for x in lats),
         "longitude": ",".join(str(x) for x in lons),
@@ -79,13 +103,14 @@ def fetch_archive_block(names, lats, lons, start_date, end_date):
         "daily": "precipitation_sum,temperature_2m_max,temperature_2m_min",
         "timezone": "UTC",
     }
-    data = http_get_json(ARCHIVE_URL, params)
-    if isinstance(data, dict):
-        data = [data]
-    if len(data) != len(names):
-        print(f"ERROR: Archive API returned {len(data)} locations, expected {len(names)}.", file=sys.stderr)
-        sys.exit(1)
-    return data
+    return as_location_list(http_get_json(ARCHIVE_URL, params), n, "Archive API")
+ 
+ 
+def anchor_for_year(today, year):
+    try:
+        return today.replace(year=year)
+    except ValueError:
+        return today.replace(year=year, day=28)  # Feb 29 in a non-leap year
  
  
 def series_to_dict(block):
@@ -93,14 +118,31 @@ def series_to_dict(block):
     daily = block.get("daily")
     if not daily or "time" not in daily:
         return {}
+    n = len(daily["time"])
     out = {}
     for i, d in enumerate(daily["time"]):
         out[d] = {
-            "precip": daily.get("precipitation_sum", [None] * len(daily["time"]))[i],
-            "tmax": daily.get("temperature_2m_max", [None] * len(daily["time"]))[i],
-            "tmin": daily.get("temperature_2m_min", [None] * len(daily["time"]))[i],
+            "precip": daily.get("precipitation_sum", [None] * n)[i],
+            "tmax": daily.get("temperature_2m_max", [None] * n)[i],
+            "tmin": daily.get("temperature_2m_min", [None] * n)[i],
         }
     return out
+ 
+ 
+def fetch_history(n, lats, lons, today):
+    """One archive request per past year covering only the window the normals use.
+    Returns one merged date->values dict per region."""
+    merged = [dict() for _ in range(n)]
+    for yr_offset in range(1, HISTORY_YEARS + 1):
+        anchor = anchor_for_year(today, today.year - yr_offset)
+        blocks = fetch_archive_block(
+            n, lats, lons,
+            anchor - timedelta(days=NORMAL_LOOKBACK_DAYS),
+            anchor + timedelta(days=NORMAL_LOOKAHEAD_DAYS),
+        )
+        for i, block in enumerate(blocks):
+            merged[i].update(series_to_dict(block))
+    return merged
  
  
 def window_sum(series, start, end, key):
@@ -145,52 +187,41 @@ def pct_of_normal(actual, normal):
     return (actual / normal) * 100
  
  
+def avg(lst):
+    return (sum(lst) / len(lst)) if lst else None
+ 
+ 
 def main():
     print("Fetching weather data (Open-Meteo, no API key) for major grain-growing regions...")
-    names = list(REGIONS.keys())
-    lats = [REGIONS[n][0] for n in names]
-    lons = [REGIONS[n][1] for n in names]
- 
+    n = len(REGIONS)
+    lats = [r[2] for r in REGIONS]
+    lons = [r[3] for r in REGIONS]
     today = date.today()
  
-    print(f"  Forecast API (past {PAST_DAYS}d + next {FORECAST_DAYS}d, {len(names)} regions)...", end=" ", flush=True)
     try:
-        fc_blocks = fetch_forecast_block(names, lats, lons)
+        print(f"  Forecast API (past {PAST_DAYS}d + next {FORECAST_DAYS}d, {n} regions)...", end=" ", flush=True)
+        fc_blocks = fetch_forecast_block(n, lats, lons)
+        print("OK")
+        print(f"  Archive API ({HISTORY_YEARS} yearly windows, {n} regions)...", end=" ", flush=True)
+        hist_series_list = fetch_history(n, lats, lons, today)
+        print("OK")
     except urllib.error.HTTPError as e:
-        print(f"HTTP {e.code} {e.reason}", file=sys.stderr)
+        print(f"\nHTTP {e.code} {e.reason}", file=sys.stderr)
         try:
             print("Response body:", e.read(2000).decode("utf-8", errors="replace"), file=sys.stderr)
         except Exception:
             pass
         sys.exit(1)
     except Exception as e:
-        print(f"error: {e}", file=sys.stderr)
+        print(f"\nerror: {e}", file=sys.stderr)
         sys.exit(1)
-    print("OK")
- 
-    archive_start = date(today.year - HISTORY_YEARS, 1, 1)
-    archive_end = today - timedelta(days=1)  # archive doesn't include today
-    print(f"  Archive API ({HISTORY_YEARS}yr history, {len(names)} regions)...", end=" ", flush=True)
-    try:
-        hist_blocks = fetch_archive_block(names, lats, lons, archive_start, archive_end)
-    except urllib.error.HTTPError as e:
-        print(f"HTTP {e.code} {e.reason}", file=sys.stderr)
-        try:
-            print("Response body:", e.read(2000).decode("utf-8", errors="replace"), file=sys.stderr)
-        except Exception:
-            pass
-        sys.exit(1)
-    except Exception as e:
-        print(f"error: {e}", file=sys.stderr)
-        sys.exit(1)
-    print("OK")
  
     result = {"regions": {}}
     missing_regions = []
  
-    for i, name in enumerate(names):
+    for i, (division, name, _lat, _lon) in enumerate(REGIONS):
         fc_series = series_to_dict(fc_blocks[i])
-        hist_series = series_to_dict(hist_blocks[i])
+        hist_series = hist_series_list[i]
         if not fc_series or not hist_series:
             missing_regions.append(name)
             continue
@@ -203,15 +234,13 @@ def main():
         # --- Forecast (forward windows starting tomorrow) ---
         temp_14d_forecast = window_avg_temp(fc_series, today + timedelta(days=1), today + timedelta(days=14))
         precip_14d_forecast = window_sum(fc_series, today + timedelta(days=1), today + timedelta(days=14), "precip")
+        temp_14d_hi, temp_14d_lo = window_extreme_temps(fc_series, today + timedelta(days=1), today + timedelta(days=14))
  
         # --- Historical normals: same calendar window, averaged across each of the past N years ---
         precip_30d_normals, precip_90d_normals, temp_7d_normals = [], [], []
         temp_14d_fwd_normals, precip_14d_fwd_normals = [], []
         for yr_offset in range(1, HISTORY_YEARS + 1):
-            try:
-                anchor = today.replace(year=today.year - yr_offset)
-            except ValueError:
-                anchor = today.replace(year=today.year - yr_offset, day=28)  # Feb 29 in a non-leap year
+            anchor = anchor_for_year(today, today.year - yr_offset)
  
             v = window_sum(hist_series, anchor - timedelta(days=29), anchor, "precip")
             if v is not None: precip_30d_normals.append(v)
@@ -224,19 +253,14 @@ def main():
             v = window_sum(hist_series, anchor + timedelta(days=1), anchor + timedelta(days=14), "precip")
             if v is not None: precip_14d_fwd_normals.append(v)
  
-        def avg(lst):
-            return (sum(lst) / len(lst)) if lst else None
- 
         precip_30d_normal = avg(precip_30d_normals)
         precip_90d_normal = avg(precip_90d_normals)
         temp_7d_normal = avg(temp_7d_normals)
         temp_14d_fwd_normal = avg(temp_14d_fwd_normals)
         precip_14d_fwd_normal = avg(precip_14d_fwd_normals)
  
-        # 14-day forecast temperature extremes (actual forecast hi/lo, not an average)
-        temp_14d_hi, temp_14d_lo = window_extreme_temps(fc_series, today + timedelta(days=1), today + timedelta(days=14))
- 
         result["regions"][name] = {
+            "division": division,
             "precip_30d_pct_normal": pct_of_normal(precip_30d, precip_30d_normal),
             "precip_30d_mm": precip_30d,
             "precip_90d_pct_normal": pct_of_normal(precip_90d, precip_90d_normal),
@@ -253,15 +277,15 @@ def main():
         print(f"ERROR: No usable weather series for: {missing_regions}", file=sys.stderr)
         sys.exit(1)
  
-    # Fail loud: every region should have produced at least the two precip-vs-normal figures.
-    broken = [n for n, d in result["regions"].items()
+    # Fail loud: every region should have produced at least the two trailing precip-vs-normal figures.
+    broken = [nm for nm, d in result["regions"].items()
               if d["precip_30d_pct_normal"] is None and d["precip_90d_pct_normal"] is None]
     if broken:
         print(f"ERROR: All precip metrics came back empty for: {broken} — check API response shape.", file=sys.stderr)
         sys.exit(1)
  
     result["_meta"] = {
-        "fetched_at": __import__("datetime").datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": "Open-Meteo (no API key)",
         "history_years": HISTORY_YEARS,
     }
@@ -272,9 +296,13 @@ def main():
  
     size = os.path.getsize(OUT)
     print(f"\nRegions fetched ({len(result['regions'])}):")
-    for name, d in result["regions"].items():
+    cur_div = None
+    for nm, d in result["regions"].items():
+        if d["division"] != cur_div:
+            cur_div = d["division"]
+            print(f"  [{cur_div}]")
         p30 = d["precip_30d_pct_normal"]
-        print(f"  {name}: 30D precip = {p30:.0f}% of normal" if p30 is not None else f"  {name}: 30D precip = n/a")
+        print(f"    {nm}: 30D precip = {p30:.0f}% of normal" if p30 is not None else f"    {nm}: 30D precip = n/a")
     print(f"\nSaved {OUT} ({size:,} bytes)")
  
  
