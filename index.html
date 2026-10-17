@@ -886,12 +886,12 @@ const SUMMARY_ROWS = [
   // Vegoils: Seasonality/Positioning/Export Sales YoY use Soybean Oil (the only vegoil with a
   // tracked CFTC future, seasonal series, and US export data) as the representative instrument.
   // Production YoY and Stocks/Use % Rank are genuinely combined across all 4 tracked oils.
-  {section:'Oilseeds', label:'Soyoil (Vegoils)',      cftcCode:'007601', usdaComm:null, domestic:'United States', seasonalName:'Soybean Oil', exportName:'SOYBEAN OIL', combinedList:VEGOILS, combinedExporters:VEGOIL_EXPORTERS, combinedImporters:VEGOIL_IMPORTERS},
+  {section:'Oilseeds', label:'Soyoil (Vegoils)',      cftcCode:'007601', usdaComm:null, domestic:'United States', seasonalName:'Soybean Oil', exportName:'SOYBEAN OIL', combinedList:VEGOILS, combinedExporters:VEGOIL_EXPORTERS},
   // Meal: Seasonality/Positioning/Export Sales use Soybean Meal (the dominant traded meal,
   // with a tracked CFTC future, seasonal series, and US export data — "SOYBEAN CAKE AND MEAL"
   // is the exact commodity name confirmed in the export sales feed). Production YoY and
   // Stocks/Use % Rank are genuinely combined across Soybean, Rapeseed, and Sunflower meal.
-  {section:'Oilseeds', label:'Soymeal (Meal)',        cftcCode:'026603', usdaComm:null, domestic:'United States', seasonalName:'Soybean Meal', exportName:'SOYBEAN CAKE AND MEAL', combinedList:MEALS, combinedExporters:MEAL_EXPORTERS, combinedImporters:MEAL_IMPORTERS},
+  {section:'Oilseeds', label:'Soymeal (Meal)',        cftcCode:'026603', usdaComm:null, domestic:'United States', seasonalName:'Soybean Meal', exportName:'SOYBEAN CAKE AND MEAL', combinedList:MEALS, combinedExporters:MEAL_EXPORTERS},
   {section:'Softs',    label:'Cotton',                cftcCode:'033661', usdaComm:'Cotton', domestic:'United States', seasonalName:'Cotton', exportName:'ALL UPLAND COTTON'},
   {section:'Softs',    label:'Cocoa',                 cftcCode:'073732', usdaComm:'Cocoa', domestic:"Cote d'Ivoire", seasonalName:'NY Cocoa', exportName:null},
   {section:'Softs',    label:'Coffee',                cftcCode:'083731', usdaComm:'Coffee', domestic:'Brazil', seasonalName:'Arabica Coffee', exportName:null},
@@ -1009,10 +1009,10 @@ function buildSummaryTable(){
     {label:'Positioning', cols:[{l:'Net % OI', w:80}, {l:'Pctile', w:66}]},
     {label:'Production YoY', cols:[{l:'Domestic', w:85}, {l:'Exporters', w:85}]},
     {label:'Export Sales YoY', cols:[{l:'Total Commit.', w:100}]},
-    {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:85}, {l:'World', w:75}, {l:'Exporters', w:85}, {l:'Importers', w:85}]},
+    {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:85}, {l:'World', w:75}]},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
-  const productWidth = 228; // matches crop calendar's Origin column width, so both tables align
+  const productWidth = 228;
 
   let html = `<table class="summary-table"><colgroup><col style="width:${productWidth}px">`;
   groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
@@ -1033,7 +1033,6 @@ function buildSummaryTable(){
 
     const countries = DATA[row.usdaComm] || {};
     const expList = row.combinedList ? row.combinedExporters : (EXPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
-    const impList = row.combinedList ? row.combinedImporters : (IMPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
 
     // Seasonality (next upcoming week)
     const seas = getNextSeasonalEntry(row.seasonalName);
@@ -1043,21 +1042,17 @@ function buildSummaryTable(){
     const m = computeLatestMetrics({code:row.cftcCode, label:row.label}, hist);
 
     // Fundamentals
-    let domesticYoY, exportersYoY, domesticStu, worldStu, expStu, impStu;
+    let domesticYoY, exportersYoY, domesticStu, worldStu;
     if(row.combinedList){
       domesticYoY = summaryProdYoYCombined(row.combinedList, row.domestic);
       exportersYoY = summaryProdYoYAggCombined(row.combinedList, expList);
       domesticStu = summaryStuPctileCombined(row.combinedList, (cm,yr)=>(DATA[cm]&&DATA[cm][row.domestic])?DATA[cm][row.domestic][yr]:undefined);
       worldStu = summaryStuPctileCombined(row.combinedList, (cm,yr)=>(DATA[cm]&&DATA[cm]['World'])?DATA[cm]['World'][yr]:undefined);
-      expStu = summaryStuPctileCombined(row.combinedList, (cm,yr)=>sumCountries(DATA[cm]||{}, expList, yr));
-      impStu = summaryStuPctileCombined(row.combinedList, (cm,yr)=>sumCountries(DATA[cm]||{}, impList, yr));
     } else {
       domesticYoY = summaryProdYoY(row.usdaComm, row.domestic);
       exportersYoY = summaryProdYoYAgg(row.usdaComm, expList);
       domesticStu = summaryStuPctile(row.usdaComm, y=>(countries[row.domestic]||{})[y]);
       worldStu = summaryStuPctile(row.usdaComm, y=>(countries['World']||{})[y]);
-      expStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, expList, y));
-      impStu = summaryStuPctile(row.usdaComm, y=>sumCountries(countries, impList, y));
     }
 
     // Export Sales — Total Commitment YoY
@@ -1085,8 +1080,6 @@ function buildSummaryTable(){
     html += `<td class="${totalCommitYoY>=0?'cftc-up':'cftc-dn'}">${totalCommitYoY===null?'—':cftcSignedPct(totalCommitYoY,1)}</td>`;
     html += `<td class="${summaryPctileClass(domesticStu)}">${summaryPctileText(domesticStu)}</td>`;
     html += `<td class="${summaryPctileClass(worldStu)}">${summaryPctileText(worldStu)}</td>`;
-    html += `<td class="${summaryPctileClass(expStu)}">${summaryPctileText(expStu)}</td>`;
-    html += `<td class="${summaryPctileClass(impStu)}">${summaryPctileText(impStu)}</td>`;
     html += `</tr>`;
   });
 
@@ -1171,17 +1164,18 @@ function fmtHiLo(hi, lo){
 function buildWeatherTable(){
   const groups = [
     {label:'Historical', cols:[
-      {l:'30D Precip vs Normal', w:150},
-      {l:'90D Precip vs Normal', w:150},
-      {l:'7D Temp Dep (Actual)', w:140},
+      {l:'90D Precip', w:112},
+      {l:'30D Precip', w:112},
+      {l:'7D Temp Dep', w:104},
     ]},
-    {label:'Forecast', cols:[
-      {l:'14D Temp Dep', w:120},
-      {l:'14D Hi/Lo (°C)', w:120},
-      {l:'14D Precip vs Normal', w:160},
+    {label:'Forecast (Next 14 Days)', cols:[
+      {l:'Temp Dep', w:96},
+      {l:'Hi / Lo (°C)', w:104},
+      {l:'Precip', w:106},
     ]},
   ];
-  let html = `<table class="weather-table"><colgroup><col style="width:200px">`;
+  const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
+  let html = `<table class="weather-table"><colgroup><col style="width:240px">`;
   groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
   html += `</colgroup><thead><tr><th rowspan="2" style="text-align:left">Region</th>`;
   groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:12px;letter-spacing:.08em">${g.label}</th>`; });
@@ -1191,12 +1185,19 @@ function buildWeatherTable(){
   });
   html += `</tr></thead><tbody>`;
 
+  // Rows are grouped under a division header (Canada / United States / South America / Europe / Asia).
+  // The division comes from the data file itself (fetch_weather.py is the single place regions are defined).
   const regions = (WEATHER_DATA && WEATHER_DATA.regions) || {};
+  let curDiv = null;
   Object.keys(regions).forEach(name=>{
     const d = regions[name];
+    if(d.division && d.division !== curDiv){
+      curDiv = d.division;
+      html += `<tr class="cftc-row-section"><td colspan="${totalCols}">${curDiv}</td></tr>`;
+    }
     html += `<tr><td>${name}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_7d_c, false)}">${fmtTempDep(d.temp_dep_7d_c)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
     html += `<td>${fmtHiLo(d.temp_14d_forecast_hi_c, d.temp_14d_forecast_lo_c)}</td>`;
@@ -1246,14 +1247,17 @@ function buildCropCalendarTable(){
 function renderSummary(){
   const root = document.getElementById('summary-root');
   root.innerHTML = '';
-  document.getElementById('summary-meta').textContent =
-    'USDA: ' + (DATA._meta?.fetched_at || 'unknown') +
-    ' — CFTC: ' + (CFTC_DATA._meta?.fetched_at || 'unknown') +
-    ' — Exports: ' + (EXPORTS_DATA && EXPORTS_DATA._meta?.fetched_at || 'unavailable');
+  // All four fetchers run in the same workflow job, so one timestamp covers everything.
+  // Show the OLDEST source timestamp so this can never overstate freshness if one source lags.
+  const stamps = [DATA, CFTC_DATA, EXPORTS_DATA, WEATHER_DATA]
+    .map(d => d && d._meta && d._meta.fetched_at)
+    .filter(Boolean)
+    .sort();
+  document.getElementById('summary-meta').textContent = 'Last updated: ' + (stamps.length ? stamps[0] : 'unknown');
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Weather — Major Growing Regions</div>`);
-  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0">Green/red show direction vs. the 10-year normal for that calendar window (wetter/warmer = green, drier/cooler = red) — not an agronomic judgment of good or bad. Precip % of normal: 100% = exactly average. Temp departure in °C.${WEATHER_DATA?'':' Weather data unavailable.'}</div>`);
+  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0">Precip is % of the 10-year normal for that calendar window (100% = average) with actual mm in brackets; Temp Dep is °C vs. that same normal. Green/red show direction only (wetter/warmer = green, drier/cooler = red), not an agronomic judgment of good or bad.${WEATHER_DATA?'':' Weather data unavailable.'}</div>`);
   if(WEATHER_DATA){
     root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildWeatherTable()}</div>`);
   }
