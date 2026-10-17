@@ -12,6 +12,13 @@ Calls (each batched across ALL regions in a single request):
      block is roughly 4x cheaper in Open-Meteo's weighted API-call accounting (calls are
      weighted by locations x days requested), which matters now that there are 17 regions.
  
+3. Seasonal Forecast API (ECMWF SEAS5, monthly): a 3-month "outlook" per region — the ensemble-mean
+   temperature anomaly, and precipitation as % of the model's own climate, over the next 3 calendar
+   months. This section is deliberately NON-FATAL: if it fails, the rest of the weather data still
+   publishes, the failure is printed loudly (and raised as a GitHub Actions warning annotation), and
+   the page shows the outlook as unavailable. The exact monthly variable names weren't fully confirmed,
+   so each variable is requested separately with candidate names — one run reveals which ones work.
+ 
 Soil moisture is intentionally NOT included — the exact Open-Meteo daily variable name
 for a root-zone aggregate wasn't confirmed, and a guessed field risked a silently-wrong column.
 """
@@ -42,6 +49,15 @@ REGIONS = [
     ("Asia", "Western Australia", -31.5, 117.0),
     ("Asia", "New South Wales", -32.5, 148.5),
 ]
+ 
+SEASONAL_URL = "https://seasonal-api.open-meteo.com/v1/seasonal"
+OUTLOOK_MONTHS = 3
+# variable -> candidate API tokens, tried in order (one request per variable so one bad name can't sink the rest)
+OUTLOOK_VARS = {
+    "temp_anom":   ["temperature_2m_anomaly"],
+    "precip_anom": ["precipitation_anomaly"],
+    "precip_mean": ["precipitation_mean", "precipitation_sum"],
+}
  
 HISTORY_YEARS = 10
 PAST_DAYS = 92       # Open-Meteo's documented max for this parameter; still covers the 90-day trailing window
@@ -158,6 +174,101 @@ def fetch_history(n, lats, lons, today):
     return merged
  
  
+def next_months(today, k):
+    """The k calendar months AFTER the current one, as 'YYYY-MM' keys."""
+    y, m = today.year, today.month
+    out = []
+    for _ in range(k):
+        m += 1
+        if m == 13:
+            y, m = y + 1, 1
+        out.append(f"{y:04d}-{m:02d}")
+    return out
+ 
+ 
+MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+ 
+ 
+def month_label(months):
+    first, last = months[0], months[-1]
+    return f"{MONTH_ABBR[int(first[5:7]) - 1]}\u2013{MONTH_ABBR[int(last[5:7]) - 1]}"
+ 
+ 
+def fetch_seasonal_var(n, lats, lons, token):
+    """One batched Seasonal API request for a single monthly variable.
+    Returns (per-location list of {'YYYY-MM': value}, units string or None)."""
+    params = {
+        "latitude": ",".join(str(x) for x in lats),
+        "longitude": ",".join(str(x) for x in lons),
+        "monthly": token,
+    }
+    blocks = as_location_list(http_get_json(SEASONAL_URL, params), n, f"Seasonal API ({token})")
+    out, units = [], None
+    for block in blocks:
+        monthly = block.get("monthly") or {}
+        times = monthly.get("time")
+        # tolerate a model-name suffix on the key (e.g. temperature_2m_anomaly_ecmwf_seas5)
+        key = next((k for k in monthly if k == token or k.startswith(token + "_")), None)
+        if not times or key is None:
+            raise ValueError(f"response has no monthly '{token}' series (keys: {sorted(monthly.keys())})")
+        out.append({t[:7]: v for t, v in zip(times, monthly[key])})
+        if units is None:
+            units = (block.get("monthly_units") or {}).get(key)
+    return out, units
+ 
+ 
+def fetch_outlook(n, lats, lons, today):
+    """Seasonal outlook per region. Never raises: returns (results, label, error_or_None)."""
+    months = next_months(today, OUTLOOK_MONTHS)
+    label = month_label(months)
+    empty = [{"outlook_temp_dep_c": None, "outlook_precip_pct_normal": None} for _ in range(n)]
+    series, problems = {}, []
+    try:
+        for var, candidates in OUTLOOK_VARS.items():
+            got = None
+            for token in candidates:
+                try:
+                    got, units = fetch_seasonal_var(n, lats, lons, token)
+                    print(f"    outlook {var}: using '{token}' (units: {units})")
+                    break
+                except urllib.error.HTTPError as e:
+                    try:
+                        body = e.read(400).decode("utf-8", errors="replace")
+                    except Exception:
+                        body = ""
+                    print(f"    outlook {var}: '{token}' rejected, HTTP {e.code} {body}")
+                except Exception as e:
+                    print(f"    outlook {var}: '{token}' failed: {e}")
+            series[var] = got
+            if got is None:
+                problems.append(var)
+        results = []
+        for i in range(n):
+            temp_dep = precip_pct = None
+            t = series.get("temp_anom")
+            if t:
+                vals = [t[i].get(m) for m in months]
+                if all(v is not None for v in vals):
+                    temp_dep = sum(vals) / len(vals)
+            pa, pm = series.get("precip_anom"), series.get("precip_mean")
+            if pa and pm:
+                anoms = [pa[i].get(m) for m in months]
+                means = [pm[i].get(m) for m in months]
+                if all(v is not None for v in anoms + means):
+                    normal = sum(means) - sum(anoms)   # the model's own climatology = forecast - anomaly
+                    if normal > 0:
+                        precip_pct = sum(means) / normal * 100
+            results.append({"outlook_temp_dep_c": temp_dep, "outlook_precip_pct_normal": precip_pct})
+        error = None
+        if problems:
+            error = "could not get: " + ", ".join(problems)
+        elif all(r["outlook_temp_dep_c"] is None and r["outlook_precip_pct_normal"] is None for r in results):
+            error = f"no data for months {months[0]}..{months[-1]} in the response"
+        return results, label, error
+    except Exception as e:
+        return empty, label, f"{type(e).__name__}: {e}"
+ 
+ 
 def window_sum(series, start, end, key):
     """Sum `key` over [start, end] inclusive, skipping missing days. Returns None if nothing found."""
     vals = []
@@ -229,6 +340,13 @@ def main():
         print(f"\nerror: {e}", file=sys.stderr)
         sys.exit(1)
  
+    print(f"  Seasonal outlook (SEAS5 monthly, next {OUTLOOK_MONTHS} months, {n} regions):")
+    outlook, outlook_label, outlook_error = fetch_outlook(n, lats, lons, today)
+    if outlook_error:
+        # Non-fatal by design: the rest of the weather data still publishes. Make it impossible to miss.
+        print(f"WARNING: seasonal outlook unavailable — {outlook_error}", file=sys.stderr)
+        print(f"::warning title=Weather outlook unavailable::{outlook_error}")
+ 
     result = {"regions": {}}
     missing_regions = []
  
@@ -284,6 +402,8 @@ def main():
             "temp_14d_forecast_lo_c": temp_14d_lo,
             "precip_14d_forecast_pct_normal": pct_of_normal(precip_14d_forecast, precip_14d_fwd_normal),
             "precip_14d_forecast_mm": precip_14d_forecast,
+            "outlook_temp_dep_c": outlook[i]["outlook_temp_dep_c"],
+            "outlook_precip_pct_normal": outlook[i]["outlook_precip_pct_normal"],
         }
  
     if missing_regions:
@@ -301,6 +421,9 @@ def main():
         "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": "Open-Meteo (no API key)",
         "history_years": HISTORY_YEARS,
+        "outlook_label": outlook_label,
+        "outlook_source": "ECMWF SEAS5 via Open-Meteo Seasonal API",
+        "outlook_error": outlook_error,
     }
  
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
@@ -315,7 +438,10 @@ def main():
             cur_div = d["division"]
             print(f"  [{cur_div}]")
         p30 = d["precip_30d_pct_normal"]
-        print(f"    {nm}: 30D precip = {p30:.0f}% of normal" if p30 is not None else f"    {nm}: 30D precip = n/a")
+        ot, op = d["outlook_temp_dep_c"], d["outlook_precip_pct_normal"]
+        out_txt = (f"outlook {outlook_label}: temp {ot:+.1f}C, precip {op:.0f}%" if (ot is not None and op is not None)
+                   else f"outlook {outlook_label}: n/a")
+        print(f"    {nm}: 30D precip = {p30:.0f}% of normal | {out_txt}" if p30 is not None else f"    {nm}: 30D precip = n/a | {out_txt}")
     print(f"\nSaved {OUT} ({size:,} bytes)")
  
  
