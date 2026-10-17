@@ -57,8 +57,12 @@ def http_get_json(url, params, max_attempts=4):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "application/json",
     })
-    # Retry transient errors (rate limiting / temporary server trouble) with backoff.
+    # Retry transient problems with backoff:
+    #   - HTTP 429 / 5xx (rate limiting, temporary server trouble)
+    #   - connection-level failures (TLS handshake timeouts, resets, read timeouts) — these are
+    #     network blips between the GitHub runner and Open-Meteo, not problems with the request.
     # Anything else (400 bad parameter, 404, ...) is a real problem: fail loud immediately.
+    # If retries are exhausted the error is re-raised, so the run still fails loudly.
     for attempt in range(1, max_attempts + 1):
         try:
             with urllib.request.urlopen(req, timeout=90) as resp:
@@ -67,6 +71,13 @@ def http_get_json(url, params, max_attempts=4):
             if e.code in (429, 500, 502, 503, 504) and attempt < max_attempts:
                 wait = 15 * attempt
                 print(f"\n    HTTP {e.code} (transient) — retrying in {wait}s (attempt {attempt}/{max_attempts})...", flush=True)
+                time.sleep(wait)
+                continue
+            raise
+        except OSError as e:  # URLError, ssl.SSLError, socket timeouts, ConnectionError
+            if attempt < max_attempts:
+                wait = 10 * attempt
+                print(f"\n    network error ({e}) — retrying in {wait}s (attempt {attempt}/{max_attempts})...", flush=True)
                 time.sleep(wait)
                 continue
             raise
@@ -142,6 +153,8 @@ def fetch_history(n, lats, lons, today):
         )
         for i, block in enumerate(blocks):
             merged[i].update(series_to_dict(block))
+        if yr_offset < HISTORY_YEARS:
+            time.sleep(2)  # small pause between requests — gentler on Open-Meteo's per-minute limits
     return merged
  
  
