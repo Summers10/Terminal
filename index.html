@@ -16,13 +16,13 @@ body.dark{
   --bg:#000;--bg1:#060606;--bg2:#0a0a0a;--border:#141414;--border2:#1e1e1e;
   --text:#d4b896;--text2:#8a7a68;--text3:#6a5a4a;
   --amber:#f5a623;--green:#2e8f52;--red:#b83838;
-  --th-bg:#040404;--section-bg:#050505;--row-alt:#030303;--row-latest:#0c0800;
+  --th-bg:#040404;--section-bg:#050505;--row-alt:#030303;--row-latest:#0c0800;--grp-line:#4a4034;
 }
 body.light{
   --bg:#FFFFFF;--bg1:#F7F8FA;--bg2:#F0F1F4;--border:#E0E2E8;--border2:#C8CCD4;
   --text:#1A1D24;--text2:#3A3F4A;--text3:#6B7280;
   --amber:#B8720A;--green:#0E7A3A;--red:#C4302B;
-  --th-bg:#F2F3F6;--section-bg:#ECEDF0;--row-alt:#F7F8FA;--row-latest:#FFF3DC;
+  --th-bg:#F2F3F6;--section-bg:#ECEDF0;--row-alt:#F7F8FA;--row-latest:#FFF3DC;--grp-line:#9AA1AD;
 }
 #topbar{position:sticky;top:0;z-index:10;padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
 #topbar h1{font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap}
@@ -497,13 +497,13 @@ function render(){
   // render path rather than the shared World/Exporters/Importers/breakout template.
   if(comm === 'Vegoils'){
     if(unitToggleEl) unitToggleEl.style.display = 'none';
-    convLabel.textContent = '1000 MT — Palm + Soybean + Rapeseed + Sunflower oil (no bushel conversion; oils have no acreage)';
+    convLabel.textContent = '1000 MT — palm + soy + rapeseed + sunflower oil';
     renderVegoilsInto(root);
     return;
   }
   if(comm === 'Meal'){
     if(unitToggleEl) unitToggleEl.style.display = 'none';
-    convLabel.textContent = '1000 MT — Soybean + Rapeseed + Sunflower meal (no bushel conversion; meal has no acreage)';
+    convLabel.textContent = '1000 MT — soy + rapeseed + sunflower meal';
     renderMealInto(root);
     return;
   }
@@ -512,11 +512,11 @@ function render(){
   const countries = DATA[comm];
 
   if(comm === 'Cotton'){
-    convLabel.textContent = 'Native USDA units — 1000 bales (480 lb), acres, lb lint/acre. No MT or bushel conversion (cotton isn\'t a bushel commodity).';
+    convLabel.textContent = 'Native units: 1000 bales (480 lb), acres, lb lint/acre';
   } else if(comm === 'Coffee'){
-    convLabel.textContent = 'Native USDA units — 1000 bags (60kg), acres, lb/acre yield. No MT or bushel conversion (coffee isn\'t a bushel commodity).';
+    convLabel.textContent = 'Native units: 1000 bags (60 kg), acres, lb/acre';
   } else if(NO_BUSHEL_COMMS.has(comm)){
-    convLabel.textContent = '1000 MT, acres, lb/acre yield. No bushel conversion (' + comm + ' isn\'t a bushel commodity).';
+    convLabel.textContent = '1000 MT, acres, lb/acre';
   } else {
     const buPerMt = BU_PER_MT[comm] || 36.7437;
     convLabel.textContent = `1 MT = ${buPerMt.toFixed(2)} bu (${comm==='Rapeseed/Canola'?'Canola':comm})`;
@@ -634,13 +634,15 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-extreme-lo{background:rgba(184,56,56,.22) !important;font-weight:800 !important}
 .cftc-extreme-yellow{background:rgba(230,180,20,.32) !important;font-weight:800 !important}
 #cftc-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
-.cal-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
-.weather-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.cal-table{width:100%;min-width:1000px;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.weather-table{width:100%;min-width:1000px;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
 .weather-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12px;font-weight:900;letter-spacing:.02em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
 .weather-table th:first-child{text-align:left}
 .weather-table td{padding:5px 6px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
 .weather-table td:first-child{text-align:left;color:var(--text);font-weight:700}
-.summary-table{table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.summary-table{width:100%;min-width:1000px;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+/* group divider: the first column of each group gets a heavier left line, running the full height of the table */
+.grp-l{border-left:2px solid var(--grp-line)}
 .summary-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
 .summary-table th:first-child{text-align:left}
 .summary-table td{padding:5px 6px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
@@ -1003,24 +1005,27 @@ function getNextSeasonalEntry(productName){
   return best;
 }
 
+// Relative column weights -> percentages summing to 100, so a table can fill its container at any width.
+function colPercents(weights){ const t = weights.reduce((a,b)=>a+b,0); return weights.map(w=>(w/t*100).toFixed(3)+'%'); }
+
 function buildSummaryTable(){
   const groups = [
-    {label:'Seasonality', cols:[{l:'This Wk', w:70}]},
-    {label:'Positioning', cols:[{l:'Net % OI', w:80}, {l:'Pctile', w:66}]},
-    {label:'Production YoY', cols:[{l:'Domestic', w:85}, {l:'Exporters', w:85}]},
-    {label:'Export Sales YoY', cols:[{l:'Total Commit.', w:100}]},
-    {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:85}, {l:'World', w:75}]},
+    {label:'Seasonality', cols:[{l:'This Wk', w:11}]},
+    {label:'Positioning', cols:[{l:'Net % OI', w:8}, {l:'Pctile', w:8}]},
+    {label:'Production YoY', cols:[{l:'Domestic', w:9}, {l:'Exporters', w:9}]},
+    {label:'Export Sales YoY', cols:[{l:'Total Commit.', w:16}]},
+    {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:9.5}, {l:'World', w:9.5}]},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
-  const productWidth = 228;
+  const productWidth = 20;
 
-  let html = `<table class="summary-table"><colgroup><col style="width:${productWidth}px">`;
-  groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
+  const pcts = colPercents([productWidth, ...groups.flatMap(g=>g.cols.map(c=>c.w))]);
+  let html = `<div class="tbl-wrap"><table class="summary-table"><colgroup>${pcts.map(pc=>`<col style="width:${pc}">`).join('')}`;
   html += `</colgroup><thead><tr><th rowspan="2">Product</th>`;
-  groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
+  groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" class="grp-l" style="text-align:center;color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
   html += `</tr><tr>`;
   groups.forEach(g=>{
-    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c.l}</th>`; });
+    g.cols.forEach((c,i)=>{ html += `<th${i===0?' class="grp-l"':''}>${c.l}</th>`; });
   });
   html += `</tr></thead><tbody>`;
 
@@ -1064,26 +1069,26 @@ function buildSummaryTable(){
 
     html += `<tr><td>${row.label}</td>`;
     if(!seas){
-      html += `<td style="color:var(--text3)">—</td>`;
+      html += `<td class="grp-l" style="color:var(--text3)">—</td>`;
     } else {
       const text = (seas.value>0?'+':'')+seas.value;
-      html += `<td style="background:${seasonalColor(seas.value)};color:#111;font-weight:800" title="Week of ${seas.label}">${text}</td>`;
+      html += `<td class="grp-l" style="background:${seasonalColor(seas.value)};color:#111;font-weight:800" title="Week of ${seas.label}">${text}</td>`;
     }
     if(!m){
-      html += `<td colspan="2" style="text-align:left;color:var(--text3)">No CFTC data</td>`;
+      html += `<td class="grp-l" colspan="2" style="text-align:left;color:var(--text3)">No CFTC data</td>`;
     } else {
-      html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
+      html += `<td class="grp-l ${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
       html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
     }
-    html += `<td class="${domesticYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(domesticYoY,1)}</td>`;
+    html += `<td class="grp-l ${domesticYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(domesticYoY,1)}</td>`;
     html += `<td class="${exportersYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(exportersYoY,1)}</td>`;
-    html += `<td class="${totalCommitYoY>=0?'cftc-up':'cftc-dn'}">${totalCommitYoY===null?'—':cftcSignedPct(totalCommitYoY,1)}</td>`;
-    html += `<td class="${summaryPctileClass(domesticStu)}">${summaryPctileText(domesticStu)}</td>`;
+    html += `<td class="grp-l ${totalCommitYoY>=0?'cftc-up':'cftc-dn'}">${totalCommitYoY===null?'—':cftcSignedPct(totalCommitYoY,1)}</td>`;
+    html += `<td class="grp-l ${summaryPctileClass(domesticStu)}">${summaryPctileText(domesticStu)}</td>`;
     html += `<td class="${summaryPctileClass(worldStu)}">${summaryPctileText(worldStu)}</td>`;
     html += `</tr>`;
   });
 
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
   return html;
 }
 
@@ -1199,30 +1204,30 @@ function buildWeatherTable(){
   // 90D +/-15%, 30D +/-25%, 14-day forecast +/-35%, seasonal outlook +/-10% (the ensemble mean is damped).
   const groups = [
     {label:'Historical', cols:[
-      {l:'90D Precip', w:112},
-      {l:'30D Precip', w:112},
-      {l:'7D Temp Dep', w:104},
+      {l:'90D Precip', w:10.5},
+      {l:'30D Precip', w:10.5},
+      {l:'7D Temp Dep', w:9.5},
     ]},
     {label:'Forecast (Next 14 Days)', cols:[
-      {l:'Temp Dep', w:96},
-      {l:'Hi / Lo (°C)', w:104},
-      {l:'Precip', w:106},
+      {l:'Temp Dep', w:9.5},
+      {l:'Hi / Lo (°C)', w:10.5},
+      {l:'Precip', w:10.5},
     ]},
   ];
   if(hasOutlook){
     groups.push({label:'Outlook ' + (wxMeta.outlook_label || '3 Mo'), cols:[
-      {l:'Temp Dep', w:80},
-      {l:'Precip', w:84},
+      {l:'Temp Dep', w:8},
+      {l:'Precip', w:8},
     ]});
   }
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
-  let html = `<table class="weather-table"><colgroup><col style="width:240px">`;
-  groups.forEach(g=>{ g.cols.forEach(c=>{ html += `<col style="width:${c.w}px">`; }); });
+  const pcts = colPercents([23, ...groups.flatMap(g=>g.cols.map(c=>c.w))]);
+  let html = `<table class="weather-table"><colgroup>${pcts.map(pc=>`<col style="width:${pc}">`).join('')}`;
   html += `</colgroup><thead><tr><th rowspan="2" style="text-align:left">Region</th>`;
-  groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:12px;letter-spacing:.08em">${g.label}</th>`; });
+  groups.forEach(g=>{ html += `<th colspan="${g.cols.length}" class="grp-l" style="text-align:center;color:var(--amber);font-size:12px;letter-spacing:.08em">${g.label}</th>`; });
   html += `</tr><tr>`;
   groups.forEach(g=>{
-    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c.l}</th>`; });
+    g.cols.forEach((c,i)=>{ html += `<th${i===0?' class="grp-l"':''}>${c.l}</th>`; });
   });
   html += `</tr></thead><tbody>`;
 
@@ -1236,14 +1241,14 @@ function buildWeatherTable(){
       html += `<tr class="cftc-row-section"><td colspan="${totalCols}">${curDiv}</td></tr>`;
     }
     html += `<tr><td>${name}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_90d_pct_normal, true, 15)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
+    html += `<td class="grp-l ${weatherDirClass(d.precip_90d_pct_normal, true, 15)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true, 25)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_7d_c, false)}">${fmtTempDep(d.temp_dep_7d_c)}</td>`;
-    html += `<td class="${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
+    html += `<td class="grp-l ${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
     html += `<td>${fmtHiLo(d.temp_14d_forecast_hi_c, d.temp_14d_forecast_lo_c)}</td>`;
     html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true, 35)}">${fmtPctNormalWithMm(d.precip_14d_forecast_pct_normal, d.precip_14d_forecast_mm)}</td>`;
     if(hasOutlook){
-      html += `<td class="${weatherDirClass(d.outlook_temp_dep_c, false, 0.3)}">${fmtTempDep(d.outlook_temp_dep_c)}</td>`;
+      html += `<td class="grp-l ${weatherDirClass(d.outlook_temp_dep_c, false, 0.3)}">${fmtTempDep(d.outlook_temp_dep_c)}</td>`;
       html += `<td class="${weatherDirClass(d.outlook_precip_pct_normal, true, 10)}">${fmtPctNormal(d.outlook_precip_pct_normal)}</td>`;
     }
     html += `</tr>`;
@@ -1255,8 +1260,8 @@ function buildWeatherTable(){
 function buildCropCalendarTable(){
   const curMonth = new Date().getMonth() + 1; // 1-12
 
-  let html = `<table class="cal-table"><colgroup><col style="width:228px">`;
-  CAL_MONTHS.forEach(()=>{ html += `<col style="width:68px">`; });
+  const calPcts = colPercents([20, ...CAL_MONTHS.map(()=>80/CAL_MONTHS.length)]);
+  let html = `<table class="cal-table"><colgroup>${calPcts.map(pc=>`<col style="width:${pc}">`).join('')}`;
   html += `</colgroup><thead><tr><th style="text-align:left">Origin</th>`;
   CAL_MONTHS.forEach((m,i)=>{
     const isCur = (i+1)===curMonth;
@@ -1310,25 +1315,18 @@ function renderSummary(){
   root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
   root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
 
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Domestic column uses United States, except Canola which uses Canada, and Coffee/Sugar which use Brazil (the actual major producers) — the US isn't a meaningful producer of either, so they also have no Export Sales YoY data. Cocoa row shows Positioning and Seasonality only — USDA PSD doesn't track cocoa at all (it's ICCO's domain, not USDA's), so Production YoY and Stocks/Use % Rank aren't available for it. Coffee's balance sheet is in its native unit — 1000 bags (60kg), not metric tons. Soyoil (Vegoils) row uses Soybean Oil for Seasonality, Positioning, and Export Sales columns (the only tracked vegoil with a CFTC future, seasonal series, and US export data); Production YoY and Stocks/Use % Rank are genuinely combined across Palm, Soybean, Rapeseed, and Sunflower oil. Soymeal (Meal) row uses Soybean Meal the same way; Production YoY and Stocks/Use % Rank are combined across Soybean, Rapeseed, and Sunflower meal. Cotton's Export Sales YoY column reads the "COTTON" key from export sales data — if that key doesn't exactly match what USDA's export sales report uses, the cell will show "—" until confirmed.</div>`);
-
-  // Force the calendar (and weather table, if present) to exactly match the summary
-  // table's actual rendered width, rather than relying on independent width math staying in sync.
-  requestAnimationFrame(()=>{
-    const summaryTable = root.querySelector('.summary-table');
-    const calTable = root.querySelector('.cal-table');
-    const wxTable = root.querySelector('.weather-table');
-    if(summaryTable){
-      const w = summaryTable.getBoundingClientRect().width;
-      if(calTable) calTable.style.width = w + 'px';
-      if(wxTable) wxTable.style.width = w + 'px';
-    }
-  });
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote"><ul>
+    <li>Domestic = United States, except Canola (Canada) and Coffee/Sugar (Brazil), the actual major producers. Those rows have no Export Sales YoY.</li>
+    <li>Soyoil (Vegoils) and Soymeal (Meal): Seasonality, Positioning and Export Sales use Soybean Oil / Soybean Meal. Production YoY and Stocks/Use Rank combine all oils / all meals.</li>
+    <li>Cocoa: Positioning and Seasonality only. USDA doesn't track cocoa.</li>
+  </ul></div>`);
 }
 </script>
 
 <style>
 .page-footnote{font-size:11px;color:var(--text3);line-height:1.6;margin:28px 0 4px;padding-top:14px;border-top:1px solid var(--border2)}
+.page-footnote ul{margin:0;padding-left:16px}
+.page-footnote li{margin:2px 0}
 </style>
 
 <style>
