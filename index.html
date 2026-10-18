@@ -488,6 +488,7 @@ function render(){
   const root = document.getElementById('root');
   root.innerHTML = '';
   const comm = currentComm;
+  updateUsdaMeta();   // the "data as of" line depends on the selected commodity
 
   const convLabel = document.getElementById('conv-label');
   const unitToggleEl = document.getElementById('unit-toggle');
@@ -606,11 +607,66 @@ function initToggles(){
   });
 }
 
+// ---- "Data as of": when the underlying numbers are from (the header's "Last updated" is only when the pipeline ran) ----
+function parseAnyDate(s){
+  if(!s) return null;
+  s = String(s).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);                 // 2026-10-13
+  if(m) return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);               // 10/08/2026
+  if(m) return new Date(Date.UTC(+m[3], +m[1]-1, +m[2]));
+  return null;
+}
+function fmtAsOfDate(d, withWeekday){
+  const o = {month:'short', day:'numeric', timeZone:'UTC'};
+  if(withWeekday) o.weekday = 'short';
+  return d.toLocaleDateString('en-US', o);
+}
+// CFTC: each history row's date is the Tuesday the positions are "as of" (the report itself comes out that Friday)
+function latestCftcDate(){
+  if(!CFTC_DATA || !CFTC_DATA.codes) return null;
+  let best = null;
+  Object.values(CFTC_DATA.codes).forEach(c=>{
+    const h = c.history;
+    const d = (h && h.length) ? parseAnyDate(h[h.length-1].date) : null;
+    if(d && (!best || d > best)) best = d;
+  });
+  return best;
+}
+// Export Sales: the week-ending date of the latest weekly report
+function latestExportsDate(){
+  if(!EXPORTS_DATA || !EXPORTS_DATA.commodities) return null;
+  let best = null;
+  Object.values(EXPORTS_DATA.commodities).forEach(c=>{
+    const d = parseAnyDate(c && c.total && c.total.period_ending);
+    if(d && (!best || d > best)) best = d;
+  });
+  return best;
+}
+// USDA: the WASDE release the pulled PSD numbers reflect (worked out by fetch_psd.py from USDA's release schedule).
+// Coffee and Sugar are on USDA's semi-annual reports instead of the monthly WASDE.
+function usdaAsOfText(comm){
+  if(comm === 'Coffee' || comm === 'Sugar') return 'USDA estimates: semi-annual report';
+  const d = parseAnyDate(DATA && DATA._meta && DATA._meta.wasde_release);
+  return d ? 'USDA estimates: ' + fmtAsOfDate(d, false) + ' WASDE' : '';
+}
+// Header block: line 1 = when the pipeline last ran, line 2 = what date the data itself is from
+function setMetaLines(id, runStamp, asOfText){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const esc = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  el.style.textAlign = 'right';
+  el.style.lineHeight = '1.5';
+  el.innerHTML = 'Last updated: ' + esc(runStamp || 'unknown') +
+    (asOfText ? '<br><span style="color:var(--text2)">' + esc(asOfText) + '</span>' : '');
+}
+function updateUsdaMeta(){ setMetaLines('meta', DATA && DATA._meta && DATA._meta.fetched_at, usdaAsOfText(currentComm)); }
+
 fetch('data/psd_data.json?_=' + Date.now())
   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(data=>{
     DATA = data;
-    document.getElementById('meta').textContent = 'Last updated: ' + (data._meta?.fetched_at || 'unknown');
+    updateUsdaMeta();
     initToggles();
     render();
     usdaReady = true;
@@ -844,7 +900,7 @@ function renderCftc(){
   const root = document.getElementById('cftc-root');
   root.innerHTML = '';
   const yrs = CFTC_DATA._meta?.years_history;
-  document.getElementById('cftc-meta').textContent = 'Last updated: ' + (CFTC_DATA._meta?.fetched_at || 'unknown');
+  { const d = latestCftcDate(); setMetaLines('cftc-meta', CFTC_DATA._meta?.fetched_at, d ? 'Positions as of ' + fmtAsOfDate(d, true) : ''); }
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
   root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window.</div>`);
 }
@@ -1200,8 +1256,8 @@ function buildWeatherTable(){
   // The Outlook group appears whenever the data file carries outlook fields (they're null if the seasonal call failed).
   const hasOutlook = Object.values(regions).some(r => 'outlook_temp_dep_c' in r);
 
-  // Precip is only coloured outside a "normal" band, wider for shorter (noisier) windows:
-  // 90D +/-15%, 30D +/-25%, 14-day forecast +/-35%, seasonal outlook +/-10% (the ensemble mean is damped).
+  // One rule for every precip column: left uncoloured ("normal") within +/-20% of normal, coloured outside it.
+  const PRECIP_BAND = 20;
   const groups = [
     {label:'Historical', cols:[
       {l:'90D Precip', w:10.5},
@@ -1241,15 +1297,15 @@ function buildWeatherTable(){
       html += `<tr class="cftc-row-section"><td colspan="${totalCols}">${curDiv}</td></tr>`;
     }
     html += `<tr><td>${name}</td>`;
-    html += `<td class="grp-l ${weatherDirClass(d.precip_90d_pct_normal, true, 15)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true, 25)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
+    html += `<td class="grp-l ${weatherDirClass(d.precip_90d_pct_normal, true, PRECIP_BAND)}">${fmtPctNormalWithMm(d.precip_90d_pct_normal, d.precip_90d_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_30d_pct_normal, true, PRECIP_BAND)}">${fmtPctNormalWithMm(d.precip_30d_pct_normal, d.precip_30d_mm)}</td>`;
     html += `<td class="${weatherDirClass(d.temp_dep_7d_c, false)}">${fmtTempDep(d.temp_dep_7d_c)}</td>`;
     html += `<td class="grp-l ${weatherDirClass(d.temp_dep_14d_forecast_c, false)}">${fmtTempDep(d.temp_dep_14d_forecast_c)}</td>`;
     html += `<td>${fmtHiLo(d.temp_14d_forecast_hi_c, d.temp_14d_forecast_lo_c)}</td>`;
-    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true, 35)}">${fmtPctNormalWithMm(d.precip_14d_forecast_pct_normal, d.precip_14d_forecast_mm)}</td>`;
+    html += `<td class="${weatherDirClass(d.precip_14d_forecast_pct_normal, true, PRECIP_BAND)}">${fmtPctNormalWithMm(d.precip_14d_forecast_pct_normal, d.precip_14d_forecast_mm)}</td>`;
     if(hasOutlook){
       html += `<td class="grp-l ${weatherDirClass(d.outlook_temp_dep_c, false, 0.3)}">${fmtTempDep(d.outlook_temp_dep_c)}</td>`;
-      html += `<td class="${weatherDirClass(d.outlook_precip_pct_normal, true, 10)}">${fmtPctNormal(d.outlook_precip_pct_normal)}</td>`;
+      html += `<td class="${weatherDirClass(d.outlook_precip_pct_normal, true, PRECIP_BAND)}">${fmtPctNormal(d.outlook_precip_pct_normal)}</td>`;
     }
     html += `</tr>`;
   });
@@ -1302,7 +1358,11 @@ function renderSummary(){
     .map(d => d && d._meta && d._meta.fetched_at)
     .filter(Boolean)
     .sort();
-  document.getElementById('summary-meta').textContent = 'Last updated: ' + (stamps.length ? stamps[0] : 'unknown');
+  const asOf = [];
+  { const d = latestCftcDate(); if(d) asOf.push('CFTC ' + fmtAsOfDate(d, true)); }
+  { const d = parseAnyDate(DATA && DATA._meta && DATA._meta.wasde_release); if(d) asOf.push('USDA ' + fmtAsOfDate(d, false) + ' WASDE'); }
+  { const d = latestExportsDate(); if(d) asOf.push('Exports wk ending ' + fmtAsOfDate(d, true)); }
+  setMetaLines('summary-meta', stamps.length ? stamps[0] : 'unknown', asOf.length ? 'Data as of: ' + asOf.join(' · ') : '');
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 
   root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Weather — Major Growing Regions</div>`);
@@ -1319,6 +1379,7 @@ function renderSummary(){
     <li>Domestic = United States, except Canola (Canada) and Coffee/Sugar (Brazil), the actual major producers. Those rows have no Export Sales YoY.</li>
     <li>Soyoil (Vegoils) and Soymeal (Meal): Seasonality, Positioning and Export Sales use Soybean Oil / Soybean Meal. Production YoY and Stocks/Use Rank combine all oils / all meals.</li>
     <li>Cocoa: Positioning and Seasonality only. USDA doesn't track cocoa.</li>
+    <li>Coffee and Sugar use USDA's semi-annual reports, not the monthly WASDE shown in the header.</li>
   </ul></div>`);
 }
 </script>
@@ -1531,7 +1592,7 @@ function buildExportsCountryTable(commName){
 function renderExports(){
   const root = document.getElementById('exports-root');
   root.innerHTML = '';
-  document.getElementById('exports-meta').textContent = 'Last updated: ' + (EXPORTS_DATA._meta?.fetched_at || 'unknown');
+  { const d = latestExportsDate(); setMetaLines('exports-meta', EXPORTS_DATA._meta?.fetched_at, d ? 'Week ending ' + fmtAsOfDate(d, true) : ''); }
 
   const commodities = Object.keys(EXPORTS_DATA.commodities || {});
   if(!exportsCommodity || !commodities.includes(exportsCommodity)){
