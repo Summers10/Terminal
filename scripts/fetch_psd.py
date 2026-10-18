@@ -4,8 +4,9 @@ Basic USDA FAS PSD fetcher — grains only (Wheat, Corn, Soybeans, Canola).
 Bulk CSV download from PSD Online, no API key required.
 Saves data/psd_data.json.
 """
-import os, sys, json, urllib.request, urllib.error, csv, io, zipfile
-from datetime import datetime
+import os, sys, json, urllib.request, urllib.error, csv, io, zipfile, re, html as html_lib
+from datetime import datetime, date, timedelta, timezone
+from zoneinfo import ZoneInfo
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "psd_data.json")
  
@@ -74,6 +75,94 @@ def download_zip(filename):
     })
     with urllib.request.urlopen(req, timeout=180) as resp:
         return resp.read()
+ 
+ 
+# --- "Data as of" for the USDA numbers: the latest WASDE release this pull can reflect -------------
+# The PSD bulk file doesn't say which release its numbers come from (its Calendar_Year/Month columns
+# look like marketing-year fields, not release dates), so the release is inferred from USDA's published
+# WASDE schedule: the latest release that was out (noon ET + ~1h for PSD to update) when we pulled.
+# Entirely non-fatal: any problem here just means the page shows no WASDE date, plus a loud warning.
+WASDE_URLS = [
+    "https://www.usda.gov/about-usda/general-information/staff-offices/office-chief-economist/commodity-markets/wasde-report",
+    "https://www.usda.gov/oce/commodity/wasde",
+]
+# Used only if the page can't be read. Both years confirmed against usda.gov's own schedule (12:00 ET).
+FALLBACK_WASDE_SCHEDULE = [
+    "2026-01-12", "2026-02-10", "2026-03-10", "2026-04-09", "2026-05-12", "2026-06-11",
+    "2026-07-10", "2026-08-12", "2026-09-11", "2026-10-09", "2026-11-10", "2026-12-10",
+    "2027-01-12", "2027-02-10", "2027-03-10", "2027-04-09", "2027-05-12", "2027-06-11",
+    "2027-07-09", "2027-08-12", "2027-09-10", "2027-10-08", "2027-11-10", "2027-12-10",
+]
+WASDE_PSD_LATENCY = timedelta(hours=1)
+_MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+ 
+ 
+def parse_wasde_schedule(page_html):
+    """Pull every 'In YYYY the WASDE report will be released on Jan. 12, Feb. 10, ...' sentence."""
+    text = html_lib.unescape(re.sub(r"<[^>]+>", " ", page_html))
+    text = re.sub(r"\s+", " ", text)
+    found = set()
+    for m in re.finditer(r"In (\d{4}) the WASDE report will be released on", text):
+        year = int(m.group(1))
+        window = text[m.end(): m.end() + 260]
+        got, last_month = [], 0
+        for tok in re.finditer(r"([A-Z][a-z]{2})[a-z]*\.?\s+(\d{1,2})(?!\d)", window):
+            mon = _MONTHS.get(tok.group(1).lower())
+            if mon is None or mon <= last_month:   # months must keep increasing; stops at the next sentence
+                break
+            last_month = mon
+            try:
+                got.append(date(year, mon, int(tok.group(2))))
+            except ValueError:
+                break
+        if len(got) >= 6:                           # a real full-year list, not a stray fragment
+            found.update(got)
+    return sorted(found)
+ 
+ 
+def fetch_wasde_schedule():
+    last_err = None
+    for url in WASDE_URLS:
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml",
+            })
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                sched = parse_wasde_schedule(resp.read().decode("utf-8", errors="replace"))
+            if len(sched) >= 12:
+                return sched
+            last_err = f"{url}: only {len(sched)} release dates found"
+        except Exception as e:
+            last_err = f"{url}: {type(e).__name__}: {e}"
+    raise ValueError(last_err or "no schedule found")
+ 
+ 
+def resolve_wasde_release(schedule, now_utc):
+    """Latest scheduled release (noon ET) that was already out, plus PSD update latency, at now_utc."""
+    et = ZoneInfo("America/New_York")
+    out = [d for d in schedule if datetime(d.year, d.month, d.day, 12, 0, tzinfo=et) + WASDE_PSD_LATENCY <= now_utc]
+    return max(out) if out else None
+ 
+ 
+def get_wasde_meta(now_utc):
+    """Never raises. Returns the _meta fields describing which WASDE the pulled data reflects."""
+    problem = None
+    try:
+        schedule, source = fetch_wasde_schedule(), "usda.gov WASDE page"
+    except Exception as e:
+        schedule, source = [date.fromisoformat(d) for d in FALLBACK_WASDE_SCHEDULE], "built-in schedule"
+        problem = f"could not read the WASDE schedule from usda.gov ({e}); using the built-in 2026-2027 schedule"
+    release = resolve_wasde_release(schedule, now_utc)
+    if release is None:
+        problem = (problem + "; " if problem else "") + "no WASDE release found on or before today"
+    elif now_utc.date() - release > timedelta(days=45):
+        problem = (problem + "; " if problem else "") + f"latest known WASDE ({release}) is over 45 days old - schedule may be out of date"
+    if problem:
+        print(f"WARNING: WASDE date: {problem}", file=sys.stderr)
+        print(f"::warning title=USDA data-as-of date::{problem}")
+    print(f"WASDE release this data reflects: {release} (source: {source})")
+    return {"wasde_release": release.isoformat() if release else None, "wasde_source": source}
  
  
 def parse_csv_zip(zipdata, result, world_by_country, unmapped_attrs):
@@ -248,9 +337,12 @@ def main():
         # Fail loud: do not silently ship data that fails sanity checks
         sys.exit(1)
  
+    meta = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
+    meta.update(get_wasde_meta(datetime.now(timezone.utc)))
+ 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
-        result["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
+        result["_meta"] = meta
         json.dump(result, f, indent=2)
  
     size = os.path.getsize(OUT)
