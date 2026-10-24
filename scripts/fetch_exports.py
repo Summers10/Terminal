@@ -21,6 +21,11 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
  
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "export_sales.json")
+# Rolling weekly snapshots (net sales / exports / balances by country) so the page can show week-over-week.
+# The USDA file only ever holds the current week, so the history is built up by this script, one week at a time.
+HISTORY_OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "export_sales_history.json")
+HISTORY_WEEKS = 5
+HISTORY_FIELDS = ("net_sales", "weekly_exports", "outstanding_sales", "accumulated_exports")
 URL = "https://apps.fas.usda.gov/esrqs/StaticReports/CWRCountryCommoditySummary.xml"
  
 # Only keep commodities whose name contains one of these keywords.
@@ -140,6 +145,49 @@ def yoy_pct(cur, prev):
     return (cur - prev) / abs(prev) * 100
  
  
+def period_to_iso(period):
+    key = parse_period_date(period)
+    return f"{key[0]:04d}-{key[1]:02d}-{key[2]:02d}" if key else None
+ 
+ 
+def update_history(result):
+    """Add this week's snapshot to the rolling history (overwriting the same week if re-run: USDA revises
+    accumulated exports, so the latest pull of a week wins) and keep only the most recent HISTORY_WEEKS weeks."""
+    hist = {"weeks": {}}
+    if os.path.exists(HISTORY_OUT):
+        try:
+            with open(HISTORY_OUT) as f:
+                hist = json.load(f)
+            if not isinstance(hist.get("weeks"), dict):
+                raise ValueError("no 'weeks' object in file")
+        except Exception as e:
+            print(f"WARNING: could not read {HISTORY_OUT} ({e}) - starting a fresh history", file=sys.stderr)
+            print(f"::warning title=Export sales history was reset::{e}")
+            hist = {"weeks": {}}
+ 
+    snapped = 0
+    for name, data in result["commodities"].items():
+        t = data["total"]
+        iso = period_to_iso(t.get("period_ending"))
+        if not iso:
+            print(f"WARNING: no usable period-ending date for {name} - not added to history", file=sys.stderr)
+            continue
+        hist["weeks"].setdefault(iso, {})[name] = {
+            "mkt_year": t.get("mkt_year"),
+            "total": {k: t.get(k) for k in HISTORY_FIELDS},
+            "countries": {c: {k: r.get(k) for k in HISTORY_FIELDS} for c, r in data["countries"].items()},
+        }
+        snapped += 1
+ 
+    keep = sorted(hist["weeks"].keys())[-HISTORY_WEEKS:]
+    hist["weeks"] = {k: hist["weeks"][k] for k in keep}
+    hist["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "weeks_kept": HISTORY_WEEKS}
+    os.makedirs(os.path.dirname(HISTORY_OUT), exist_ok=True)
+    with open(HISTORY_OUT, "w") as f:
+        json.dump(hist, f, separators=(",", ":"))
+    print(f"History: {snapped} commodity snapshots saved; weeks on file: {', '.join(keep)}")
+ 
+ 
 def main():
     print(f"Fetching USDA FAS Export Sales (country-level) from {URL} ...")
     try:
@@ -218,6 +266,7 @@ def main():
         week_num = to_num(get_field(attrib, FIELD_CANDIDATES["mkt_year_week"]))
  
         net_sales = to_qty(get_field(attrib, FIELD_CANDIDATES["net_sales"]))
+        weekly_exports = to_qty(get_field(attrib, FIELD_CANDIDATES["weekly_exports"]))
         outstanding = to_qty(get_field(attrib, FIELD_CANDIDATES["outstanding_sales"]))
         accum_exports = to_qty(get_field(attrib, FIELD_CANDIDATES["accumulated_exports"]))
         total_commit = to_qty(get_field(attrib, FIELD_CANDIDATES["total_commitment"]))
@@ -240,6 +289,7 @@ def main():
             "mkt_year": mkt_year_str,
             "mkt_year_week": week_num,
             "net_sales": net_sales,
+            "weekly_exports": weekly_exports,
             "outstanding_sales": outstanding,
             "accumulated_exports": accum_exports,
             "total_commitment": total_commit,
@@ -320,6 +370,17 @@ def main():
         data.pop("_total_raw_attrib", None)
         data.pop("_total_sort_key", None)
         data.pop("_country_sort_keys", None)
+ 
+    # The weekly-exports figure feeds the week-over-week view. Its attribute name was never confirmed against the
+    # real file, so check it actually resolved to numbers; if not, warn loudly (non-fatal: the rest is still valid).
+    n_rec = sum(len(d["countries"]) for d in result["commodities"].values())
+    n_wk = sum(1 for d in result["commodities"].values() for r in d["countries"].values() if r.get("weekly_exports") is not None)
+    if n_rec and n_wk == 0:
+        print(f"WARNING: 'WeeklyExports' did not resolve on any of {n_rec} country records - the week-over-week "
+              f"exports columns will be blank. Attributes on the first record: {sorted(sample_attrib.keys())}", file=sys.stderr)
+        print("::warning title=Weekly exports field not found::see log for the attribute names present")
+ 
+    update_history(result)
  
     result["_meta"] = {
         "fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
