@@ -939,13 +939,12 @@ const CFTC_COL_GROUPS = [
 ];
 
 // Gross long/short cell: the figure, with the week's change small beside it.
-// Colour = market stance, not sign: longs added / shorts cut = bullish (green); longs cut / shorts added = bearish (red).
+// Colour = sign of the change, same for longs and shorts: added = green, cut = red.
 function cftcGrossCell(val, chg, isShort){
   let chgHtml = '<span class="gc"></span>';
   if(chg!==null && chg!==undefined && !isNaN(chg)){
     const r = Math.round(chg);
-    const bullish = isShort ? r<0 : r>0;
-    const cls = r===0 ? '' : (bullish ? 'cftc-up' : 'cftc-dn');
+    const cls = r===0 ? '' : (r>0 ? 'cftc-up' : 'cftc-dn');
     chgHtml = `<span class="gc ${cls}" title="${isShort?'Shorts':'Longs'} ${r>0?'added':(r<0?'cut':'unchanged')} vs prior week">${r===0?'0':cftcSignedNum(r)}</span>`;
   }
   return `<span class="gf">${cftcFmt(val)}</span>${chgHtml}`;
@@ -1001,7 +1000,7 @@ function renderCftc(){
   const yrs = CFTC_DATA._meta?.years_history;
   { const d = latestCftcDate(); setMetaLines('cftc-meta', CFTC_DATA._meta?.fetched_at, d ? 'Positions as of ' + fmtAsOfDate(d, true) : ''); }
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = bullish: longs added or shorts cut; red = bearish).</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut).</div>`);
 }
 
 function loadCftc(){
@@ -1618,6 +1617,8 @@ renderSeasonals();
 .exp-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .exp-table td.prior{color:var(--text3)}
 .exp-table tr.exp-total td{background:var(--section-bg);color:var(--text);font-weight:900}
+.exp-table tr.exp-latest td{font-weight:800}
+.exp-table tr.exp-latest td:first-child{color:var(--amber)}
 .exp-table tr.exp-click{cursor:pointer}
 .exp-table tr.exp-click:hover td{background:var(--row-alt)}
 .exp-table tr.exp-sel td{background:var(--row-latest)}
@@ -1670,74 +1671,50 @@ function buildExportsSummaryTable(){
   return html;
 }
 
-// Week over week: this week's flows by country vs the prior weekly report (from the history fetch_exports.py keeps).
+// Week over Week: one row per weekly report for the selected commodity, same columns as the summary table above,
+// so you can see how exports have developed through the marketing year. Rows come from the history kept by
+// fetch_exports.py (rebuilt from earlier saved runs, then one new week at a time).
 function expIso(period){ const d = parseAnyDate(period); return d ? d.toISOString().slice(0,10) : null; }
-function expPriorWeek(commName){
-  const comm = (EXPORTS_DATA.commodities || {})[commName];
-  const curIso = comm && comm.total ? expIso(comm.total.period_ending) : null;
-  if(!curIso || !EXPORTS_HISTORY || !EXPORTS_HISTORY.weeks) return null;
-  const weeks = Object.keys(EXPORTS_HISTORY.weeks).filter(w => w < curIso && EXPORTS_HISTORY.weeks[w][commName]).sort();
-  if(!weeks.length) return null;
-  const w = weeks[weeks.length-1];
-  return {iso: w, snap: EXPORTS_HISTORY.weeks[w][commName]};
-}
 
 function buildExportsWowTable(commName){
   const comm = (EXPORTS_DATA.commodities || {})[commName];
-  if(!comm) return '<div style="color:var(--text3);padding:10px 0">No data</div>';
-  const curIso = comm.total ? expIso(comm.total.period_ending) : null;
-  const prior = expPriorWeek(commName);
+  if(!comm || !comm.total) return '<div style="color:var(--text3);padding:10px 0">No data</div>';
 
-  // caption: which two weeks are being compared (and any reason they might not be like-for-like)
-  const fmtIso = iso => fmtAsOfDate(parseAnyDate(iso), true);
-  let cap = '';
-  if(prior){
-    cap = `This week: week ending ${fmtIso(curIso)} &nbsp;·&nbsp; Prior: week ending ${fmtIso(prior.iso)}`;
-    const gap = Math.round((parseAnyDate(curIso) - parseAnyDate(prior.iso)) / 86400000);
-    if(gap !== 7) cap += ` &nbsp;·&nbsp; <span class="cftc-dn">prior snapshot is ${gap} days earlier — a week in between wasn't captured</span>`;
-    if(prior.snap.mkt_year && comm.total && comm.total.mkt_year && prior.snap.mkt_year !== comm.total.mkt_year)
-      cap += ` &nbsp;·&nbsp; <span class="cftc-dn">marketing year changed between these weeks — flows aren't like-for-like</span>`;
-  } else {
-    cap = `Week ending ${curIso ? fmtIso(curIso) : '—'} &nbsp;·&nbsp; the prior week isn't on file yet — history builds from each weekly report, so the comparison fills in after the next one.`;
+  // saved weeks + the week currently in export_sales.json (the freshest pull wins for its own week)
+  const rows = {};
+  if(EXPORTS_HISTORY && EXPORTS_HISTORY.weeks){
+    Object.keys(EXPORTS_HISTORY.weeks).forEach(iso=>{ const r = EXPORTS_HISTORY.weeks[iso][commName]; if(r) rows[iso] = r.total ? Object.assign({mkt_year:r.mkt_year}, r.total) : r; });   // .total = earlier file shape
   }
+  const t = comm.total, curIso = expIso(t.period_ending);
+  if(curIso) rows[curIso] = {mkt_year:t.mkt_year, net_sales:t.net_sales, outstanding_sales:t.outstanding_sales, accumulated_exports:t.accumulated_exports,
+    total_commitment:t.total_commitment, yoy_accum_exports_pct:t.yoy_accum_exports_pct, yoy_total_commitment_pct:t.yoy_total_commitment_pct};
+  const isos = Object.keys(rows).sort().reverse();      // newest first
 
-  const groups = [
-    {label:'Net Sales', key:'net_sales'},
-    {label:'Exports (Shipped)', key:'weekly_exports'},
-    {label:'Outstanding Sales', key:'outstanding_sales'},
-  ];
-  let html = `<div class="exp-cap">${cap}</div>`;
-  html += `<table class="exp-table"><thead><tr><th rowspan="2">Country</th>`;
-  groups.forEach(g=>{ html += `<th colspan="3" class="grp-l" style="text-align:center;color:var(--amber);letter-spacing:.06em">${g.label}</th>`; });
-  html += `</tr><tr>`;
-  groups.forEach(()=>{ html += `<th class="grp-l">This Wk</th><th>Prior Wk</th><th>Chg</th>`; });
+  const n = isos.length;
+  let cap = `${n} weekly report${n===1?'':'s'} on file for this commodity`;
+  if(n < 4) cap += ' — more weeks appear as each weekly report is collected';
+
+  const cols = ['Net Sales (Wk)','Outstanding Sales','Accum. Exports (YTD)','Total Commitment','Accum. Exports YoY','Total Commitment YoY'];
+  let html = `<div class="exp-cap">${cap}</div><table class="exp-table"><thead><tr><th>Week Ending</th>`;
+  cols.forEach(c=>{ html += `<th>${c}</th>`; });
   html += `</tr></thead><tbody>`;
 
-  const cc = v => v>0 ? 'cftc-up' : (v<0 ? 'cftc-dn' : '');
-  function cells(cur, pri){
-    let h = '';
-    groups.forEach((g, gi)=>{
-      const c = cur ? cur[g.key] : null, pv = pri ? pri[g.key] : null;
-      const chg = (c!==null && c!==undefined && pv!==null && pv!==undefined) ? c - pv : null;
-      const thisCls = g.key==='net_sales' && c!==null && c!==undefined ? (c>=0?'cftc-up':'cftc-dn') : '';
-      h += `<td class="grp-l ${thisCls}">${expFmt(c)}</td><td class="prior">${prior ? expFmt(pv) : '—'}</td><td class="${chg===null?'':cc(chg)}">${prior && chg!==null ? fmtChg(chg,0) : '—'}</td>`;
-    });
-    return h;
-  }
-
-  // all-destinations total first (bold), then countries that had activity in either week, biggest net sales first
-  if(comm.total){
-    html += `<tr class="exp-total"><td>Total (all destinations)</td>${cells(comm.total, prior ? prior.snap.total : null)}</tr>`;
-  }
-  const curC = comm.countries || {}, priC = prior ? (prior.snap.countries || {}) : {};
-  const active = r => r && ((r.net_sales||0)!==0 || (r.weekly_exports||0)!==0);
-  const names = [...new Set([...Object.keys(curC), ...Object.keys(priC)])].filter(n => active(curC[n]) || active(priC[n]));
-  names.sort((a,b)=> ((curC[b]&&curC[b].net_sales)||-Infinity) - ((curC[a]&&curC[a].net_sales)||-Infinity));
-  if(!names.length){
-    html += `<tr><td colspan="10" style="color:var(--text3)">No country activity</td></tr>`;
-  } else {
-    names.forEach(n=>{ html += `<tr><td>${n}</td>${cells(curC[n], priC[n])}</tr>`; });
-  }
+  let lastMy = null;
+  isos.forEach((iso, k)=>{
+    const r = rows[iso];
+    if(r.mkt_year && r.mkt_year !== lastMy){            // marketing-year divider (weeks are comparable within one)
+      html += `<tr class="exp-row-section"><td colspan="7">Marketing year ${r.mkt_year}</td></tr>`;
+      lastMy = r.mkt_year;
+    }
+    html += `<tr class="${k===0?'exp-latest':''}"><td>${fmtAsOfDate(parseAnyDate(iso), true)}</td>`;
+    html += `<td class="${r.net_sales>=0?'cftc-up':'cftc-dn'}">${expFmt(r.net_sales)}</td>`;
+    html += `<td>${expFmt(r.outstanding_sales)}</td>`;
+    html += `<td>${expFmt(r.accumulated_exports)}</td>`;
+    html += `<td>${expFmt(r.total_commitment)}</td>`;
+    html += `<td class="${r.yoy_accum_exports_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(r.yoy_accum_exports_pct)}</td>`;
+    html += `<td class="${r.yoy_total_commitment_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(r.yoy_total_commitment_pct)}</td>`;
+    html += `</tr>`;
+  });
   html += `</tbody></table>`;
   return html;
 }
@@ -1789,10 +1766,10 @@ function renderExports(){
     exportsCommodity = commodities[0];
   }
 
-  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin-bottom:0">Commodity Summary — YTD vs Prior Year<span class="exp-hint">click a commodity to see its countries below</span></div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin-bottom:0">Commodity Summary — YTD vs Prior Year<span class="exp-hint">click a commodity to see its detail below</span></div>`);
   root.insertAdjacentHTML('beforeend', buildExportsSummaryTable());
   root.insertAdjacentHTML('beforeend', `<div id="exports-detail"></div>`);
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Metric tons (cotton: running bales); current marketing year only. Net Sales = new sales this week, net of cancellations · Exports = shipped this week · Outstanding = sold, not yet shipped · Accum. Exports = shipped YTD · Total Commitment = Accum. + Outstanding. Week over Week compares with the prior weekly report.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Metric tons (cotton: running bales); current marketing year only. Net Sales = new sales this week, net of cancellations · Outstanding = sold, not yet shipped · Accum. Exports = shipped YTD · Total Commitment = Accum. + Outstanding. Week over Week lists each weekly report, newest first.</div>`);
 
   // click a commodity in the summary to switch the detail below (no re-render of the page, so nothing jumps)
   root.querySelectorAll('.exp-table tr.exp-click').forEach(tr=>{
