@@ -12,6 +12,12 @@ on:
 permissions:
   contents: write
  
+# One run at a time: a second trigger (manual run, or two crons close together) waits for the first to finish
+# instead of racing it to push, which is what made the last push get rejected.
+concurrency:
+  group: fetch-data
+  cancel-in-progress: false
+ 
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -41,6 +47,23 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add data/psd_data.json data/cftc_data.json data/export_sales.json data/export_sales_history.json data/weather_data.json
-          git diff --staged --quiet || git commit -m "Update PSD/CFTC/Export Sales/Weather data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push
+          if git diff --staged --quiet; then
+            echo "No data changes to commit"
+            exit 0
+          fi
+          git commit -m "Update PSD/CFTC/Export Sales/Weather data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # This job takes minutes, so someone else may have pushed to main meanwhile (e.g. you uploading a file).
+          # Rebase this run's commit on top of theirs and retry. In a rebase, "-X theirs" means "prefer the commit
+          # being replayed" = this run's freshly fetched data, so a clash on a data file is resolved in favour of the new data.
+          for attempt in 1 2 3; do
+            if git pull --rebase -X theirs origin "${GITHUB_REF_NAME:-main}" && git push; then
+              echo "Pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "Push attempt $attempt failed - retrying in 5s"
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "Could not push after 3 attempts" >&2
+          exit 1
  
