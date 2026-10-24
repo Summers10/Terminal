@@ -16,7 +16,7 @@ defensively: if the expected attributes aren't found, it prints every
 attribute actually present on a sample record and exits non-zero, so a
 mismatch is caught and fixed in one pass rather than shipped silently.
 """
-import os, sys, json, urllib.request, urllib.error, re
+import os, sys, json, urllib.request, urllib.error, re, subprocess
 import xml.etree.ElementTree as ET
 from datetime import datetime
  
@@ -24,8 +24,12 @@ OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 # Rolling weekly snapshots (net sales / exports / balances by country) so the page can show week-over-week.
 # The USDA file only ever holds the current week, so the history is built up by this script, one week at a time.
 HISTORY_OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "export_sales_history.json")
-HISTORY_WEEKS = 5
-HISTORY_FIELDS = ("net_sales", "weekly_exports", "outstanding_sales", "accumulated_exports")
+HISTORY_WEEKS = 110          # ~2 marketing years of weekly rows; totals only, so the file stays small
+HISTORY_FIELDS = ("net_sales", "weekly_exports", "outstanding_sales", "accumulated_exports", "total_commitment",
+                  "yoy_accum_exports_pct", "yoy_total_commitment_pct")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EXPORT_REPO_PATH = "data/export_sales.json"
+MAX_BACKFILL_COMMITS = 1500
 URL = "https://apps.fas.usda.gov/esrqs/StaticReports/CWRCountryCommoditySummary.xml"
  
 # Only keep commodities whose name contains one of these keywords.
@@ -150,9 +154,74 @@ def period_to_iso(period):
     return f"{key[0]:04d}-{key[1]:02d}-{key[2]:02d}" if key else None
  
  
+def _slim_total(t):
+    """The weekly totals row kept per commodity per week (totals only - no country detail)."""
+    rec = {k: t.get(k) for k in HISTORY_FIELDS}
+    rec["mkt_year"] = t.get("mkt_year")
+    return rec
+ 
+ 
+def _normalise_old_snapshot(snap):
+    """Older history files nested the totals under 'total' and kept countries; flatten to the current shape."""
+    if "total" in snap and isinstance(snap["total"], dict):
+        rec = {k: snap["total"].get(k) for k in HISTORY_FIELDS}
+        rec["mkt_year"] = snap.get("mkt_year")
+    else:
+        rec = {k: snap.get(k) for k in HISTORY_FIELDS}
+        rec["mkt_year"] = snap.get("mkt_year")
+    if rec.get("total_commitment") is None and rec.get("outstanding_sales") is not None and rec.get("accumulated_exports") is not None:
+        rec["total_commitment"] = rec["outstanding_sales"] + rec["accumulated_exports"]
+    return rec
+ 
+ 
+def _git(*args):
+    return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, timeout=120)
+ 
+ 
+def backfill_from_git(weeks, current):
+    """Recover earlier weeks from earlier committed versions of export_sales.json: the workflow commits that file on
+    every run, so each commit holds one week's national totals for every commodity. Oldest -> newest, so the latest
+    pull of any given week wins (USDA revises accumulated exports). Returns (weeks_added, snapshots_rejected).
+    A snapshot is rejected if its size is wildly out of line with today's (e.g. files saved before the old
+    1000x-units bug was fixed), so bad history can never end up in the table."""
+    log = _git("log", "--reverse", "-n", str(MAX_BACKFILL_COMMITS), "--format=%H", "--", EXPORT_REPO_PATH)
+    commits = log.stdout.split()
+    if log.returncode != 0 or not commits:
+        raise ValueError("no earlier commits of export_sales.json found - the workflow checkout must use fetch-depth: 0 "
+                         f"(git said: {log.stderr.strip() or 'nothing'})")
+    added, rejected = set(), 0
+    for c in commits:
+        shown = _git("show", f"{c}:{EXPORT_REPO_PATH}")
+        if shown.returncode != 0:
+            continue
+        try:
+            old = json.loads(shown.stdout)
+        except ValueError:
+            continue
+        for name, data in (old.get("commodities") or {}).items():
+            t = (data or {}).get("total") or {}
+            iso = period_to_iso(t.get("period_ending"))
+            if not iso:
+                continue
+            rec = _slim_total(t)
+            if rec.get("total_commitment") is None and rec.get("outstanding_sales") is not None and rec.get("accumulated_exports") is not None:
+                rec["total_commitment"] = rec["outstanding_sales"] + rec["accumulated_exports"]
+            if any(rec.get(k) is None for k in ("net_sales", "outstanding_sales", "accumulated_exports", "total_commitment")):
+                rejected += 1
+                continue
+            cur = ((current["commodities"].get(name) or {}).get("total") or {}).get("total_commitment")
+            if cur and rec["total_commitment"] and not (0.02 <= rec["total_commitment"] / cur <= 50):
+                rejected += 1
+                continue
+            weeks.setdefault(iso, {})[name] = rec
+            added.add(iso)
+    return len(added), rejected
+ 
+ 
 def update_history(result):
-    """Add this week's snapshot to the rolling history (overwriting the same week if re-run: USDA revises
-    accumulated exports, so the latest pull of a week wins) and keep only the most recent HISTORY_WEEKS weeks."""
+    """Weekly national totals per commodity, one row per week, kept ~2 marketing years. Each run adds the current
+    week (re-runs of the same week overwrite it - USDA revises accumulated exports, so the latest pull wins). The
+    first time it runs it also rebuilds earlier weeks from the repo's past commits of export_sales.json."""
     hist = {"weeks": {}}
     if os.path.exists(HISTORY_OUT):
         try:
@@ -164,6 +233,22 @@ def update_history(result):
             print(f"WARNING: could not read {HISTORY_OUT} ({e}) - starting a fresh history", file=sys.stderr)
             print(f"::warning title=Export sales history was reset::{e}")
             hist = {"weeks": {}}
+    meta = hist.get("_meta") or {}
+ 
+    # tolerate the earlier file shape (nested totals + per-country detail)
+    for iso, comms in hist["weeks"].items():
+        for name, snap in list(comms.items()):
+            comms[name] = _normalise_old_snapshot(snap)
+ 
+    # one-time rebuild of earlier weeks from git history (before adding the current week, so the current pull wins)
+    if not meta.get("git_backfill"):
+        try:
+            n_weeks, n_rejected = backfill_from_git(hist["weeks"], result)
+            meta["git_backfill"] = datetime.utcnow().strftime("%Y-%m-%d")
+            print(f"History backfill from git: {n_weeks} earlier weeks recovered" + (f" ({n_rejected} snapshots rejected as implausible)" if n_rejected else ""))
+        except Exception as e:
+            print(f"WARNING: could not rebuild earlier weeks from git history - {e}", file=sys.stderr)
+            print(f"::warning title=Export history backfill skipped::{e}")
  
     snapped = 0
     for name, data in result["commodities"].items():
@@ -172,20 +257,17 @@ def update_history(result):
         if not iso:
             print(f"WARNING: no usable period-ending date for {name} - not added to history", file=sys.stderr)
             continue
-        hist["weeks"].setdefault(iso, {})[name] = {
-            "mkt_year": t.get("mkt_year"),
-            "total": {k: t.get(k) for k in HISTORY_FIELDS},
-            "countries": {c: {k: r.get(k) for k in HISTORY_FIELDS} for c, r in data["countries"].items()},
-        }
+        hist["weeks"].setdefault(iso, {})[name] = _slim_total(t)
         snapped += 1
  
     keep = sorted(hist["weeks"].keys())[-HISTORY_WEEKS:]
     hist["weeks"] = {k: hist["weeks"][k] for k in keep}
-    hist["_meta"] = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "weeks_kept": HISTORY_WEEKS}
+    meta.update({"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "weeks_kept": HISTORY_WEEKS})
+    hist["_meta"] = meta
     os.makedirs(os.path.dirname(HISTORY_OUT), exist_ok=True)
     with open(HISTORY_OUT, "w") as f:
         json.dump(hist, f, separators=(",", ":"))
-    print(f"History: {snapped} commodity snapshots saved; weeks on file: {', '.join(keep)}")
+    print(f"History: {snapped} commodity snapshots saved this run; {len(keep)} weeks on file ({keep[0]} .. {keep[-1]})")
  
  
 def main():
