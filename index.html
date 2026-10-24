@@ -57,6 +57,7 @@ td.latest{color:var(--amber) !important;font-weight:800 !important}
 td.pctile-tight{color:var(--red) !important;font-weight:800 !important}
 td.pctile-loose{color:var(--green) !important;font-weight:800 !important}
 td.pctile-mid{color:var(--text3) !important}
+td.prior{color:var(--text3)}
 td.up{color:var(--green) !important}
 td.dn{color:var(--red) !important}
 .stack-wrap{display:flex;flex-direction:column;gap:0}
@@ -229,6 +230,39 @@ function yoyPct(cur,prev){
   return (cur-prev)/Math.abs(prev)*100;
 }
 
+// ---- Prior WASDE comparison ----
+// psd_data.json carries `_prior`: the previous WASDE's numbers for each commodity's latest market year (built by
+// fetch_psd.py from the repo's own history). attachPrior() hangs each one on the matching current-year record as `_p`,
+// so every table can read "what the prior estimate was" from the same place it reads the current number.
+function attachPrior(data){
+  const pr = data && data._prior && data._prior.data;
+  if(!pr) return;
+  Object.keys(pr).forEach(comm=>{
+    const cdata = data[comm]; if(!cdata) return;
+    Object.keys(pr[comm]).forEach(country=>{
+      const cd = cdata[country]; if(!cd) return;
+      Object.keys(pr[comm][country]).forEach(y=>{ if(cd[y]) cd[y]._p = pr[comm][country][y]; });
+    });
+  });
+}
+function priorHeader(){
+  const d = parseAnyDate(DATA && DATA._prior && DATA._prior.release);
+  return d ? 'Prior ' + fmtAsOfDate(d, false) : 'Prior WASDE';
+}
+// signed change, e.g. +1,250 / -80 / 0 (0 decimals unless told otherwise)
+function fmtChg(v, d){
+  if(v===null || v===undefined || isNaN(v)) return '—';
+  const dec = d || 0;
+  const r = Number(v.toFixed(dec));
+  if(r === 0) return '0';
+  return (r>0?'+':'-') + Math.abs(r).toLocaleString(undefined, {minimumFractionDigits:dec, maximumFractionDigits:dec});
+}
+function chgClass(v, d){
+  if(v===null || v===undefined || isNaN(v)) return '';
+  const r = Number(v.toFixed(d||0));
+  return r>0 ? 'up' : (r<0 ? 'dn' : '');
+}
+
 function getRaw(yearData, key){
   const v = yearData ? yearData[key] : undefined;
   return (v!==undefined && !isNaN(v)) ? v : null;
@@ -287,16 +321,26 @@ function acresK(ahRaw){ return ahRaw===null ? null : ahRaw*ACRES_PER_HA; }
 function sumCountries(countries, countryNames, year){
   const keys=['ah','bs','pr','im','dc','ex','es'];
   const out={}; let any=false;
+  const pOut={}; let pAny=false;
   for(const k of keys){
-    let s=0, has=false;
+    let s=0, has=false, ps=0, pHas=false, pMissing=false;
     for(const c of countryNames){
       const cd = countries[c];
-      const v = cd && cd[year] ? cd[year][k] : undefined;
-      if(v!==undefined && !isNaN(v)){ s+=v; has=true; any=true; }
+      const rec = cd ? cd[year] : undefined;
+      const v = rec ? rec[k] : undefined;
+      if(v!==undefined && !isNaN(v)){
+        s+=v; has=true; any=true;
+        const pv = rec._p ? rec._p[k] : undefined;
+        if(pv!==undefined && !isNaN(pv)){ ps+=pv; pHas=true; } else { pMissing=true; }
+      }
     }
     out[k]= has ? s : undefined;
+    // the aggregate's prior is only meaningful if EVERY contributing country has a prior (else it would show a fake revision)
+    if(has && pHas && !pMissing){ pOut[k]=ps; pAny=true; }
   }
-  return any ? out : null;
+  if(!any) return null;
+  if(pAny) out._p = pOut;
+  return out;
 }
 
 function unitLabel(){
@@ -340,8 +384,8 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
     {type:'stu_pctile', label:'S/U Percentile Rank (' + fullYears.length + 'yr hist)', cls:'row-pctile'},
   ];
 
-  function displayVal(row, y){
-    const yd = yearDataFn(y);
+  // value of a row for one year-record (works for the current numbers and for the prior-WASDE `_p` record alike)
+  function valFromYd(row, yd){
     if(row.area) return acresK(getRaw(yd,'ah'));
     if(row.yield){
       if(isCotton) return yieldLbAcCotton(getRaw(yd,'pr'), getRaw(yd,'ah'));
@@ -351,22 +395,40 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
     }
     if(row.type==='total') return convertVal(getTotalRaw(yd, row.keys), currentUnit, comm);
     if(row.type==='stu') return getStu(yd);
-    if(row.type==='stu_pctile') return stuPctile(y);
     return convertVal(getRaw(yd, row.key), currentUnit, comm);
+  }
+  function displayVal(row, y){
+    if(row.type==='stu_pctile') return stuPctile(y);
+    return valFromYd(row, yearDataFn(y));
+  }
+  const latestYd = yearDataFn(latestYear);
+  const priorYd = latestYd && latestYd._p ? latestYd._p : null;
+  // prior-WASDE cells for one row; a total is only compared when every component exists in BOTH vintages
+  function priorCells(row){
+    const blank = '<td class="grp-l prior">—</td><td class="prior">—</td>';
+    if(row.type==='stu_pctile' || !priorYd) return blank;
+    if(row.type==='total' && !row.keys.every(k=>getRaw(priorYd,k)!==null && getRaw(latestYd,k)!==null)) return blank;
+    const pv = valFromYd(row, priorYd), cv = valFromYd(row, latestYd);
+    if(pv===null) return blank;
+    const d = (row.type==='stu' || row.yield) ? 1 : 0;
+    const chg = cv!==null ? cv - pv : null;
+    const pText = row.type==='stu' ? fmtStu(pv) : (row.yield ? fmt2(pv) : fmt(pv));
+    const cText = chg===null ? '—' : fmtChg(chg, d) + (row.type==='stu' && chg!==null && Number(chg.toFixed(1))!==0 ? 'pp' : '');
+    return `<td class="grp-l prior">${pText}</td><td class="${chgClass(chg, d)}">${cText}</td>`;
   }
 
   let html = `<div class="tbl-wrap"><table class="bal-table"><colgroup><col style="width:175px">`;
   for(const y of years) html += '<col>';
-  if(includeYoy) html += '<col style="width:75px">';
+  if(includeYoy) html += '<col style="width:75px"><col style="width:100px"><col style="width:80px">';
   html += `</colgroup><thead><tr><th>ITEM</th>`;
   for(const y of years) html += `<th class="${y===latestYear?'latest':''}">${y}</th>`;
-  if(includeYoy) html += `<th class="yoy">YoY Δ</th>`;
+  if(includeYoy) html += `<th class="yoy">YoY Δ</th><th class="yoy grp-l">${priorHeader()}</th><th class="yoy">Chg</th>`;
   html += `</tr></thead><tbody>`;
 
   let alt=false;
   for(const row of ROWS){
     if(row.type==='section'){
-      html += `<tr class="row-section"><td colspan="${years.length+1+(includeYoy?1:0)}">${row.label}</td></tr>`;
+      html += `<tr class="row-section"><td colspan="${years.length+1+(includeYoy?3:0)}">${row.label}</td></tr>`;
       alt=false; continue;
     }
     const cls=[row.cls||'', alt?'row-alt':''].filter(Boolean).join(' ');
@@ -397,6 +459,7 @@ function buildBalanceTable(comm, yearDataFn, years, includeYoy, allYearsFull){
         const text = row.type==='stu' ? (yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(1)+'pp') : fmtYoy(yoy);
         html += `<td class="${cls}">${text}</td>`;
       }
+      html += priorCells(row);
     }
     html += '</tr>';
   }
@@ -436,12 +499,13 @@ function buildMetricByCountryTable(countryList, countries, years, metric){
   const prevYear = years.length>1 ? years[years.length-2] : null;
   let html = `<div class="tbl-wrap"><table class="bal-table"><thead><tr><th>Country</th>`;
   years.forEach(y=>{ html += `<th class="${y===latestYear?'latest':''}">${y}</th>`; });
-  html += `<th class="yoy">YoY Δ</th>`;
+  html += `<th class="yoy">YoY Δ</th><th class="yoy grp-l">${priorHeader()}</th><th class="yoy">Chg</th>`;
   html += `</tr></thead><tbody>`;
 
   let alt=false;
   const totals = {};
   years.forEach(y=>totals[y]={sum:0,has:false});
+  const pTot = {sum:0, has:false, missing:false};   // prior total only if every country has a prior value
 
   function metricVal(cd, y){
     if(metric==='ah') return acresK(getRaw(cd[y], 'ah'));
@@ -467,6 +531,12 @@ function buildMetricByCountryTable(countryList, countries, years, metric){
     let yoyCls = 'latest';
     if(yoy!==null){ yoyCls += yoy>0?' up':(yoy<0?' dn':''); }
     html += `<td class="${yoyCls}">${fmtYoy(yoy)}</td>`;
+    // prior WASDE: the latest year's prior value for this country + the revision
+    const pRec = cd[latestYear] ? cd[latestYear]._p : undefined;
+    const pV = pRec ? (metric==='ah' ? acresK(getRaw(pRec,'ah')) : convertVal(getRaw(pRec, metric), currentUnit, currentComm)) : null;
+    if(curV!==null){ if(pV!==null){ pTot.sum += pV; pTot.has = true; } else { pTot.missing = true; } }
+    const rChg = (curV!==null && pV!==null) ? curV - pV : null;
+    html += `<td class="grp-l prior">${fmt(pV)}</td><td class="${chgClass(rChg,0)}">${fmtChg(rChg,0)}</td>`;
     html += `</tr>`;
   });
 
@@ -480,6 +550,9 @@ function buildMetricByCountryTable(countryList, countries, years, metric){
   const totPrev = prevYear && totals[prevYear].has ? totals[prevYear].sum : null;
   const totYoy = yoyPct(totCur, totPrev);
   html += `<td>${fmtYoy(totYoy)}</td>`;
+  const pTotV = (pTot.has && !pTot.missing) ? pTot.sum : null;
+  const tChg = (pTotV!==null && totCur!==null) ? totCur - pTotV : null;
+  html += `<td class="grp-l prior">${fmt(pTotV)}</td><td class="${chgClass(tChg,0)}">${fmtChg(tChg,0)}</td>`;
   html += `</tr></tbody></table></div>`;
   return html;
 }
@@ -648,7 +721,8 @@ function latestExportsDate(){
 function usdaAsOfText(comm){
   if(comm === 'Coffee' || comm === 'Sugar') return 'USDA estimates: semi-annual report';
   const d = parseAnyDate(DATA && DATA._meta && DATA._meta.wasde_release);
-  return d ? 'USDA estimates: ' + fmtAsOfDate(d, false) + ' WASDE' : '';
+  const pd = parseAnyDate(DATA && DATA._prior && DATA._prior.release);
+  return d ? 'USDA estimates: ' + fmtAsOfDate(d, false) + ' WASDE' + (pd ? ' (prior: ' + fmtAsOfDate(pd, false) + ')' : '') : '';
 }
 // Header block: line 1 = when the pipeline last ran, line 2 = what date the data itself is from
 function setMetaLines(id, runStamp, asOfText){
@@ -666,6 +740,7 @@ fetch('data/psd_data.json?_=' + Date.now())
   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(data=>{
     DATA = data;
+    attachPrior(DATA);
     updateUsdaMeta();
     initToggles();
     render();
@@ -684,6 +759,8 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-row-section td{background:var(--section-bg);color:var(--amber) !important;font-size:13px !important;font-weight:900 !important;letter-spacing:.16em;text-transform:uppercase;padding:8px 10px 6px;border-top:2px solid var(--amber)}
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+.gf{display:inline-block;min-width:62px;text-align:right}
+.gc{display:inline-block;min-width:50px;margin-left:6px;text-align:right;font-size:10.5px;font-weight:700}
 .cftc-up{color:var(--green) !important}
 .cftc-dn{color:var(--red) !important}
 .cftc-extreme-hi{background:rgba(46,143,82,.22) !important;font-weight:800 !important}
@@ -803,7 +880,14 @@ function computeRow(hist, i){
       weeklyChange = net - (prev.mm_long - prev.mm_short);
     }
   }
-  return {oi, oiChg:h.oi_chg, mmL, mmS, net, netPctOi, grossLPctOi, grossSPctOi, weeklyChange};
+  // Change in gross longs / shorts vs the prior weekly report (did funds add to, or cut, each side)
+  let grossLChg = null, grossSChg = null;
+  if(i>0){
+    const prev = hist[i-1];
+    if(prev.mm_long!==null && mmL!==null) grossLChg = mmL - prev.mm_long;
+    if(prev.mm_short!==null && mmS!==null) grossSChg = mmS - prev.mm_short;
+  }
+  return {oi, oiChg:h.oi_chg, mmL, mmS, net, netPctOi, grossLPctOi, grossSPctOi, weeklyChange, grossLChg, grossSChg};
 }
 
 function computeLatestMetrics(entry, hist){
@@ -854,6 +938,19 @@ const CFTC_COL_GROUPS = [
   {label:'Open Interest', cols:['OI','OI Chg']},
 ];
 
+// Gross long/short cell: the figure, with the week's change small beside it.
+// Colour = market stance, not sign: longs added / shorts cut = bullish (green); longs cut / shorts added = bearish (red).
+function cftcGrossCell(val, chg, isShort){
+  let chgHtml = '<span class="gc"></span>';
+  if(chg!==null && chg!==undefined && !isNaN(chg)){
+    const r = Math.round(chg);
+    const bullish = isShort ? r<0 : r>0;
+    const cls = r===0 ? '' : (bullish ? 'cftc-up' : 'cftc-dn');
+    chgHtml = `<span class="gc ${cls}" title="${isShort?'Shorts':'Longs'} ${r>0?'added':(r<0?'cut':'unchanged')} vs prior week">${r===0?'0':cftcSignedNum(r)}</span>`;
+  }
+  return `<span class="gf">${cftcFmt(val)}</span>${chgHtml}`;
+}
+
 function buildCftcRow(entry, hist){
   const m = computeLatestMetrics(entry, hist);
   let html = `<tr><td>${entry.label}</td>`;
@@ -864,8 +961,8 @@ function buildCftcRow(entry, hist){
     html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.weeklyChange)}</td>`;
     html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
     html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
-    html += `<td>${cftcFmt(m.mmL)}</td>`;
-    html += `<td>${cftcFmt(m.mmS)}</td>`;
+    html += `<td>${cftcGrossCell(m.mmL, m.grossLChg, false)}</td>`;
+    html += `<td>${cftcGrossCell(m.mmS, m.grossSChg, true)}</td>`;
     html += `<td class="${grossExtremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
     html += `<td class="${grossExtremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
     html += `<td>${cftcFmt(m.oi)}</td>`;
@@ -875,8 +972,10 @@ function buildCftcRow(entry, hist){
   return html;
 }
 
+// Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, Long%OI, Short%OI, OI, OI Chg
+const CFTC_COL_WIDTHS = [13, 9, 8, 7.5, 6.5, 13, 13, 7.5, 7.5, 8.5, 6.5];
 function buildCftcMasterTable(){
-  let html = `<table class="cftc-table"><thead>`;
+  let html = `<table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
   html += `<tr><th rowspan="2">Product</th>`;
   CFTC_COL_GROUPS.forEach(g=>{ html += `<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
   html += `</tr><tr>`;
@@ -902,7 +1001,7 @@ function renderCftc(){
   const yrs = CFTC_DATA._meta?.years_history;
   { const d = latestCftcDate(); setMetaLines('cftc-meta', CFTC_DATA._meta?.fetched_at, d ? 'Positions as of ' + fmtAsOfDate(d, true) : ''); }
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = bullish: longs added or shorts cut; red = bearish).</div>`);
 }
 
 function loadCftc(){
@@ -1051,12 +1150,15 @@ function getNextSeasonalEntry(productName){
   // and the labeled weeks are "Sep 14" / "Sep 21", this returns "Sep 14" since
   // today falls inside that week's Sep 14–20 span.
   let best = null;
-  SEASONALS_WEEKS.forEach((w,i)=>{
-    const parts = w.split(' ');
-    const d = new Date(year, monthMap[parts[0]], parseInt(parts[1],10));
-    if(d<=today && (best===null || d>best.date)){
-      best = {date:d, label:w, value:vals[i]};
-    }
+  // also try last year's dates: in early January the newest week started the previous December (Dec 28/29)
+  [year-1, year].forEach(yr=>{
+    SEASONALS_WEEKS.forEach((w,i)=>{
+      const parts = w.split(' ');
+      const d = new Date(yr, monthMap[parts[0]], parseInt(parts[1],10));
+      if(d<=today && (best===null || d>best.date)){
+        best = {date:d, label:w, value:vals[i]};
+      }
+    });
   });
   return best;
 }
@@ -1399,7 +1501,7 @@ function renderSummary(){
 .seas-section-row td{background:var(--section-bg) !important;color:var(--amber) !important;font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.08em;text-align:left;position:sticky;left:0}
 </style>
 <script>
-const SEASONALS_WEEKS = ["Dec 29","Jan 05","Jan 12","Jan 19","Jan 26","Feb 02","Feb 09","Feb 16","Feb 23","Mar 02","Mar 09","Mar 16","Mar 23","Mar 30","Apr 06","Apr 13","Apr 20","Apr 27","May 04","May 11","May 18","May 25","Jun 01","Jun 08","Jun 15","Jun 22","Jun 29","Jul 06","Jul 13","Jul 20","Jul 27","Aug 03","Aug 10","Aug 17","Aug 24","Aug 31","Sep 07","Sep 14","Sep 21","Sep 28","Oct 05","Oct 12","Oct 19","Oct 26","Nov 02","Nov 09","Nov 16"];
+const SEASONALS_WEEKS = ["Dec 29","Jan 05","Jan 12","Jan 19","Jan 26","Feb 02","Feb 09","Feb 16","Feb 23","Mar 02","Mar 09","Mar 16","Mar 23","Mar 30","Apr 06","Apr 13","Apr 20","Apr 27","May 04","May 11","May 18","May 25","Jun 01","Jun 08","Jun 15","Jun 22","Jun 29","Jul 06","Jul 13","Jul 20","Jul 27","Aug 03","Aug 10","Aug 17","Aug 24","Aug 31","Sep 07","Sep 14","Sep 21","Sep 28","Oct 05","Oct 12","Oct 19","Oct 26","Nov 02","Nov 09","Nov 16","Nov 23","Nov 30","Dec 07","Dec 14","Dec 21","Dec 28"];
 
 const SEASONALS_SECTIONS = [
   {label:'Grains', products:['Corn','Chicago Wheat','Kansas Wheat','Spring Wheat','Matif Wheat']},
@@ -1409,27 +1511,27 @@ const SEASONALS_SECTIONS = [
 ];
 
 const SEASONALS_DATA = {
-  'Corn': [4,4,5,2,4,3,4,-5,4,2,-2,-2,1,-1,4,3,1,-1,2,4,1,-1,1,-1,-5,-5,-1,4,-1,-2,-4,-4,-2,-2,-3,-2,-1,-4,-4,-4,5,4,2,-2,-3,-4,-4],
-  'Chicago Wheat': [-1,0,3,3,4,-4,2,-1,2,1,-2,1,-1,3,2,3,1,3,1,3,1,-3,-5,-5,-5,-5,-3,2,-1,-4,-4,-2,-4,-3,-3,-1,-1,1,4,4,2,1,-2,-3,-4,-3,-1],
-  'Kansas Wheat': [-2,3,4,4,4,-1,-1,0,1,2,-2,2,2,2,4,4,3,4,-1,0,-3,-2,-4,-4,-3,-3,-1,2,-3,-4,-3,-1,-4,-3,-3,-1,0,0,2,3,2,1,-2,-1,-4,-3,-2],
-  'Spring Wheat': [-2,1,-1,-1,-3,-2,2,-1,1,0,1,-5,-1,-1,4,2,0,-1,4,1,2,-5,-2,-3,0,-4,1,4,3,-4,0,-4,-4,-1,-4,-4,0,5,5,5,1,-1,-2,-1,0,0,1],
-  'Matif Wheat': [-4,0,-1,-1,-1,-3,-3,3,1,-1,1,2,1,-3,4,4,2,-1,1,5,2,-5,-4,-5,-5,-3,2,4,3,-5,4,-4,-4,-4,-4,-4,0,3,5,5,3,1,-2,-1,-1,1,-1],
-  'Soybeans': [1,4,1,1,3,5,4,3,4,-3,-2,-3,0,-1,3,5,0,-2,3,1,-1,2,-1,-3,-4,-3,-5,-4,-4,-5,-5,-4,5,4,0,-2,-5,-5,-4,2,4,5,2,2,-2,-3,-3],
-  'Soybean Meal': [1,1,1,3,4,4,-2,4,-3,-2,-1,2,-3,4,0,4,0,0,2,1,-3,-1,-3,-4,-3,-1,0,-3,1,-5,-5,-1,-4,-1,-1,-5,-4,-4,-5,-4,3,4,3,-3,-2,-3,-3],
-  'Soybean Oil': [-2,2,-1,2,3,3,3,3,-3,1,-2,-4,2,-4,1,5,-3,1,-1,4,-4,-2,2,-3,-4,4,-3,-5,-1,-4,4,-3,1,4,-3,-4,-5,-5,-4,0,4,4,2,0,-2,-2,-2],
-  'Canola Seed': [-2,-2,-1,-2,-1,3,1,5,-3,0,4,4,5,4,5,4,5,5,5,-1,2,-3,-4,-3,3,2,-3,1,-5,-5,-4,1,1,-1,-3,-5,-5,-5,-4,3,4,2,0,-2,-2,-3,-3],
-  'Matif Rapeseed': [0,-5,-4,-4,-1,-3,1,3,-1,-2,1,4,1,1,1,1,1,1,-1,-2,-3,-5,-4,-2,3,-2,-1,-3,1,-1,4,-3,1,-1,-1,-5,-3,-3,1,3,2,4,1,-2,-3,1,-3],
-  'Palm Oil': [2,-5,-3,1,4,5,4,2,3,-4,-1,-3,2,-2,-1,-4,-1,-3,-3,1,-3,-5,-4,-2,5,-4,1,2,-1,-2,-1,3,4,0,0,-1,-1,-1,-2,-3,2,-2,-1,0,-1,2,-1],
-  'Cattle': [1,-1,3,4,2,1,-2,-5,1,4,-1,-1,0,0,-5,0,2,1,1,-4,-4,-3,5,-1,5,1,4,1,-1,5,-1,-4,-4,2,-3,1,4,4,2,-1,-1,0,-1,-2,-3,-4,-1],
-  'Hogs': [-1,3,1,4,1,2,-1,4,1,1,3,0,-2,-3,0,2,0,-1,3,-4,3,2,1,4,5,4,-5,-4,-2,-1,2,5,2,2,4,4,4,4,-1,-3,3,-1,-2,-2,-3,-3,-1],
-  'Feeder Cattle': [3,1,1,-2,-1,-1,-4,-1,0,2,4,-3,2,1,-4,1,3,2,4,-5,-4,4,4,4,2,4,3,-1,-4,2,0,2,4,-3,3,-4,4,4,2,4,-1,-2,-5,4,2,-1,-1],
-  'Cotton': [1,1,3,1,1,-3,-1,-1,-1,-3,-4,-4,-1,-5,-2,-2,-2,2,1,-4,0,-5,-3,-2,-4,-4,-1,1,-3,3,-2,2,1,1,4,1,5,5,1,1,-2,-2,-3,-1,-1,-1,0],
-  'Sugar No. 11': [1,2,4,3,3,2,-4,-3,-2,-4,-4,-4,-2,0,1,1,1,2,3,-1,-1,3,2,-3,1,-1,1,-1,-3,-1,3,2,1,1,1,5,0,0,1,-2,-2,-2,-2,-2,-3,-4,-2],
-  'White Sugar': [1,4,3,3,5,3,3,-4,2,-4,-4,-2,-1,-2,1,1,-3,-1,2,1,0,1,1,2,0,-4,-2,1,1,5,-3,-3,-1,-2,1,0,5,-1,5,-1,1,-1,-3,-2,-3,3,1],
-  'Arabica Coffee': [-1,-1,0,4,4,5,5,-1,3,-1,-1,-5,0,1,5,-2,-5,-2,-3,1,1,-3,-1,1,4,-1,-1,-3,-3,1,2,3,5,5,4,5,5,2,-3,-3,-2,-3,-4,4,-4,-3,4],
-  'Robusta Coffee': [4,1,1,4,4,-3,1,3,-1,0,3,-1,-1,-4,-3,1,-1,-3,-1,-1,-1,1,0,2,4,-1,-4,-4,5,-5,-1,2,4,-2,4,-3,4,-3,2,-1,-3,-1,-3,-3,-1,4,4],
-  'NY Cocoa': [2,1,3,-1,-1,-1,4,5,1,-1,-1,4,-2,4,5,5,1,2,-1,-3,1,-5,-3,-3,-5,-1,5,-1,-2,-4,-3,-1,5,-1,-1,2,-2,2,-2,-3,-3,4,-2,5,5,3,-3],
-  'London Cocoa': [-3,1,1,-2,-1,4,-3,-1,-1,1,-3,4,2,-2,-3,1,-1,4,2,4,4,-4,-3,-1,0,2,-2,4,-4,1,-3,1,-1,-3,-1,-3,2,-1,-4,1,-3,-5,-3,2,3,4,4],
+  'Corn': [4,4,5,2,4,3,4,-5,4,2,-2,-2,1,-1,4,3,1,-1,2,4,1,-1,1,-1,-5,-5,-1,4,-1,-2,-4,-4,-2,-2,-3,-2,-1,-4,-4,-4,5,4,2,-1,-3,-4,-2,-1,0,1,4,2,2],
+  'Chicago Wheat': [-1,0,3,3,4,-4,2,-1,2,1,-2,1,-1,3,2,3,1,3,1,3,1,-3,-5,-5,-5,-5,-3,2,-1,-4,-4,-2,-4,-3,-3,-1,-1,1,4,4,2,1,-2,-1,-2,-4,-3,-2,-2,-2,0,1,-2],
+  'Kansas Wheat': [-2,3,4,4,4,-1,-1,0,1,2,-2,2,2,2,4,4,3,4,-1,0,-3,-2,-4,-4,-3,-3,-1,2,-3,-4,-3,-1,-4,-3,-3,-1,0,0,2,3,2,1,-2,-2,-3,-4,-3,-3,-2,-2,3,2,-1],
+  'Spring Wheat': [-2,1,-1,-1,-3,-2,2,-1,1,0,1,-5,-1,-1,4,2,0,-1,4,1,2,-5,-2,-3,0,-4,1,4,3,-4,0,-4,-4,-1,-4,-4,0,5,5,5,1,-1,-2,-1,-3,-4,-3,-3,-1,-2,0,-1,-2],
+  'Matif Wheat': [-4,0,-1,-1,-1,-3,-3,3,1,-1,1,2,1,-3,4,4,2,-1,1,5,2,-5,-4,-5,-5,-3,2,4,3,-5,4,-4,-4,-4,-4,-4,0,3,5,5,3,1,-2,1,-2,0,-2,-3,-4,-2,3,2,-2],
+  'Soybeans': [1,4,1,1,3,5,4,3,4,-3,-2,-3,0,-1,3,5,0,-2,3,1,-1,2,-1,-3,-4,-3,-5,-4,-4,-5,-5,-4,5,4,0,-2,-5,-5,-4,2,4,5,2,2,-1,-2,-2,2,-1,0,0,0,0],
+  'Soybean Meal': [1,1,1,3,4,4,-2,4,-3,-2,-1,2,-3,4,0,4,0,0,2,1,-3,-1,-3,-4,-3,-1,0,-3,1,-5,-5,-1,-4,-1,-1,-5,-4,-4,-5,-4,3,4,3,3,-3,-3,-3,0,-1,2,2,1,-1],
+  'Soybean Oil': [-2,2,-1,2,3,3,3,3,-3,1,-2,-4,2,-4,1,5,-3,1,-1,4,-4,-2,2,-3,-4,4,-3,-5,-1,-4,4,-3,1,4,-3,-4,-5,-5,-4,0,4,4,2,0,-2,-2,-2,-2,-4,-4,-1,0,2],
+  'Canola Seed': [-2,-2,-1,-2,-1,3,1,5,-3,0,4,4,5,4,5,4,5,5,5,-1,2,-3,-4,-3,3,2,-3,1,-5,-5,-4,1,1,-1,-3,-5,-5,-5,-4,3,4,2,0,2,0,-3,-4,-3,-3,-1,-1,1,-1],
+  'Matif Rapeseed': [0,-5,-4,-4,-1,-3,1,3,-1,-2,1,4,1,1,1,1,1,1,-1,-2,-3,-5,-4,-2,3,-2,-1,-3,1,-1,4,-3,1,-1,-1,-5,-3,-3,1,3,2,4,1,4,1,-3,-5,-3,0,0,0,-1,2],
+  'Palm Oil': [2,-5,-3,1,4,5,4,2,3,-4,-1,-3,2,-2,-1,-4,-1,-3,-3,1,-3,-5,-4,-2,5,-4,1,2,-1,-2,-1,3,4,0,0,-1,-1,-1,-2,-3,2,-2,-1,5,2,-1,-2,2,-2,-2,3,3,3],
+  'Cattle': [1,-1,3,4,2,1,-2,-5,1,4,-1,-1,0,0,-5,0,2,1,1,-4,-4,-3,5,-1,5,1,4,1,-1,5,-1,-4,-4,2,-3,1,4,4,2,-1,-1,0,-1,-2,-3,-4,-1,-4,-2,0,5,4,1],
+  'Hogs': [-1,3,1,4,1,2,-1,4,1,1,3,0,-2,-3,0,2,0,-1,3,-4,3,2,1,4,5,4,-5,-4,-2,-1,2,5,2,2,4,4,4,4,-1,-3,3,-1,-2,-3,-4,-3,1,-2,-3,-3,3,2,-3],
+  'Feeder Cattle': [3,1,1,-2,-1,-1,-4,-1,0,2,4,-3,2,1,-4,1,3,2,4,-5,-4,4,4,4,2,4,3,-1,-4,2,0,2,4,-3,3,-4,4,4,2,4,-1,-2,-5,-5,-3,-5,2,-4,3,1,5,3,3],
+  'Cotton': [1,1,3,1,1,-3,-1,-1,-1,-3,-4,-4,-1,-5,-2,-2,-2,2,1,-4,0,-5,-3,-2,-4,-4,-1,1,-3,3,-2,2,1,1,4,1,5,5,1,1,-2,-2,-3,-3,-2,-2,-1,0,2,2,4,2,4],
+  'Sugar No. 11': [1,2,4,3,3,2,-4,-3,-2,-4,-4,-4,-2,0,1,1,1,2,3,-1,-1,3,2,-3,1,-1,1,-1,-3,-1,3,2,1,1,1,5,0,0,1,-2,-2,-2,-2,-2,0,-1,-4,-5,-5,-5,-3,1,1],
+  'White Sugar': [1,4,3,3,5,3,3,-4,2,-4,-4,-2,-1,-2,1,1,-3,-1,2,1,0,1,1,2,0,-4,-2,1,1,5,-3,-3,-1,-2,1,0,5,-1,5,-1,1,-1,-3,-4,-2,-3,-5,-5,-5,-5,-2,1,2],
+  'Arabica Coffee': [-1,-1,0,4,4,5,5,-1,3,-1,-1,-5,0,1,5,-2,-5,-2,-3,1,1,-3,-1,1,4,-1,-1,-3,-3,1,2,3,5,5,4,5,5,2,-3,-3,-2,-3,-4,-2,3,4,4,1,0,-3,-2,-3,-1],
+  'Robusta Coffee': [4,1,1,4,4,-3,1,3,-1,0,3,-1,-1,-4,-3,1,-1,-3,-1,-1,-1,1,0,2,4,-1,-4,-4,5,-5,-1,2,4,-2,4,-3,4,-3,2,-1,-3,-1,-3,-4,1,1,4,0,1,-2,-3,-3,-1],
+  'NY Cocoa': [2,1,3,-1,-1,-1,4,5,1,-1,-1,4,-2,4,5,5,1,2,-1,-3,1,-5,-3,-3,-5,-1,5,-1,-2,-4,-3,-1,5,-1,-1,2,-2,2,-2,-3,-3,4,-2,-3,3,3,4,0,3,3,0,-3,-3],
+  'London Cocoa': [-3,1,1,-2,-1,4,-3,-1,-1,1,-3,4,2,-2,-3,1,-1,4,2,4,4,-4,-3,-1,0,2,-2,4,-4,1,-3,1,-1,-3,-1,-3,2,-1,-4,1,-3,-5,-3,-3,3,4,4,-2,1,3,0,-3,-4],
 };
 
 function seasonalColor(v){
@@ -1446,10 +1548,19 @@ function seasonalColor(v){
 
 let seasonalsMonth = null;
 
-function getSeasonalsMonths(){
-  const months = [];
-  SEASONALS_WEEKS.forEach(w=>{ const m=w.split(' ')[0]; if(!months.includes(m)) months.push(m); });
-  return months;
+// Calendar order. The list's first slot ("Dec 29") is the week straddling New Year, so it is shown with January.
+const SEAS_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function getSeasonalsMonths(){ return SEAS_MONTHS; }
+function seasWeekMonth(i){ return i===0 ? 'Jan' : SEASONALS_WEEKS[i].split(' ')[0]; }
+// Selected month + the next 2, wrapping at year end (Dec -> Jan, Feb). When a window runs Dec -> Jan the New Year
+// week is already covered by the final "Dec 28" slot, so the leading "Dec 29" slot is left out to avoid a duplicate.
+function seasWindow(startMonth){
+  const s = SEAS_MONTHS.indexOf(startMonth);
+  const window = [0,1,2].map(k=>SEAS_MONTHS[(s+k)%12]);
+  const wraps = window.indexOf('Dec')>=0 && window.indexOf('Jan')>=0 && window.indexOf('Dec') < window.indexOf('Jan');
+  const cols = [];
+  window.forEach(m=>{ SEASONALS_WEEKS.forEach((w,i)=>{ if(seasWeekMonth(i)===m && !(wraps && i===0)) cols.push({w,i}); }); });
+  return {window, cols};
 }
 
 function defaultSeasonalsMonth(){
@@ -1459,10 +1570,7 @@ function defaultSeasonalsMonth(){
 }
 
 function buildSeasonalsTable(startMonth){
-  const months = getSeasonalsMonths();
-  const startIdx = months.indexOf(startMonth);
-  const windowMonths = months.slice(startIdx, startIdx+3); // rolling quarter: selected month + next 2
-  const cols = SEASONALS_WEEKS.map((w,i)=>({w,i})).filter(o=>windowMonths.includes(o.w.split(' ')[0]));
+  const cols = seasWindow(startMonth).cols;   // rolling quarter: selected month + next 2 (wraps at year end)
 
   let html = `<table class="seas-table"><thead><tr><th class="seas-label-h">Product</th>`;
   cols.forEach(o=>{ html += `<th>${o.w}</th>`; });
@@ -1493,7 +1601,7 @@ function renderSeasonals(){
   months.forEach(m=>{
     selHtml += `<button class="tbtn seas-month-btn${m===seasonalsMonth?' active':''}" data-m="${m}">${m}</button>`;
   });
-  selHtml += `</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">Showing ${seasonalsMonth} through the following 2 months</div>`;
+  selHtml += `</div><div style="font-size:12px;color:var(--text3);margin-bottom:10px">Showing ${seasWindow(seasonalsMonth).window[0]} through ${seasWindow(seasonalsMonth).window[2]}</div>`;
   root.innerHTML = selHtml + buildSeasonalsTable(seasonalsMonth) + `<div class="page-footnote">Forward-looking weekly seasonal score (-5 to +5), 15-year lookback. Static — manually entered, not auto-updating.</div>`;
   root.querySelectorAll('.seas-month-btn').forEach(b=>{
     b.addEventListener('click', ()=>{ seasonalsMonth = b.dataset.m; renderSeasonals(); });
@@ -1508,12 +1616,22 @@ renderSeasonals();
 .exp-table th:first-child{text-align:left;width:20%}
 .exp-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .exp-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+.exp-table td.prior{color:var(--text3)}
+.exp-table tr.exp-total td{background:var(--section-bg);color:var(--text);font-weight:900}
+.exp-table tr.exp-click{cursor:pointer}
+.exp-table tr.exp-click:hover td{background:var(--row-alt)}
+.exp-table tr.exp-sel td{background:var(--row-latest)}
+.exp-table tr.exp-sel td:first-child{color:var(--amber);box-shadow:inset 3px 0 0 var(--amber)}
+.exp-hint{margin-left:12px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:none;color:var(--text3)}
+.exp-cap{font-size:12px;color:var(--text3);margin:0 0 8px}
 .exp-row-section td{background:var(--section-bg);color:var(--amber) !important;font-size:13px !important;font-weight:900 !important;letter-spacing:.16em;text-transform:uppercase;padding:8px 10px 6px;border-top:2px solid var(--amber)}
 #exports-err{padding:40px;text-align:center;color:var(--red);font-size:14px}
 </style>
 <script>
 let EXPORTS_DATA = null;
 let exportsCommodity = null;
+let exportsView = 'country';     // 'country' | 'wow'
+let EXPORTS_HISTORY = null;      // weekly snapshots kept by fetch_exports.py (needed for week-over-week)
 
 function expFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
 function expSignedPct(v){
@@ -1539,7 +1657,7 @@ function buildExportsSummaryTable(){
   Object.keys(commodities).forEach(commName=>{
     const t = commodities[commName].total;
     if(!t) return;
-    html += `<tr><td>${commName}</td>`;
+    html += `<tr class="exp-click${commName===exportsCommodity?' exp-sel':''}" data-c="${commName.replace(/"/g,'&quot;')}" title="Click for the country detail below"><td>${commName}</td>`;
     html += `<td class="${t.net_sales>=0?'cftc-up':'cftc-dn'}">${expFmt(t.net_sales)}</td>`;
     html += `<td>${expFmt(t.outstanding_sales)}</td>`;
     html += `<td>${expFmt(t.accumulated_exports)}</td>`;
@@ -1548,6 +1666,78 @@ function buildExportsSummaryTable(){
     html += `<td class="${t.yoy_total_commitment_pct>=0?'cftc-up':'cftc-dn'}">${expSignedPct(t.yoy_total_commitment_pct)}</td>`;
     html += `</tr>`;
   });
+  html += `</tbody></table>`;
+  return html;
+}
+
+// Week over week: this week's flows by country vs the prior weekly report (from the history fetch_exports.py keeps).
+function expIso(period){ const d = parseAnyDate(period); return d ? d.toISOString().slice(0,10) : null; }
+function expPriorWeek(commName){
+  const comm = (EXPORTS_DATA.commodities || {})[commName];
+  const curIso = comm && comm.total ? expIso(comm.total.period_ending) : null;
+  if(!curIso || !EXPORTS_HISTORY || !EXPORTS_HISTORY.weeks) return null;
+  const weeks = Object.keys(EXPORTS_HISTORY.weeks).filter(w => w < curIso && EXPORTS_HISTORY.weeks[w][commName]).sort();
+  if(!weeks.length) return null;
+  const w = weeks[weeks.length-1];
+  return {iso: w, snap: EXPORTS_HISTORY.weeks[w][commName]};
+}
+
+function buildExportsWowTable(commName){
+  const comm = (EXPORTS_DATA.commodities || {})[commName];
+  if(!comm) return '<div style="color:var(--text3);padding:10px 0">No data</div>';
+  const curIso = comm.total ? expIso(comm.total.period_ending) : null;
+  const prior = expPriorWeek(commName);
+
+  // caption: which two weeks are being compared (and any reason they might not be like-for-like)
+  const fmtIso = iso => fmtAsOfDate(parseAnyDate(iso), true);
+  let cap = '';
+  if(prior){
+    cap = `This week: week ending ${fmtIso(curIso)} &nbsp;·&nbsp; Prior: week ending ${fmtIso(prior.iso)}`;
+    const gap = Math.round((parseAnyDate(curIso) - parseAnyDate(prior.iso)) / 86400000);
+    if(gap !== 7) cap += ` &nbsp;·&nbsp; <span class="cftc-dn">prior snapshot is ${gap} days earlier — a week in between wasn't captured</span>`;
+    if(prior.snap.mkt_year && comm.total && comm.total.mkt_year && prior.snap.mkt_year !== comm.total.mkt_year)
+      cap += ` &nbsp;·&nbsp; <span class="cftc-dn">marketing year changed between these weeks — flows aren't like-for-like</span>`;
+  } else {
+    cap = `Week ending ${curIso ? fmtIso(curIso) : '—'} &nbsp;·&nbsp; the prior week isn't on file yet — history builds from each weekly report, so the comparison fills in after the next one.`;
+  }
+
+  const groups = [
+    {label:'Net Sales', key:'net_sales'},
+    {label:'Exports (Shipped)', key:'weekly_exports'},
+    {label:'Outstanding Sales', key:'outstanding_sales'},
+  ];
+  let html = `<div class="exp-cap">${cap}</div>`;
+  html += `<table class="exp-table"><thead><tr><th rowspan="2">Country</th>`;
+  groups.forEach(g=>{ html += `<th colspan="3" class="grp-l" style="text-align:center;color:var(--amber);letter-spacing:.06em">${g.label}</th>`; });
+  html += `</tr><tr>`;
+  groups.forEach(()=>{ html += `<th class="grp-l">This Wk</th><th>Prior Wk</th><th>Chg</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  const cc = v => v>0 ? 'cftc-up' : (v<0 ? 'cftc-dn' : '');
+  function cells(cur, pri){
+    let h = '';
+    groups.forEach((g, gi)=>{
+      const c = cur ? cur[g.key] : null, pv = pri ? pri[g.key] : null;
+      const chg = (c!==null && c!==undefined && pv!==null && pv!==undefined) ? c - pv : null;
+      const thisCls = g.key==='net_sales' && c!==null && c!==undefined ? (c>=0?'cftc-up':'cftc-dn') : '';
+      h += `<td class="grp-l ${thisCls}">${expFmt(c)}</td><td class="prior">${prior ? expFmt(pv) : '—'}</td><td class="${chg===null?'':cc(chg)}">${prior && chg!==null ? fmtChg(chg,0) : '—'}</td>`;
+    });
+    return h;
+  }
+
+  // all-destinations total first (bold), then countries that had activity in either week, biggest net sales first
+  if(comm.total){
+    html += `<tr class="exp-total"><td>Total (all destinations)</td>${cells(comm.total, prior ? prior.snap.total : null)}</tr>`;
+  }
+  const curC = comm.countries || {}, priC = prior ? (prior.snap.countries || {}) : {};
+  const active = r => r && ((r.net_sales||0)!==0 || (r.weekly_exports||0)!==0);
+  const names = [...new Set([...Object.keys(curC), ...Object.keys(priC)])].filter(n => active(curC[n]) || active(priC[n]));
+  names.sort((a,b)=> ((curC[b]&&curC[b].net_sales)||-Infinity) - ((curC[a]&&curC[a].net_sales)||-Infinity));
+  if(!names.length){
+    html += `<tr><td colspan="10" style="color:var(--text3)">No country activity</td></tr>`;
+  } else {
+    names.forEach(n=>{ html += `<tr><td>${n}</td>${cells(curC[n], priC[n])}</tr>`; });
+  }
   html += `</tbody></table>`;
   return html;
 }
@@ -1599,29 +1789,38 @@ function renderExports(){
     exportsCommodity = commodities[0];
   }
 
-  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin-bottom:0">Commodity Summary — YTD vs Prior Year</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin-bottom:0">Commodity Summary — YTD vs Prior Year<span class="exp-hint">click a commodity to see its countries below</span></div>`);
   root.insertAdjacentHTML('beforeend', buildExportsSummaryTable());
+  root.insertAdjacentHTML('beforeend', `<div id="exports-detail"></div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Metric tons (cotton: running bales); current marketing year only. Net Sales = new sales this week, net of cancellations · Exports = shipped this week · Outstanding = sold, not yet shipped · Accum. Exports = shipped YTD · Total Commitment = Accum. + Outstanding. Week over Week compares with the prior weekly report.</div>`);
 
-  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:24px 0 0">By Country — Largest to Smallest</div>`);
-
-  const selWrap = document.createElement('div');
-  selWrap.style.margin = '14px 0';
-  selWrap.className = 'toggle';
-  selWrap.style.display = 'inline-flex';
-  selWrap.style.flexWrap = 'wrap';
-  commodities.forEach(c=>{
-    const btn = document.createElement('button');
-    btn.className = 'tbtn exp-comm-btn' + (c===exportsCommodity ? ' active' : '');
-    btn.dataset.c = c;
-    btn.textContent = c;
-    btn.addEventListener('click', ()=>{ exportsCommodity = c; renderExports(); });
-    selWrap.appendChild(btn);
+  // click a commodity in the summary to switch the detail below (no re-render of the page, so nothing jumps)
+  root.querySelectorAll('.exp-table tr.exp-click').forEach(tr=>{
+    tr.addEventListener('click', ()=>{ exportsCommodity = tr.dataset.c; renderExportsDetail(); });
   });
-  root.appendChild(selWrap);
-
-  root.insertAdjacentHTML('beforeend', buildExportsCountryTable(exportsCommodity));
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Figures in metric tons — current marketing year only (excludes forward sales already booked against next marketing year). Net Sales — new sales this week, net of cancellations. Outstanding Sales — sold but not yet shipped. Accum. Exports (YTD) — shipped so far this marketing year. Total Commitment — Accum. Exports + Outstanding Sales.</div>`);
+  renderExportsDetail();
 }
+
+// The lower section: country breakdown or week-over-week for the commodity selected in the summary table.
+function renderExportsDetail(){
+  const box = document.getElementById('exports-detail');
+  if(!box || !EXPORTS_DATA) return;
+  document.querySelectorAll('#exports-root tr.exp-click').forEach(tr=>tr.classList.toggle('exp-sel', tr.dataset.c === exportsCommodity));
+  const title = exportsView === 'wow'
+    ? `Week over Week — ${exportsCommodity}`
+    : `By Country — ${exportsCommodity} — Largest to Smallest`;
+  let html = `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:24px 0 0">${title}</div>`;
+  html += `<div class="toggle" style="display:inline-flex;margin:14px 0"><button class="tbtn exp-view-btn${exportsView==='country'?' active':''}" data-v="country">Country Breakdown</button><button class="tbtn exp-view-btn${exportsView==='wow'?' active':''}" data-v="wow">Week over Week</button></div>`;
+  html += exportsView === 'wow' ? buildExportsWowTable(exportsCommodity) : buildExportsCountryTable(exportsCommodity);
+  box.innerHTML = html;
+  box.querySelectorAll('.exp-view-btn').forEach(b=>b.addEventListener('click', ()=>{ exportsView = b.dataset.v; renderExportsDetail(); }));
+}
+
+// Week-over-week history is optional: without it the toggle still works and says the prior week isn't on file yet.
+fetch('data/export_sales_history.json?_=' + Date.now())
+  .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(h=>{ EXPORTS_HISTORY = h; renderExportsDetail(); })
+  .catch(()=>{ /* not created yet - fine */ });
 
 fetch('data/export_sales.json?_=' + Date.now())
   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
@@ -1679,16 +1878,24 @@ function sumAcrossOils(entityFn, year, commList){
   const list = commList || VEGOILS;
   const keys = ['bs','pr','im','dc','ex','es'];
   const out = {}; let any = false;
+  const pOut = {}; let pAny = false;
   keys.forEach(k=>{
-    let s = 0, has = false;
+    let s = 0, has = false, ps = 0, pHas = false, pMissing = false;
     list.forEach(oil=>{
       const yd = entityFn(oil, year);
       const v = yd ? yd[k] : undefined;
-      if(v !== undefined && !isNaN(v)){ s += v; has = true; any = true; }
+      if(v !== undefined && !isNaN(v)){
+        s += v; has = true; any = true;
+        const pv = yd._p ? yd._p[k] : undefined;
+        if(pv !== undefined && !isNaN(pv)){ ps += pv; pHas = true; } else { pMissing = true; }
+      }
     });
     out[k] = has ? s : undefined;
+    if(has && pHas && !pMissing){ pOut[k] = ps; pAny = true; }
   });
-  return any ? out : null;
+  if(!any) return null;
+  if(pAny) out._p = pOut;
+  return out;
 }
 
 function buildOilBalanceTable(yearDataFn, years, includeYoy, allYearsFull){
@@ -1719,26 +1926,42 @@ function buildOilBalanceTable(yearDataFn, years, includeYoy, allYearsFull){
     {type:'stu_pctile', label:'S/U Percentile Rank (' + fullYears.length + 'yr hist)', cls:'row-pctile'},
   ];
 
-  function displayVal(row, y){
-    const yd = yearDataFn(y);
+  function valFromYd(row, yd){
     if(row.type==='total') return getTotalRaw(yd, row.keys);
     if(row.type==='stu') return getStu(yd);
-    if(row.type==='stu_pctile') return stuPctile(y);
     return getRaw(yd, row.key);
+  }
+  function displayVal(row, y){
+    if(row.type==='stu_pctile') return stuPctile(y);
+    return valFromYd(row, yearDataFn(y));
+  }
+  const latestYd = yearDataFn(latestYear);
+  const priorYd = latestYd && latestYd._p ? latestYd._p : null;
+  function priorCells(row){
+    const blank = '<td class="grp-l prior">—</td><td class="prior">—</td>';
+    if(row.type==='stu_pctile' || !priorYd) return blank;
+    if(row.type==='total' && !row.keys.every(k=>getRaw(priorYd,k)!==null && getRaw(latestYd,k)!==null)) return blank;
+    const pv = valFromYd(row, priorYd), cv = valFromYd(row, latestYd);
+    if(pv===null) return blank;
+    const d = row.type==='stu' ? 1 : 0;
+    const chg = cv!==null ? cv - pv : null;
+    const pText = row.type==='stu' ? fmtStu(pv) : fmt(pv);
+    const cText = chg===null ? '—' : fmtChg(chg, d) + (row.type==='stu' && Number(chg.toFixed(1))!==0 ? 'pp' : '');
+    return `<td class="grp-l prior">${pText}</td><td class="${chgClass(chg, d)}">${cText}</td>`;
   }
 
   let html = `<div class="tbl-wrap"><table class="oil-table"><colgroup><col style="width:190px">`;
   years.forEach(()=>{ html += '<col>'; });
-  if(includeYoy) html += '<col style="width:75px">';
+  if(includeYoy) html += '<col style="width:75px"><col style="width:100px"><col style="width:80px">';
   html += `</colgroup><thead><tr><th>ITEM</th>`;
   years.forEach(y=>{ html += `<th class="${y===latestYear?'latest':''}">${y}</th>`; });
-  if(includeYoy) html += `<th class="yoy">YoY Δ</th>`;
+  if(includeYoy) html += `<th class="yoy">YoY Δ</th><th class="yoy grp-l">${priorHeader()}</th><th class="yoy">Chg</th>`;
   html += `</tr></thead><tbody>`;
 
   let alt = false;
   ROWS.forEach(row=>{
     if(row.type==='section'){
-      html += `<tr class="row-section"><td colspan="${years.length+1+(includeYoy?1:0)}">${row.label}</td></tr>`;
+      html += `<tr class="row-section"><td colspan="${years.length+1+(includeYoy?3:0)}">${row.label}</td></tr>`;
       alt = false; return;
     }
     const cls = [row.cls||'', alt?'row-alt':''].filter(Boolean).join(' ');
@@ -1769,6 +1992,7 @@ function buildOilBalanceTable(yearDataFn, years, includeYoy, allYearsFull){
         const text = row.type==='stu' ? (yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(1)+'pp') : fmtYoy(yoy);
         html += `<td class="${cls}">${text}</td>`;
       }
+      html += priorCells(row);
     }
     html += '</tr>';
   });
