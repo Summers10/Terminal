@@ -4,7 +4,7 @@ Basic USDA FAS PSD fetcher — grains only (Wheat, Corn, Soybeans, Canola).
 Bulk CSV download from PSD Online, no API key required.
 Saves data/psd_data.json.
 """
-import os, sys, json, urllib.request, urllib.error, csv, io, zipfile, re, html as html_lib
+import os, sys, json, urllib.request, urllib.error, csv, io, zipfile, re, subprocess, html as html_lib
 from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
  
@@ -146,7 +146,7 @@ def resolve_wasde_release(schedule, now_utc):
  
  
 def get_wasde_meta(now_utc):
-    """Never raises. Returns the _meta fields describing which WASDE the pulled data reflects."""
+    """Never raises. Returns (meta_fields, schedule, release_date) describing which WASDE the pulled data reflects."""
     problem = None
     try:
         schedule, source = fetch_wasde_schedule(), "usda.gov WASDE page"
@@ -162,7 +162,75 @@ def get_wasde_meta(now_utc):
         print(f"WARNING: WASDE date: {problem}", file=sys.stderr)
         print(f"::warning title=USDA data-as-of date::{problem}")
     print(f"WASDE release this data reflects: {release} (source: {source})")
-    return {"wasde_release": release.isoformat() if release else None, "wasde_source": source}
+    return {"wasde_release": release.isoformat() if release else None, "wasde_source": source}, schedule, release
+ 
+ 
+# --- Prior WASDE snapshot -------------------------------------------------------------------------
+# PSD only publishes the latest estimates, so "what did the previous WASDE say?" comes from this repo's own
+# history: the workflow commits data/psd_data.json every day, so the version committed just BEFORE the current
+# WASDE came out holds the previous release's numbers. Only the latest market year per commodity is kept (that is
+# the column the tables compare). Non-fatal: if git history isn't available the page just shows no prior column.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PSD_REPO_PATH = "data/psd_data.json"
+PRIOR_KEYS = ("ah", "bs", "pr", "im", "dc", "ex", "es")
+ 
+ 
+def _git(*args):
+    return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, timeout=90)
+ 
+ 
+def get_prior_snapshot(result, current_release, schedule):
+    """Never raises. Returns the _prior block, or None (after a loud warning) if it can't be built."""
+    problem = None
+    try:
+        if current_release is None:
+            raise ValueError("current WASDE release unknown")
+        cutoff = datetime(current_release.year, current_release.month, current_release.day, 12, 0,
+                          tzinfo=ZoneInfo("America/New_York"))
+        log = _git("log", f"--until={cutoff.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                   "-n", "1", "--format=%H", "--", PSD_REPO_PATH)
+        commit = log.stdout.strip()
+        if log.returncode != 0 or not commit:
+            raise ValueError("no earlier commit of psd_data.json found - the workflow checkout must use fetch-depth: 0 "
+                             f"(git said: {log.stderr.strip() or 'nothing'})")
+        shown = _git("show", f"{commit}:{PSD_REPO_PATH}")
+        if shown.returncode != 0:
+            raise ValueError(f"could not read {PSD_REPO_PATH} at {commit[:10]}: {shown.stderr.strip()}")
+        old = json.loads(shown.stdout)
+        fetched = (old.get("_meta") or {}).get("fetched_at")
+        if not fetched:
+            raise ValueError(f"commit {commit[:10]} has no fetched_at - can't tell which release it holds")
+        fetched_dt = datetime.strptime(fetched, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        prior_release = resolve_wasde_release(schedule, fetched_dt)
+        if prior_release is None or prior_release >= current_release:
+            raise ValueError(f"commit {commit[:10]} (pulled {fetched}) does not hold an earlier release than {current_release}")
+ 
+        data, n_rows = {}, 0
+        for comm, countries in result.items():
+            if comm.startswith("_") or comm not in old:
+                continue
+            years = {y for yrs in countries.values() for y in yrs}
+            if not years:
+                continue
+            latest = max(years)
+            for country, yrs in countries.items():
+                rec = ((old.get(comm) or {}).get(country) or {}).get(latest)
+                if not rec:
+                    continue
+                slim = {k: rec[k] for k in PRIOR_KEYS if k in rec}
+                if slim:
+                    data.setdefault(comm, {}).setdefault(country, {})[latest] = slim
+                    n_rows += 1
+        if not data:
+            raise ValueError(f"commit {commit[:10]} shares no commodity/country rows with the current data")
+        print(f"Prior WASDE snapshot: release {prior_release} from commit {commit[:10]} (pulled {fetched}) - "
+              f"{len(data)} commodities, {n_rows} country rows")
+        return {"release": prior_release.isoformat(), "commit": commit[:10], "fetched_at": fetched, "data": data}
+    except Exception as e:
+        problem = f"{type(e).__name__}: {e}"
+    print(f"WARNING: prior-WASDE comparison unavailable - {problem}", file=sys.stderr)
+    print(f"::warning title=Prior WASDE comparison unavailable::{problem}")
+    return None
  
  
 def parse_csv_zip(zipdata, result, world_by_country, unmapped_attrs):
@@ -338,11 +406,15 @@ def main():
         sys.exit(1)
  
     meta = {"fetched_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
-    meta.update(get_wasde_meta(datetime.now(timezone.utc)))
+    wasde_meta, schedule, release = get_wasde_meta(datetime.now(timezone.utc))
+    meta.update(wasde_meta)
+    prior = get_prior_snapshot(result, release, schedule)
  
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
         result["_meta"] = meta
+        if prior:
+            result["_prior"] = prior
         json.dump(result, f, indent=2)
  
     size = os.path.getsize(OUT)
