@@ -59,6 +59,8 @@ OUTLOOK_VARS = {
     "precip_mean": ["precipitation_mean", "precipitation_sum"],
 }
  
+FRESH_HOURS = 20   # skip the fetch if the saved file is newer than this (the workflow runs several times a day)
+ 
 HISTORY_YEARS = 10
 PAST_DAYS = 92       # Open-Meteo's documented max for this parameter; still covers the 90-day trailing window
 FORECAST_DAYS = 16   # Open-Meteo's max; we only use the first 14
@@ -315,9 +317,39 @@ def avg(lst):
     return (sum(lst) / len(lst)) if lst else None
  
  
+def saved_data_is_fresh(region_names):
+    """True if data/weather_data.json is recent enough that re-fetching would only burn Open-Meteo's free allowance.
+    Always refetches when forced (WEATHER_FORCE=1, set for manual workflow runs), when the region list or file shape
+    has changed, or when the last run's outlook failed (so a failed outlook is retried on the next run)."""
+    if os.environ.get("WEATHER_FORCE"):
+        return False, "forced (WEATHER_FORCE set)"
+    try:
+        with open(OUT) as f:
+            d = json.load(f)
+        fetched = datetime.strptime(d["_meta"]["fetched_at"], "%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return False, "no usable saved file"
+    regions = d.get("regions") or {}
+    if set(regions) != set(region_names):
+        return False, "region list changed"
+    if any("outlook_temp_dep_c" not in r for r in regions.values()):
+        return False, "saved file predates the outlook fields"
+    if (d["_meta"].get("outlook_error")):
+        return False, "last run's outlook failed - retrying"
+    age_h = (datetime.utcnow() - fetched).total_seconds() / 3600
+    if age_h < FRESH_HOURS:
+        return True, f"saved data is {age_h:.1f}h old (< {FRESH_HOURS}h)"
+    return False, f"saved data is {age_h:.1f}h old"
+ 
+ 
 def main():
     print("Fetching weather data (Open-Meteo, no API key) for major grain-growing regions...")
     n = len(REGIONS)
+    fresh, why = saved_data_is_fresh([r[1] for r in REGIONS])
+    if fresh:
+        print(f"Skipping weather fetch - {why}. (Set WEATHER_FORCE=1 to refresh anyway.)")
+        return
+    print(f"Fetching because: {why}")
     lats = [r[2] for r in REGIONS]
     lons = [r[3] for r in REGIONS]
     today = date.today()
