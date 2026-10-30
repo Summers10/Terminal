@@ -1475,12 +1475,14 @@ function buildCropCalendarTable(){
 function renderSummary(){
   const root = document.getElementById('summary-root');
   root.innerHTML = '';
-  // All four fetchers run in the same workflow job, so one timestamp covers everything.
-  // Show the OLDEST source timestamp so this can never overstate freshness if one source lags.
+  // The fetchers run together, but not every run refreshes every source (weather skips itself when its data is under
+  // 20h old, and a failed fetcher keeps its previous data) - so show the NEWEST run time here. How fresh each source's
+  // data really is is what the "Data as of" line below is for.
   const stamps = [DATA, CFTC_DATA, EXPORTS_DATA, WEATHER_DATA]
     .map(d => d && d._meta && d._meta.fetched_at)
     .filter(Boolean)
-    .sort();
+    .sort()
+    .reverse();
   const asOf = [];
   { const d = latestCftcDate(); if(d) asOf.push('CFTC ' + fmtAsOfDate(d, true)); }
   { const d = parseAnyDate(DATA && DATA._meta && DATA._meta.wasde_release); if(d) asOf.push('USDA ' + fmtAsOfDate(d, false) + ' WASDE'); }
