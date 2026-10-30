@@ -157,7 +157,7 @@
       "precip_90d_pct_normal": 64.74130122022697,
       "precip_90d_mm": 121.49999999999999,
       "temp_dep_7d_c": -2.1185714285714283,
-      "temp_dep_14d_forecast_c": -0.754999999999999,
+      "temp_dep_14d_forecast_c": -0.7514285714285691,
       "temp_14d_forecast_hi_c": 17.5,
       "temp_14d_forecast_lo_c": 1.7,
       "precip_14d_forecast_pct_normal": 11.764705882352946,
@@ -257,7 +257,7 @@
     }
   },
   "_meta": {
-    "fetched_at": "2026-10-30T22:11:21Z",
+    "fetched_at": "2026-10-30T22:31:35Z",
     "source": "Open-Meteo (no API key)",
     "history_years": 10,
     "outlook_label": "Nov\u2013Jan",
