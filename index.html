@@ -759,6 +759,7 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-row-section td{background:var(--section-bg);color:var(--amber) !important;font-size:13px !important;font-weight:900 !important;letter-spacing:.16em;text-transform:uppercase;padding:8px 10px 6px;border-top:2px solid var(--amber)}
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
+.cftc-note{margin-left:12px;font-size:11px !important;font-weight:600 !important;letter-spacing:.04em !important;text-transform:none !important;color:var(--text3) !important}
 .gf{display:inline-block;min-width:62px;text-align:right}
 .gc{display:inline-block;min-width:50px;margin-left:6px;text-align:right;font-size:10.5px;font-weight:700}
 .cftc-up{color:var(--green) !important}
@@ -822,6 +823,27 @@ const CFTC_GROUPS = [
     {code:"088691", label:"Gold"},
     {code:"084691", label:"Silver"},
     {code:"085692", label:"Copper"},
+  ]},
+  // Financial futures come from CFTC's separate TFF report, which has no "Managed Money": Leveraged Funds is the closest equivalent.
+  {label:"Currencies", note:"Leveraged Funds", codes:[
+    {code:"098662", label:"US Dollar Index"},
+    {code:"099741", label:"Euro"},
+    {code:"097741", label:"Japanese Yen"},
+    {code:"096742", label:"British Pound"},
+    {code:"090741", label:"Canadian Dollar"},
+    {code:"232741", label:"Australian Dollar"},
+    {code:"092741", label:"Swiss Franc"},
+  ]},
+  {label:"Equities", note:"Leveraged Funds", codes:[
+    {code:"13874A", label:"S&P 500 (E-mini)"},
+  ]},
+  {label:"Treasuries", note:"Leveraged Funds", codes:[
+    {code:"042601", label:"2-Yr T-Note"},
+    {code:"044601", label:"5-Yr T-Note"},
+    {code:"043602", label:"10-Yr T-Note"},
+    {code:"043607", label:"Ultra 10-Yr T-Note"},
+    {code:"020601", label:"T-Bond (30-Yr)"},
+    {code:"020604", label:"Ultra T-Bond"},
   ]},
 ];
 
@@ -984,7 +1006,7 @@ function buildCftcMasterTable(){
   html += `</tr></thead><tbody>`;
 
   CFTC_GROUPS.forEach(group=>{
-    html += `<tr class="cftc-row-section"><td colspan="11">${group.label}</td></tr>`;
+    html += `<tr class="cftc-row-section"><td colspan="11">${group.label}${group.note ? `<span class="cftc-note">${group.note}</span>` : ''}</td></tr>`;
     group.codes.forEach(entry=>{
       const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
       html += buildCftcRow(entry, hist);
@@ -1000,7 +1022,7 @@ function renderCftc(){
   const yrs = CFTC_DATA._meta?.years_history;
   { const d = latestCftcDate(); setMetaLines('cftc-meta', CFTC_DATA._meta?.fetched_at, d ? 'Positions as of ' + fmtAsOfDate(d, true) : ''); }
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut).</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut).</div>`);
 }
 
 function loadCftc(){
