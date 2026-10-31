@@ -126,6 +126,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     document.getElementById('seasonals-page').style.display = btn.dataset.page === 'seasonals' ? '' : 'none';
     document.getElementById('exports-page').style.display = btn.dataset.page === 'exports' ? '' : 'none';
     document.getElementById('weather-page').style.display = btn.dataset.page === 'weather' ? '' : 'none';
+    if(btn.dataset.page === 'cftc' && typeof fitCftcTable === 'function') fitCftcTable();   // size the columns once the page is visible
   });
 });
 </script>
@@ -154,7 +155,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">CFTC Commitment of Traders</h1>
   <div id="cftc-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
-  <div id="cftc-root" style="max-width:1640px;margin:0 auto;padding:22px"></div>
+  <div id="cftc-root" style="max-width:1840px;margin:0 auto;padding:22px"></div>
 </div>
 <div id="seasonals-page" style="display:none">
 <div id="seasonals-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
@@ -769,7 +770,6 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .cftc-note{margin-left:12px;font-size:11px !important;font-weight:600 !important;letter-spacing:.04em !important;text-transform:none !important;color:var(--text3) !important}
-.cftc-table{min-width:1590px}
 .cftc-table tr.cftc-click{cursor:pointer}
 .cftc-table tr.cftc-click:hover td{background-image:linear-gradient(rgba(128,128,128,.10),rgba(128,128,128,.10))}
 .cftc-table tr.cftc-sel td{background-image:linear-gradient(rgba(245,166,35,.13),rgba(245,166,35,.13))}
@@ -1248,6 +1248,43 @@ function wireCftcChartControls(box, idx, list){
   }));
 }
 
+// Sizes every CFTC column to the widest thing actually in it, measured in the browser with the real data and font, so
+// nothing is ever cut off (fixed guesses kept failing once real numbers - 7-digit Treasury positions, 6-digit OI
+// changes - arrived). Spare width is shared out in proportion to CFTC_COL_WIDTHS; if the content needs more room than the
+// window offers, the table keeps the width it needs and scrolls inside its own box instead of clipping.
+function fitCftcTable(){
+  const table = document.querySelector('#cftc-root table.cftc-table');
+  if(!table || !table.offsetParent) return;          // page hidden: it is fitted when the tab is shown
+  const cols = [...table.querySelectorAll('colgroup col')], n = cols.length;
+  table.style.minWidth = '';
+  cols.forEach((c, i)=>{ c.style.width = CFTC_COL_WIDTHS[i] + '%'; });
+  const need = new Array(n).fill(0), wide = [];
+  const headRows = table.tHead ? [...table.tHead.rows] : [];
+  [...table.rows].forEach(tr=>{
+    if(tr.classList.contains('cftc-row-section')) return;
+    let ci = (headRows.length > 1 && tr === headRows[1]) ? 1 : 0;       // 2nd header row starts after the Product column
+    [...tr.cells].forEach(cell=>{
+      const span = cell.colSpan || 1, cs = getComputedStyle(cell), rg = document.createRange();
+      rg.selectNodeContents(cell);
+      const w = Math.ceil(rg.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth || 0) + 4);
+      if(span === 1) need[ci] = Math.max(need[ci], w); else wide.push({ci, span, w});
+      ci += span;
+    });
+  });
+  // a heading that spans several columns (e.g. "Gross Positions") must fit across them
+  wide.forEach(({ci, span, w})=>{
+    const have = need.slice(ci, ci + span).reduce((a, b)=>a + b, 0);
+    if(w > have){ const add = (w - have) / span; for(let k = ci; k < ci + span; k++) need[k] += add; }
+  });
+  const sumNeed = need.reduce((a, b)=>a + b, 0), avail = table.parentElement.clientWidth;
+  let widths;
+  if(sumNeed >= avail){ widths = need.map(Math.ceil); table.style.minWidth = Math.ceil(sumNeed) + 'px'; }
+  else { const extra = avail - sumNeed; widths = need.map((x, i)=>x + extra * CFTC_COL_WIDTHS[i] / 100); }
+  cols.forEach((c, i)=>{ c.style.width = widths[i].toFixed(1) + 'px'; });
+}
+let _cftcFitTimer = null;
+window.addEventListener('resize', ()=>{ clearTimeout(_cftcFitTimer); _cftcFitTimer = setTimeout(fitCftcTable, 150); });
+
 function renderCftc(){
   const root = document.getElementById('cftc-root');
   root.innerHTML = '';
@@ -1258,6 +1295,7 @@ function renderCftc(){
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
   root.insertAdjacentHTML('beforeend', `<div id="cftc-chart"></div>`);
   root.querySelectorAll('tr.cftc-click').forEach(tr=>tr.addEventListener('click', ()=>cftcSelect(tr.dataset.code, true)));
+  fitCftcTable();
   renderCftcChart();
   root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Click any row to chart it below. Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut). Historical Max (blue-grey) = largest net long, net short, gross long and gross short over the window, in contracts, with the largest % of OI seen in small type; hover for the dates.</div>`);
 }
