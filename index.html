@@ -155,7 +155,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">CFTC Commitment of Traders</h1>
   <div id="cftc-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
-  <div id="cftc-root" style="max-width:1840px;margin:0 auto;padding:22px"></div>
+  <div id="cftc-root" style="max-width:1500px;margin:0 auto;padding:22px"></div>
 </div>
 <div id="seasonals-page" style="display:none">
 <div id="seasonals-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
@@ -1067,8 +1067,10 @@ function buildCftcRow(entry, hist){
   return html;
 }
 
-// Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, OI, OI Chg, then the 4 extremes columns
-const CFTC_COL_WIDTHS = [10.8, 7.2, 5.2, 5.2, 4.4, 9.5, 9.5, 6.4, 4.8, 10.3, 10.3, 8.2, 8.2];
+// How spare width is shared out (each column is already sized to fit its content): Product, Net Pos, Wkly Chg, Net%OI,
+// Pctile, Gross Long, Gross Short, OI, OI Chg, then the 4 Historical Max columns - which get very little, so that
+// reference section stays compact instead of stretching.
+const CFTC_COL_WIDTHS = [12, 9, 8, 8, 7, 14, 14, 9, 8, 2.75, 2.75, 2.75, 2.75];
 function buildCftcMasterTable(){
   const yrs = CFTC_DATA._meta?.years_history;
   let html = `<div class="tbl-wrap"><div class="cftc-scale"><table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
