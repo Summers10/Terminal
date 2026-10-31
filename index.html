@@ -764,16 +764,33 @@ fetch('data/psd_data.json?_=' + Date.now())
 <style>
 .cftc-table{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
 .cftc-table th{background:var(--th-bg);padding:7px 4px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap;overflow:hidden}
-.cftc-table th:first-child{text-align:left;width:15%}
+.cftc-table th:first-child{text-align:left}
 .cftc-row-section td{background:var(--section-bg);color:var(--amber) !important;font-size:13px !important;font-weight:900 !important;letter-spacing:.16em;text-transform:uppercase;padding:8px 10px 6px;border-top:2px solid var(--amber)}
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .cftc-note{margin-left:12px;font-size:11px !important;font-weight:600 !important;letter-spacing:.04em !important;text-transform:none !important;color:var(--text3) !important}
-.cftc-table{min-width:1420px}
+.cftc-table{min-width:1590px}
+.cftc-table tr.cftc-click{cursor:pointer}
+.cftc-table tr.cftc-click:hover td{background-image:linear-gradient(rgba(128,128,128,.10),rgba(128,128,128,.10))}
+.cftc-table tr.cftc-sel td{background-image:linear-gradient(rgba(245,166,35,.13),rgba(245,166,35,.13))}
+.cftc-table tr.cftc-sel td:first-child{box-shadow:inset 3px 0 0 var(--amber);color:var(--amber)}
+#cftc-chart{margin-top:30px;border-top:2px solid var(--amber);padding-top:14px}
+.cftc-chart-hdr{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px;margin-bottom:12px}
+.cftc-chart-title{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:900;color:var(--text);letter-spacing:.04em}
+.cftc-chart-title small{display:block;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.04em}
+.cftc-chart-title .tbtn{border:1px solid var(--border2);border-radius:3px;padding:4px 10px;font-size:12px}
+.cftc-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;color:var(--text3);margin-left:auto}
+.cftc-legend i{display:inline-block;vertical-align:middle;margin-right:6px}
+.cftc-legend .lg-line{width:18px;height:0;border-top:2px solid var(--amber)}
+.cftc-legend .lg-bar{width:11px;height:11px}
+.cftc-legend .lg-g{background:rgba(46,143,82,.35)}
+.cftc-legend .lg-r{background:rgba(192,57,43,.35)}
+.cftc-legend .lg-dash{width:18px;height:0;border-top:1.5px dashed var(--ref-color)}
+.rf{display:inline-block;min-width:66px;text-align:right}
+.rp{display:inline-block;min-width:44px;margin-left:6px;text-align:right;font-size:10px;font-weight:600;opacity:.85}
 .cftc-table td.cftc-ref{color:var(--ref-color);font-style:italic;font-weight:600;background:var(--ref-bg)}
 .cftc-table th.cftc-ref-h{color:var(--ref-color) !important;font-style:italic;background:var(--ref-bg)}
 .cftc-ref-sub{display:block;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:none}
-.stu-sm{margin-left:7px;font-size:10.5px;font-weight:600;color:var(--text3)}
 .gf{display:inline-block;min-width:62px;text-align:right}
 .gc{display:inline-block;min-width:50px;margin-left:6px;text-align:right;font-size:10.5px;font-weight:700}
 .cftc-up{color:var(--green) !important}
@@ -938,43 +955,36 @@ function computeLatestMetrics(entry, hist){
     if(v===null || !arr.length) return null;
     return arr.filter(x=>x<=v).length/arr.length*100;
   }
-  // Week-over-week change in net % OI (percentage points): moving the same way as the net position = adding to it,
-  // the opposite way = unwinding it.
-  const prevRow = rows.length>1 ? rows[rows.length-2] : null;
-  const netPctOiChg = (latest.netPctOi!==null && prevRow && prevRow.netPctOi!==null) ? latest.netPctOi - prevRow.netPctOi : null;
-
-  // Largest positions seen over the whole history window, in contracts (with the report date they were set).
-  const ext = {maxNetLong:null, maxNetShort:null, maxGrossLong:null, maxGrossShort:null};
+  // Largest positions seen over the whole history window: in contracts, and as a share of open interest (each is
+  // its own maximum, so they can fall on different dates), with the report date they were set.
+  const ext = {maxNetLong:null, maxNetShort:null, maxGrossLong:null, maxGrossShort:null,
+               maxNetLongPct:null, maxNetShortPct:null, maxGrossLongPct:null, maxGrossShortPct:null};
+  const hi = (cur, v, date)=> (cur===null || v>cur.v) ? {v, date} : cur;
+  const lo = (cur, v, date)=> (cur===null || v<cur.v) ? {v, date} : cur;
   rows.forEach((r,i)=>{
     const date = hist[i].date;
-    if(r.net!==null){
-      if(ext.maxNetLong===null || r.net>ext.maxNetLong.v) ext.maxNetLong = {v:r.net, date};
-      if(ext.maxNetShort===null || r.net<ext.maxNetShort.v) ext.maxNetShort = {v:r.net, date};
-    }
-    if(r.mmL!==null && (ext.maxGrossLong===null || r.mmL>ext.maxGrossLong.v)) ext.maxGrossLong = {v:r.mmL, date};
-    if(r.mmS!==null && (ext.maxGrossShort===null || r.mmS>ext.maxGrossShort.v)) ext.maxGrossShort = {v:r.mmS, date};
+    if(r.net!==null){ ext.maxNetLong = hi(ext.maxNetLong, r.net, date); ext.maxNetShort = lo(ext.maxNetShort, r.net, date); }
+    if(r.mmL!==null) ext.maxGrossLong = hi(ext.maxGrossLong, r.mmL, date);
+    if(r.mmS!==null) ext.maxGrossShort = hi(ext.maxGrossShort, r.mmS, date);
+    if(r.netPctOi!==null){ ext.maxNetLongPct = hi(ext.maxNetLongPct, r.netPctOi, date); ext.maxNetShortPct = lo(ext.maxNetShortPct, r.netPctOi, date); }
+    if(r.grossLPctOi!==null) ext.maxGrossLongPct = hi(ext.maxGrossLongPct, r.grossLPctOi, date);
+    if(r.grossSPctOi!==null) ext.maxGrossShortPct = hi(ext.maxGrossShortPct, r.grossSPctOi, date);
   });
   return {
     ...latest,
     netPctile: pctileOf(latest.netPctOi, netHistory),
     glPctile: pctileOf(latest.grossLPctOi, glHistory),
     gsPctile: pctileOf(latest.grossSPctOi, gsHistory),
-    netPctOiChg,
     ...ext,
   };
 }
 
-// What a week's change in net % OI means given the side the funds are on
+// What a week's change in the net position (contracts) means given the side the funds are on
 function posActionText(net, chg){
   if(net===null || chg===null || chg===undefined) return '';
-  if(Math.abs(chg) < 0.05) return 'little changed';
+  if(chg===0) return 'unchanged';
   if(net>=0) return chg>0 ? 'adding to longs' : 'unwinding longs';
   return chg<0 ? 'adding to shorts' : 'covering shorts';
-}
-function fmtPP(v){
-  if(v===null || v===undefined || isNaN(v)) return '—';
-  const r = Number(v.toFixed(1));
-  return (r>0?'+':(r<0?'-':'')) + Math.abs(r).toFixed(1) + 'pp';
 }
 
 function extremeClass(p){
@@ -996,6 +1006,11 @@ function grossExtremeClass(p){
   if(p>=90) return 'cftc-extreme-yellow';
   return '';
 }
+
+// Chart state: which contract is selected (click a row), contracts vs % of OI, and how many years to show
+let cftcSelected = null;
+let cftcChartMode = 'contracts';   // 'contracts' | 'pct'
+let cftcChartYears = 2;
 
 const CFTC_COL_GROUPS = [
   {label:'Position', cols:['Net Position','Wkly Chg']},
@@ -1021,7 +1036,9 @@ function cftcGrossCell(val, chg, isShort){
 
 function buildCftcRow(entry, hist){
   const m = computeLatestMetrics(entry, hist);
-  let html = `<tr><td>${entry.label}</td>`;
+  let html = m
+    ? `<tr class="cftc-click${entry.code===cftcSelected?' cftc-sel':''}" data-code="${entry.code}" title="Click to chart"><td>${entry.label}</td>`
+    : `<tr><td>${entry.label}</td>`;
   if(!m){
     html += `<td class="grp-l" colspan="14" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
   } else {
@@ -1036,9 +1053,12 @@ function buildCftcRow(entry, hist){
     html += `<td class="grp-l">${cftcFmt(m.oi)}</td>`;
     html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.oiChg)}</td>`;
     // historical extremes (reference columns, styled differently so they don't read as part of the live table)
-    [['maxNetLong','Largest net long'],['maxNetShort','Largest net short'],['maxGrossLong','Largest gross long'],['maxGrossShort','Largest gross short']].forEach(([k, what], i)=>{
-      const e = m[k];
-      html += `<td class="cftc-ref${i===0?' grp-l':''}"${e?` title="${what} in the window — set ${e.date}"`:''}>${e ? cftcFmt(e.v) : '—'}</td>`;
+    // each shows the largest position in contracts, with the largest share of open interest seen beside it in small type
+    [['maxNetLong','maxNetLongPct','Largest net long'],['maxNetShort','maxNetShortPct','Largest net short'],
+     ['maxGrossLong','maxGrossLongPct','Largest gross long'],['maxGrossShort','maxGrossShortPct','Largest gross short']].forEach(([k, kp, what], i)=>{
+      const e = m[k], ep = m[kp];
+      const tip = e ? `${what}: ${cftcFmt(e.v)} contracts, set ${e.date}` + (ep ? ` · largest % of OI: ${cftcPct(ep.v)}, set ${ep.date}` : '') : '';
+      html += `<td class="cftc-ref${i===0?' grp-l':''}"${tip?` title="${tip}"`:''}><span class="rf">${e ? cftcFmt(e.v) : '—'}</span><span class="rp">${ep ? cftcPct(ep.v) : ''}</span></td>`;
     });
   }
   html += `</tr>`;
@@ -1046,7 +1066,7 @@ function buildCftcRow(entry, hist){
 }
 
 // Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, Long%OI, Short%OI, OI, OI Chg, then the 4 extremes columns
-const CFTC_COL_WIDTHS = [10.4, 6.8, 5.2, 5.2, 4.4, 9.0, 9.0, 5.6, 5.6, 6.4, 4.4, 7, 7, 7, 7];
+const CFTC_COL_WIDTHS = [10.8, 6.7, 4.6, 4.7, 4.0, 8.15, 8.15, 5.1, 5.9, 5.7, 4.2, 8, 8, 8, 8];
 function buildCftcMasterTable(){
   const yrs = CFTC_DATA._meta?.years_history;
   let html = `<div class="tbl-wrap"><table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
@@ -1072,13 +1092,174 @@ function buildCftcMasterTable(){
   return html;
 }
 
+// ---------------- CFTC CHART ----------------
+// Click a row in the table and the chart below shows that contract: net position as a line, gross long as a faded green
+// histogram, gross short as a faded red histogram hanging below zero, and the historical maxima as faint dashed lines.
+function cftcProductList(){
+  const out = [];
+  CFTC_GROUPS.forEach(g=>g.codes.forEach(e=>{
+    const h = CFTC_DATA.codes && CFTC_DATA.codes[e.code] ? CFTC_DATA.codes[e.code].history : null;
+    if(h && h.length) out.push(e);
+  }));
+  return out;
+}
+function cftcSelect(code, scroll){
+  cftcSelected = code;
+  document.querySelectorAll('#cftc-root tr.cftc-click').forEach(tr=>tr.classList.toggle('cftc-sel', tr.dataset.code === code));
+  renderCftcChart();
+  if(scroll){ const box = document.getElementById('cftc-chart'); if(box) box.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+}
+function cftcNiceTicks(lo, hi, n){
+  const span = (hi - lo) || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const ticks = [];
+  for(let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) ticks.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  return ticks;
+}
+function cftcAxisFmt(v, pct){
+  if(pct) return v.toFixed(0) + '%';
+  const a = Math.abs(v);
+  return a >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : a >= 1e3 ? Math.round(v / 1e3) + 'k' : String(Math.round(v));
+}
+
+function renderCftcChart(){
+  const box = document.getElementById('cftc-chart');
+  if(!box || !CFTC_DATA || !CFTC_DATA.codes) return;
+  const rec = CFTC_DATA.codes[cftcSelected];
+  if(!rec || !rec.history || !rec.history.length){ box.innerHTML = ''; return; }
+  const pct = cftcChartMode === 'pct';
+  const list = cftcProductList();
+  const entry = list.find(e=>e.code === cftcSelected) || {label: rec.label || cftcSelected};
+  const m = computeLatestMetrics(entry, rec.history);
+
+  // weekly series, in contracts and as % of open interest
+  const full = rec.history.map(h=>{
+    const net = (h.mm_long !== null && h.mm_short !== null) ? h.mm_long - h.mm_short : null, oi = h.oi;
+    return {date:h.date, net, long:h.mm_long, short:h.mm_short,
+      netPct:   (net !== null && oi) ? net / oi * 100 : null,
+      longPct:  (h.mm_long !== null && oi) ? h.mm_long / oi * 100 : null,
+      shortPct: (h.mm_short !== null && oi) ? h.mm_short / oi * 100 : null};
+  });
+  const cut = new Date(full[full.length-1].date + 'T00:00:00Z'); cut.setUTCFullYear(cut.getUTCFullYear() - cftcChartYears);
+  const cutIso = cut.toISOString().slice(0, 10);
+  const kN = pct ? 'netPct' : 'net', kL = pct ? 'longPct' : 'long', kS = pct ? 'shortPct' : 'short';
+  const pts = full.filter(p => p.date >= cutIso && p[kN] !== null && p[kL] !== null && p[kS] !== null);
+
+  const idx = list.findIndex(e=>e.code === cftcSelected);
+  const toggle = (cls, items, active) => `<div class="toggle">${items.map(([v, t])=>`<button class="tbtn ${cls}${String(v)===String(active)?' active':''}" data-v="${v}">${t}</button>`).join('')}</div>`;
+  let html = `<div class="cftc-chart-hdr">
+    <div class="cftc-chart-title"><button class="tbtn cftc-step" data-d="-1" title="Previous product">◀</button>
+      <span>${entry.label}<small>${rec.category || 'Managed Money'}</small></span>
+      <button class="tbtn cftc-step" data-d="1" title="Next product">▶</button></div>
+    ${toggle('cftc-mode', [['contracts','Contracts'], ['pct','% OI']], cftcChartMode)}
+    ${toggle('cftc-years', [[1,'1Y'], [2,'2Y'], [5,'5Y'], [10,'10Y']], cftcChartYears)}
+    <div class="cftc-legend"><span><i class="lg-line"></i>Net position</span><span><i class="lg-bar lg-g"></i>Gross long</span><span><i class="lg-bar lg-r"></i>Gross short (shown negative)</span><span><i class="lg-dash"></i>Historical max</span></div>
+  </div>`;
+  if(pts.length < 2){
+    box.innerHTML = html + `<div style="padding:30px 0;color:var(--text3)">Not enough history to chart.</div>`;
+    wireCftcChartControls(box, idx, list);
+    return;
+  }
+
+  // historical-max reference lines (full history window, whatever range is on screen)
+  const mx = pct
+    ? [['Max net long', m.maxNetLongPct], ['Max gross long', m.maxGrossLongPct], ['Max net short', m.maxNetShortPct], ['Max gross short', m.maxGrossShortPct]]
+    : [['Max net long', m.maxNetLong], ['Max gross long', m.maxGrossLong], ['Max net short', m.maxNetShort], ['Max gross short', m.maxGrossShort]];
+  const lines = mx.filter(([, o])=>o).map(([name, o])=>({name, v: name === 'Max gross short' ? -o.v : o.v, date:o.date}));
+
+  let lo = 0, hi = 0;
+  pts.forEach(p=>{ lo = Math.min(lo, p[kN], -p[kS]); hi = Math.max(hi, p[kN], p[kL]); });
+  lines.forEach(l=>{ lo = Math.min(lo, l.v); hi = Math.max(hi, l.v); });
+  const pad = (hi - lo) * 0.05 || 1; lo -= pad; hi += pad;
+
+  const W = 1300, H = 430, M = {l:72, r:176, t:14, b:34};
+  const plotW = W - M.l - M.r, plotH = H - M.t - M.b, n = pts.length, step = plotW / n;
+  const bw = Math.max(1, Math.min(step * 0.72, 14));
+  const y = v => M.t + (hi - v) / (hi - lo) * plotH;
+  const cx = i => M.l + (i + 0.5) * step;
+  const fmtV = v => pct ? cftcPct(v) : cftcFmt(v);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:100%;font-family:inherit" role="img">`;
+  cftcNiceTicks(lo, hi, 7).forEach(t=>{
+    svg += `<line x1="${M.l}" x2="${M.l + plotW}" y1="${y(t)}" y2="${y(t)}" style="stroke:var(--border);stroke-width:1"/>`;
+    svg += `<text x="${M.l - 8}" y="${y(t) + 4}" text-anchor="end" style="fill:var(--text3);font-size:11px">${cftcAxisFmt(t, pct)}</text>`;
+  });
+  // gross long (up) and gross short (down) histograms
+  pts.forEach((p, i)=>{
+    const x0 = cx(i) - bw / 2;
+    svg += `<rect x="${x0.toFixed(2)}" y="${y(p[kL]).toFixed(2)}" width="${bw.toFixed(2)}" height="${Math.max(0, y(0) - y(p[kL])).toFixed(2)}" fill="#2e8f52" fill-opacity=".28"/>`;
+    svg += `<rect x="${x0.toFixed(2)}" y="${y(0).toFixed(2)}" width="${bw.toFixed(2)}" height="${Math.max(0, y(-p[kS]) - y(0)).toFixed(2)}" fill="#c0392b" fill-opacity=".28"/>`;
+  });
+  svg += `<line x1="${M.l}" x2="${M.l + plotW}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--text3);stroke-width:1"/>`;
+  // historical maxima: faint dashed lines, labelled at the right (labels nudged apart if two sit close together)
+  const lab = lines.map(l=>({...l, ly: y(l.v)})).sort((a, b)=>a.ly - b.ly);
+  for(let i = 1; i < lab.length; i++){ if(lab[i].ly - lab[i-1].ly < 13) lab[i].ly = lab[i-1].ly + 13; }
+  lines.forEach(l=>{
+    svg += `<line x1="${M.l}" x2="${M.l + plotW}" y1="${y(l.v)}" y2="${y(l.v)}" style="stroke:var(--ref-color);stroke-opacity:.6;stroke-width:1.2;stroke-dasharray:5 5"/>`;
+  });
+  lab.forEach(l=>{
+    svg += `<text x="${M.l + plotW + 8}" y="${l.ly + 4}" style="fill:var(--ref-color);font-size:10.5px;font-style:italic"><title>${l.name} — set ${l.date}</title>${l.name} ${fmtV(l.v)}</text>`;
+  });
+  // net position line
+  svg += `<polyline fill="none" points="${pts.map((p, i)=>cx(i).toFixed(1) + ',' + y(p[kN]).toFixed(1)).join(' ')}" style="stroke:var(--amber);stroke-width:2;stroke-linejoin:round"/>`;
+  // x axis: a label every few months
+  const every = cftcChartYears <= 1 ? 1 : cftcChartYears <= 2 ? 3 : cftcChartYears <= 5 ? 6 : 12;
+  let lastMi = -1;
+  pts.forEach((p, i)=>{
+    const d = new Date(p.date + 'T00:00:00Z'), mi = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    if(mi % every === 0 && mi !== lastMi){
+      lastMi = mi;
+      svg += `<line x1="${cx(i)}" x2="${cx(i)}" y1="${M.t + plotH}" y2="${M.t + plotH + 5}" style="stroke:var(--text3)"/>`;
+      svg += `<text x="${cx(i)}" y="${H - 12}" text-anchor="middle" style="fill:var(--text3);font-size:11px">${d.toLocaleDateString('en-US', {month:'short', year:'2-digit', timeZone:'UTC'})}</text>`;
+    }
+  });
+  svg += `<g class="cftc-hover" pointer-events="none"></g><rect class="cftc-hit" x="${M.l}" y="${M.t}" width="${plotW}" height="${plotH}" fill="transparent"/></svg>`;
+
+  box.innerHTML = html + svg;
+  wireCftcChartControls(box, idx, list);
+
+  // hover read-out: both units for the week under the cursor
+  const el = box.querySelector('svg'), hit = el.querySelector('.cftc-hit'), g = el.querySelector('.cftc-hover');
+  hit.addEventListener('mousemove', ev=>{
+    const r = el.getBoundingClientRect(), x = (ev.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(n - 1, Math.floor((x - M.l) / step))), p = pts[i], X = cx(i);
+    const rows = [
+      new Date(p.date + 'T00:00:00Z').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric', timeZone:'UTC'}),
+      `Net          ${cftcFmt(p.net)}  (${cftcPct(p.netPct)} OI)`,
+      `Gross long   ${cftcFmt(p.long)}  (${cftcPct(p.longPct)})`,
+      `Gross short  ${cftcFmt(p.short)}  (${cftcPct(p.shortPct)})`,
+    ];
+    const tw = 268, th = rows.length * 16 + 12, tx = X > M.l + plotW / 2 ? X - tw - 12 : X + 12, ty = M.t + 8;
+    g.innerHTML = `<line x1="${X}" x2="${X}" y1="${M.t}" y2="${M.t + plotH}" style="stroke:var(--text3);stroke-width:1;stroke-dasharray:3 3"/>`
+      + `<circle cx="${X}" cy="${y(p[kN])}" r="4" style="fill:var(--amber)"/>`
+      + `<rect x="${tx}" y="${ty}" width="${tw}" height="${th}" rx="3" style="fill:var(--bg);stroke:var(--border2)"/>`
+      + rows.map((t, k)=>`<text x="${tx + 10}" y="${ty + 20 + k * 16}" xml:space="preserve" style="fill:${k === 0 ? 'var(--amber)' : 'var(--text)'};font-size:11.5px;font-weight:${k === 0 ? 800 : 600}">${t.replace(/ /g, '\u00a0')}</text>`).join('');
+  });
+  hit.addEventListener('mouseleave', ()=>{ g.innerHTML = ''; });
+}
+
+function wireCftcChartControls(box, idx, list){
+  box.querySelectorAll('.cftc-mode').forEach(b=>b.addEventListener('click', ()=>{ cftcChartMode = b.dataset.v; renderCftcChart(); }));
+  box.querySelectorAll('.cftc-years').forEach(b=>b.addEventListener('click', ()=>{ cftcChartYears = +b.dataset.v; renderCftcChart(); }));
+  box.querySelectorAll('.cftc-step').forEach(b=>b.addEventListener('click', ()=>{
+    if(!list.length) return;
+    const next = list[(idx + +b.dataset.d + list.length) % list.length];
+    cftcSelect(next.code, false);
+  }));
+}
+
 function renderCftc(){
   const root = document.getElementById('cftc-root');
   root.innerHTML = '';
   const yrs = CFTC_DATA._meta?.years_history;
   { const d = latestCftcDate(); setMetaLines('cftc-meta', CFTC_DATA._meta?.fetched_at, d ? 'Positions as of ' + fmtAsOfDate(d, true) : ''); }
+  const list = cftcProductList();
+  if(!list.some(e=>e.code === cftcSelected)) cftcSelected = list.length ? list[0].code : null;   // first product with data
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut). Historical Max (blue-grey) = largest net long, net short, gross long and gross short over the window, in contracts; hover for the date.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div id="cftc-chart"></div>`);
+  root.querySelectorAll('tr.cftc-click').forEach(tr=>tr.addEventListener('click', ()=>cftcSelect(tr.dataset.code, true)));
+  renderCftcChart();
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Click any row to chart it below. Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut). Historical Max (blue-grey) = largest net long, net short, gross long and gross short over the window, in contracts, with the largest % of OI seen in small type; hover for the dates.</div>`);
 }
 
 function loadCftc(){
@@ -1214,11 +1395,11 @@ function summaryPctileClass(p){
 }
 
 function summaryPctileText(p){ return p===null||p===undefined ? '—' : cftcOrdinal(p); }
-// Stocks-to-use cell: the rank vs history is the main number, the actual stocks/use % sits small beside it
+// Stocks-to-use cell: just the rank vs history (the actual stocks/use % is in the hover text)
 function summaryStuCell(o, first){
   const cls = (first ? 'grp-l ' : '') + summaryPctileClass(o ? o.p : null);
   if(!o) return `<td class="${cls}">—</td>`;
-  return `<td class="${cls}" title="Rank vs history (higher = looser) · stocks/use ${fmtStu(o.v)}">${summaryPctileText(o.p)}<span class="stu-sm">${fmtStu(o.v)}</span></td>`;
+  return `<td class="${cls}" title="Rank vs history (higher = looser) · stocks/use ${fmtStu(o.v)}">${summaryPctileText(o.p)}</td>`;
 }
 
 // This week and the week after it. After the last slot ("Dec 28") the next week is early January; slot 0 ("Dec 29") is
@@ -1341,8 +1522,8 @@ function buildSummaryTable(){
     } else {
       html += `<td class="grp-l ${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
       html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
-      const chgCls = m.netPctOiChg===null ? '' : (Number(m.netPctOiChg.toFixed(1))===0 ? '' : (m.netPctOiChg>0 ? 'cftc-up' : 'cftc-dn'));
-      html += `<td class="${chgCls}" title="${posActionText(m.net, m.netPctOiChg)} (net % OI vs last week)">${fmtPP(m.netPctOiChg)}</td>`;
+      const chgCls = (m.weeklyChange===null || m.weeklyChange===0) ? '' : (m.weeklyChange>0 ? 'cftc-up' : 'cftc-dn');
+      html += `<td class="${chgCls}" title="${posActionText(m.net, m.weeklyChange)} (net position vs last week, contracts)">${cftcSignedNum(m.weeklyChange)}</td>`;
     }
     html += `<td class="grp-l ${domesticYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(domesticYoY,1)}</td>`;
     html += `<td class="${exportersYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(exportersYoY,1)}</td>`;
@@ -1578,8 +1759,7 @@ function renderSummary(){
     <li>Domestic = United States, except Canola (Canada) and Coffee/Sugar (Brazil), the actual major producers. Those rows have no Export Sales YoY.</li>
     <li>Soyoil (Vegoils) and Soymeal (Meal): Seasonality, Positioning and Export Sales use Soybean Oil / Soybean Meal. Production YoY and Stocks/Use Rank combine all oils / all meals.</li>
     <li>Cocoa: Positioning and Seasonality only. USDA doesn't track cocoa.</li>
-    <li>Seasonality: this week and next. Positioning Change = move in Net % OI vs last week; same direction as the net position = adding, opposite = unwinding.</li>
-    <li>Stocks to Use: the rank vs history (higher = looser) is the main number, with the actual stocks/use % beside it.</li>
+    <li>Seasonality: this week and next. Positioning Change = the week's move in net position (contracts); same direction as the net position = adding, opposite = unwinding.</li>
     <li>Coffee and Sugar use USDA's semi-annual reports, not the monthly WASDE shown in the header.</li>
   </ul></div>`);
 }
