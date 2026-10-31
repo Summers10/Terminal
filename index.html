@@ -770,6 +770,7 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .cftc-note{margin-left:12px;font-size:11px !important;font-weight:600 !important;letter-spacing:.04em !important;text-transform:none !important;color:var(--text3) !important}
+.cftc-scale{transform-origin:0 0}
 .cftc-table tr.cftc-click{cursor:pointer}
 .cftc-table tr.cftc-click:hover td{background-image:linear-gradient(rgba(128,128,128,.10),rgba(128,128,128,.10))}
 .cftc-table tr.cftc-sel td{background-image:linear-gradient(rgba(245,166,35,.13),rgba(245,166,35,.13))}
@@ -1016,7 +1017,6 @@ const CFTC_COL_GROUPS = [
   {label:'Position', cols:['Net Position','Wkly Chg']},
   {label:'Net Exposure', cols:['Net % OI','Pctile']},
   {label:'Gross Positions', cols:['Gross Long','Gross Short']},
-  {label:'Gross % of OI', cols:['Long % OI','Short % OI']},
   {label:'Open Interest', cols:['OI','OI Chg']},
   // Reference only (not part of the live positioning): the largest positions seen over the history window, in contracts.
   {label:'Historical Max', ref:true, cols:['Net Long','Net Short','Gross Long','Gross Short']},
@@ -1040,36 +1040,38 @@ function buildCftcRow(entry, hist){
     ? `<tr class="cftc-click${entry.code===cftcSelected?' cftc-sel':''}" data-code="${entry.code}" title="Click to chart"><td>${entry.label}</td>`
     : `<tr><td>${entry.label}</td>`;
   if(!m){
-    html += `<td class="grp-l" colspan="14" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
+    html += `<td class="grp-l" colspan="12" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
   } else {
     html += `<td class="grp-l ${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
     html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.weeklyChange)}</td>`;
     html += `<td class="grp-l ${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
     html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
-    html += `<td class="grp-l">${cftcGrossCell(m.mmL, m.grossLChg, false)}</td>`;
-    html += `<td>${cftcGrossCell(m.mmS, m.grossSChg, true)}</td>`;
-    html += `<td class="grp-l ${grossExtremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
-    html += `<td class="${grossExtremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
+    // gross long / short: yellow when unusually large vs the lookback; hover for the position as a share of open interest
+    const yrs = CFTC_DATA._meta?.years_history;
+    const grossTip = (what, v, pctOi, pctile)=> `${what}: ${cftcFmt(v)} contracts = ${cftcPct(pctOi)} of open interest` + (pctile===null||pctile===undefined ? '' : ` · ${cftcOrdinal(pctile)} percentile${yrs ? ' of the '+yrs+'-yr window' : ''}`);
+    html += `<td class="grp-l ${grossExtremeClass(m.glPctile)}" title="${grossTip('Gross long', m.mmL, m.grossLPctOi, m.glPctile)}">${cftcGrossCell(m.mmL, m.grossLChg, false)}</td>`;
+    html += `<td class="${grossExtremeClass(m.gsPctile)}" title="${grossTip('Gross short', m.mmS, m.grossSPctOi, m.gsPctile)}">${cftcGrossCell(m.mmS, m.grossSChg, true)}</td>`;
     html += `<td class="grp-l">${cftcFmt(m.oi)}</td>`;
     html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.oiChg)}</td>`;
     // historical extremes (reference columns, styled differently so they don't read as part of the live table)
-    // each shows the largest position in contracts, with the largest share of open interest seen beside it in small type
-    [['maxNetLong','maxNetLongPct','Largest net long'],['maxNetShort','maxNetShortPct','Largest net short'],
-     ['maxGrossLong','maxGrossLongPct','Largest gross long'],['maxGrossShort','maxGrossShortPct','Largest gross short']].forEach(([k, kp, what], i)=>{
+    // each shows the largest position in contracts; the net maxes also show the largest share of open interest in small
+    // type (the gross maxes keep theirs in the hover text only)
+    [['maxNetLong','maxNetLongPct','Largest net long', true],['maxNetShort','maxNetShortPct','Largest net short', true],
+     ['maxGrossLong','maxGrossLongPct','Largest gross long', false],['maxGrossShort','maxGrossShortPct','Largest gross short', false]].forEach(([k, kp, what, showPct], i)=>{
       const e = m[k], ep = m[kp];
       const tip = e ? `${what}: ${cftcFmt(e.v)} contracts, set ${e.date}` + (ep ? ` · largest % of OI: ${cftcPct(ep.v)}, set ${ep.date}` : '') : '';
-      html += `<td class="cftc-ref${i===0?' grp-l':''}"${tip?` title="${tip}"`:''}><span class="rf">${e ? cftcFmt(e.v) : '—'}</span><span class="rp">${ep ? cftcPct(ep.v) : ''}</span></td>`;
+      html += `<td class="cftc-ref${i===0?' grp-l':''}"${tip?` title="${tip}"`:''}><span class="rf">${e ? cftcFmt(e.v) : '—'}</span>${showPct ? `<span class="rp">${ep ? cftcPct(ep.v) : ''}</span>` : ''}</td>`;
     });
   }
   html += `</tr>`;
   return html;
 }
 
-// Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, Long%OI, Short%OI, OI, OI Chg, then the 4 extremes columns
-const CFTC_COL_WIDTHS = [10.8, 6.7, 4.6, 4.7, 4.0, 8.15, 8.15, 5.1, 5.9, 5.7, 4.2, 8, 8, 8, 8];
+// Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, OI, OI Chg, then the 4 extremes columns
+const CFTC_COL_WIDTHS = [10.8, 7.2, 5.2, 5.2, 4.4, 9.5, 9.5, 6.4, 4.8, 10.3, 10.3, 8.2, 8.2];
 function buildCftcMasterTable(){
   const yrs = CFTC_DATA._meta?.years_history;
-  let html = `<div class="tbl-wrap"><table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
+  let html = `<div class="tbl-wrap"><div class="cftc-scale"><table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
   html += `<tr><th rowspan="2">Product</th>`;
   CFTC_COL_GROUPS.forEach(g=>{
     const label = g.ref ? `${g.label}<span class="cftc-ref-sub">${yrs ? yrs+'yr · ' : ''}contracts</span>` : g.label;
@@ -1082,13 +1084,13 @@ function buildCftcMasterTable(){
   html += `</tr></thead><tbody>`;
 
   CFTC_GROUPS.forEach(group=>{
-    html += `<tr class="cftc-row-section"><td colspan="15">${group.label}${group.note ? `<span class="cftc-note">${group.note}</span>` : ''}</td></tr>`;
+    html += `<tr class="cftc-row-section"><td colspan="13">${group.label}${group.note ? `<span class="cftc-note">${group.note}</span>` : ''}</td></tr>`;
     group.codes.forEach(entry=>{
       const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
       html += buildCftcRow(entry, hist);
     });
   });
-  html += `</tbody></table></div>`;
+  html += `</tbody></table></div></div>`;
   return html;
 }
 
@@ -1251,12 +1253,15 @@ function wireCftcChartControls(box, idx, list){
 // Sizes every CFTC column to the widest thing actually in it, measured in the browser with the real data and font, so
 // nothing is ever cut off (fixed guesses kept failing once real numbers - 7-digit Treasury positions, 6-digit OI
 // changes - arrived). Spare width is shared out in proportion to CFTC_COL_WIDTHS; if the content needs more room than the
-// window offers, the table keeps the width it needs and scrolls inside its own box instead of clipping.
+// window offers, the whole table is scaled down to fit - so it never clips and never scrolls sideways.
 function fitCftcTable(){
   const table = document.querySelector('#cftc-root table.cftc-table');
   if(!table || !table.offsetParent) return;          // page hidden: it is fitted when the tab is shown
+  const box = table.parentElement, wrap = box.parentElement;
   const cols = [...table.querySelectorAll('colgroup col')], n = cols.length;
-  table.style.minWidth = '';
+  // start from a clean, unscaled state so the measurements below are true sizes
+  box.style.transform = ''; box.style.width = ''; wrap.style.height = ''; wrap.style.overflowX = '';
+  table.style.minWidth = ''; table.style.width = '';
   cols.forEach((c, i)=>{ c.style.width = CFTC_COL_WIDTHS[i] + '%'; });
   const need = new Array(n).fill(0), wide = [];
   const headRows = table.tHead ? [...table.tHead.rows] : [];
@@ -1276,11 +1281,22 @@ function fitCftcTable(){
     const have = need.slice(ci, ci + span).reduce((a, b)=>a + b, 0);
     if(w > have){ const add = (w - have) / span; for(let k = ci; k < ci + span; k++) need[k] += add; }
   });
-  const sumNeed = need.reduce((a, b)=>a + b, 0), avail = table.parentElement.clientWidth;
-  let widths;
-  if(sumNeed >= avail){ widths = need.map(Math.ceil); table.style.minWidth = Math.ceil(sumNeed) + 'px'; }
-  else { const extra = avail - sumNeed; widths = need.map((x, i)=>x + extra * CFTC_COL_WIDTHS[i] / 100); }
-  cols.forEach((c, i)=>{ c.style.width = widths[i].toFixed(1) + 'px'; });
+  const sumNeed = need.reduce((a, b)=>a + b, 0), avail = wrap.clientWidth;
+  if(sumNeed > avail){
+    // lay the table out at the width it needs, then scale that down to the window. The scale comes from the widths
+    // actually set (each rounded up), so the scaled table can't overshoot the box by a pixel or two.
+    const px = need.map(Math.ceil), sum = px.reduce((a, b)=>a + b, 0);
+    cols.forEach((c, i)=>{ c.style.width = px[i] + 'px'; });
+    table.style.width = sum + 'px'; box.style.width = sum + 'px';
+    const w = Math.max(sum, table.offsetWidth), z = avail / w;      // table.offsetWidth includes the collapsed borders
+    box.style.width = w + 'px';
+    box.style.transform = `scale(${z})`;
+    wrap.style.height = Math.ceil(box.offsetHeight * z) + 'px';   // a transform doesn't change layout height, so set it
+    wrap.style.overflowX = 'hidden'; wrap.style.overflowX = 'clip';   // nothing can scroll sideways ('clip' ignored by old browsers -> stays 'hidden')
+  } else {
+    const extra = avail - sumNeed;                               // plenty of room: share the spare width out
+    cols.forEach((c, i)=>{ c.style.width = (Math.floor((need[i] + extra * CFTC_COL_WIDTHS[i] / 100) * 10) / 10) + 'px'; });   // rounded down so the total can't exceed the box
+  }
 }
 let _cftcFitTimer = null;
 window.addEventListener('resize', ()=>{ clearTimeout(_cftcFitTimer); _cftcFitTimer = setTimeout(fitCftcTable, 150); });
@@ -1297,7 +1313,7 @@ function renderCftc(){
   root.querySelectorAll('tr.cftc-click').forEach(tr=>tr.addEventListener('click', ()=>cftcSelect(tr.dataset.code, true)));
   fitCftcTable();
   renderCftcChart();
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Click any row to chart it below. Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut). Historical Max (blue-grey) = largest net long, net short, gross long and gross short over the window, in contracts, with the largest % of OI seen in small type; hover for the dates.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Click any row to chart it below. Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut). Historical Max (blue-grey) = largest net long, net short, gross long and gross short over the window, in contracts (net maxes also show the largest % of OI in small type). Hover Gross Positions for % of open interest, and Historical Max for dates.</div>`);
 }
 
 function loadCftc(){
