@@ -16,13 +16,13 @@ body.dark{
   --bg:#000;--bg1:#060606;--bg2:#0a0a0a;--border:#141414;--border2:#1e1e1e;
   --text:#d4b896;--text2:#8a7a68;--text3:#6a5a4a;
   --amber:#f5a623;--green:#2e8f52;--red:#b83838;
-  --th-bg:#040404;--section-bg:#050505;--row-alt:#030303;--row-latest:#0c0800;--grp-line:#4a4034;
+  --th-bg:#040404;--section-bg:#050505;--row-alt:#030303;--row-latest:#0c0800;--grp-line:#4a4034;--ref-color:#8496bd;--ref-bg:rgba(132,150,189,.07);
 }
 body.light{
   --bg:#FFFFFF;--bg1:#F7F8FA;--bg2:#F0F1F4;--border:#E0E2E8;--border2:#C8CCD4;
   --text:#1A1D24;--text2:#3A3F4A;--text3:#6B7280;
   --amber:#B8720A;--green:#0E7A3A;--red:#C4302B;
-  --th-bg:#F2F3F6;--section-bg:#ECEDF0;--row-alt:#F7F8FA;--row-latest:#FFF3DC;--grp-line:#9AA1AD;
+  --th-bg:#F2F3F6;--section-bg:#ECEDF0;--row-alt:#F7F8FA;--row-latest:#FFF3DC;--grp-line:#9AA1AD;--ref-color:#5b6f94;--ref-bg:rgba(91,111,148,.07);
 }
 #topbar{position:sticky;top:0;z-index:10;padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px;flex-wrap:wrap}
 #topbar h1{font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap}
@@ -154,7 +154,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">CFTC Commitment of Traders</h1>
   <div id="cftc-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
-  <div id="cftc-root" style="max-width:1300px;margin:0 auto;padding:22px"></div>
+  <div id="cftc-root" style="max-width:1640px;margin:0 auto;padding:22px"></div>
 </div>
 <div id="seasonals-page" style="display:none">
 <div id="seasonals-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
@@ -769,6 +769,11 @@ fetch('data/psd_data.json?_=' + Date.now())
 .cftc-table td{padding:4px 4px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg);overflow:hidden;text-overflow:ellipsis}
 .cftc-table td:first-child{text-align:left;color:var(--text);font-weight:700}
 .cftc-note{margin-left:12px;font-size:11px !important;font-weight:600 !important;letter-spacing:.04em !important;text-transform:none !important;color:var(--text3) !important}
+.cftc-table{min-width:1420px}
+.cftc-table td.cftc-ref{color:var(--ref-color);font-style:italic;font-weight:600;background:var(--ref-bg)}
+.cftc-table th.cftc-ref-h{color:var(--ref-color) !important;font-style:italic;background:var(--ref-bg)}
+.cftc-ref-sub{display:block;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:none}
+.stu-sm{margin-left:7px;font-size:10.5px;font-weight:600;color:var(--text3)}
 .gf{display:inline-block;min-width:62px;text-align:right}
 .gc{display:inline-block;min-width:50px;margin-left:6px;text-align:right;font-size:10.5px;font-weight:700}
 .cftc-up{color:var(--green) !important}
@@ -783,7 +788,7 @@ fetch('data/psd_data.json?_=' + Date.now())
 .weather-table th:first-child{text-align:left}
 .weather-table td{padding:5px 6px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;background:var(--bg)}
 .weather-table td:first-child{text-align:left;color:var(--text);font-weight:700}
-.summary-table{width:100%;min-width:1000px;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
+.summary-table{width:100%;min-width:1080px;table-layout:fixed;border-collapse:collapse;border:1px solid var(--border2);background:var(--bg)}
 /* group divider: the first column of each group gets a heavier left line, running the full height of the table */
 .grp-l{border-left:2px solid var(--grp-line)}
 .summary-table th{background:var(--th-bg);padding:7px 6px;text-align:right;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:var(--text);border-bottom:2px solid var(--border2);white-space:nowrap}
@@ -933,12 +938,43 @@ function computeLatestMetrics(entry, hist){
     if(v===null || !arr.length) return null;
     return arr.filter(x=>x<=v).length/arr.length*100;
   }
+  // Week-over-week change in net % OI (percentage points): moving the same way as the net position = adding to it,
+  // the opposite way = unwinding it.
+  const prevRow = rows.length>1 ? rows[rows.length-2] : null;
+  const netPctOiChg = (latest.netPctOi!==null && prevRow && prevRow.netPctOi!==null) ? latest.netPctOi - prevRow.netPctOi : null;
+
+  // Largest positions seen over the whole history window, in contracts (with the report date they were set).
+  const ext = {maxNetLong:null, maxNetShort:null, maxGrossLong:null, maxGrossShort:null};
+  rows.forEach((r,i)=>{
+    const date = hist[i].date;
+    if(r.net!==null){
+      if(ext.maxNetLong===null || r.net>ext.maxNetLong.v) ext.maxNetLong = {v:r.net, date};
+      if(ext.maxNetShort===null || r.net<ext.maxNetShort.v) ext.maxNetShort = {v:r.net, date};
+    }
+    if(r.mmL!==null && (ext.maxGrossLong===null || r.mmL>ext.maxGrossLong.v)) ext.maxGrossLong = {v:r.mmL, date};
+    if(r.mmS!==null && (ext.maxGrossShort===null || r.mmS>ext.maxGrossShort.v)) ext.maxGrossShort = {v:r.mmS, date};
+  });
   return {
     ...latest,
     netPctile: pctileOf(latest.netPctOi, netHistory),
     glPctile: pctileOf(latest.grossLPctOi, glHistory),
     gsPctile: pctileOf(latest.grossSPctOi, gsHistory),
+    netPctOiChg,
+    ...ext,
   };
+}
+
+// What a week's change in net % OI means given the side the funds are on
+function posActionText(net, chg){
+  if(net===null || chg===null || chg===undefined) return '';
+  if(Math.abs(chg) < 0.05) return 'little changed';
+  if(net>=0) return chg>0 ? 'adding to longs' : 'unwinding longs';
+  return chg<0 ? 'adding to shorts' : 'covering shorts';
+}
+function fmtPP(v){
+  if(v===null || v===undefined || isNaN(v)) return '—';
+  const r = Number(v.toFixed(1));
+  return (r>0?'+':(r<0?'-':'')) + Math.abs(r).toFixed(1) + 'pp';
 }
 
 function extremeClass(p){
@@ -967,6 +1003,8 @@ const CFTC_COL_GROUPS = [
   {label:'Gross Positions', cols:['Gross Long','Gross Short']},
   {label:'Gross % of OI', cols:['Long % OI','Short % OI']},
   {label:'Open Interest', cols:['OI','OI Chg']},
+  // Reference only (not part of the live positioning): the largest positions seen over the history window, in contracts.
+  {label:'Historical Max', ref:true, cols:['Net Long','Net Short','Gross Long','Gross Short']},
 ];
 
 // Gross long/short cell: the figure, with the week's change small beside it.
@@ -985,43 +1023,52 @@ function buildCftcRow(entry, hist){
   const m = computeLatestMetrics(entry, hist);
   let html = `<tr><td>${entry.label}</td>`;
   if(!m){
-    html += `<td colspan="10" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
+    html += `<td class="grp-l" colspan="14" style="text-align:left;color:var(--text3)">No data (code ${entry.code})</td>`;
   } else {
-    html += `<td class="${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
+    html += `<td class="grp-l ${m.net>=0?'cftc-up':'cftc-dn'}">${cftcFmt(m.net)}</td>`;
     html += `<td class="${m.weeklyChange>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.weeklyChange)}</td>`;
-    html += `<td class="${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
+    html += `<td class="grp-l ${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
     html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
-    html += `<td>${cftcGrossCell(m.mmL, m.grossLChg, false)}</td>`;
+    html += `<td class="grp-l">${cftcGrossCell(m.mmL, m.grossLChg, false)}</td>`;
     html += `<td>${cftcGrossCell(m.mmS, m.grossSChg, true)}</td>`;
-    html += `<td class="${grossExtremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
+    html += `<td class="grp-l ${grossExtremeClass(m.glPctile)}">${cftcPct(m.grossLPctOi)}</td>`;
     html += `<td class="${grossExtremeClass(m.gsPctile)}">${cftcPct(m.grossSPctOi)}</td>`;
-    html += `<td>${cftcFmt(m.oi)}</td>`;
+    html += `<td class="grp-l">${cftcFmt(m.oi)}</td>`;
     html += `<td class="${m.oiChg>=0?'cftc-up':'cftc-dn'}">${cftcSignedNum(m.oiChg)}</td>`;
+    // historical extremes (reference columns, styled differently so they don't read as part of the live table)
+    [['maxNetLong','Largest net long'],['maxNetShort','Largest net short'],['maxGrossLong','Largest gross long'],['maxGrossShort','Largest gross short']].forEach(([k, what], i)=>{
+      const e = m[k];
+      html += `<td class="cftc-ref${i===0?' grp-l':''}"${e?` title="${what} in the window — set ${e.date}"`:''}>${e ? cftcFmt(e.v) : '—'}</td>`;
+    });
   }
   html += `</tr>`;
   return html;
 }
 
-// Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, Long%OI, Short%OI, OI, OI Chg
-const CFTC_COL_WIDTHS = [13, 9, 8, 7.5, 6.5, 13, 13, 7.5, 7.5, 8.5, 6.5];
+// Product, Net Pos, Wkly Chg, Net%OI, Pctile, Gross Long, Gross Short, Long%OI, Short%OI, OI, OI Chg, then the 4 extremes columns
+const CFTC_COL_WIDTHS = [10.4, 6.8, 5.2, 5.2, 4.4, 9.0, 9.0, 5.6, 5.6, 6.4, 4.4, 7, 7, 7, 7];
 function buildCftcMasterTable(){
-  let html = `<table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
+  const yrs = CFTC_DATA._meta?.years_history;
+  let html = `<div class="tbl-wrap"><table class="cftc-table"><colgroup>${CFTC_COL_WIDTHS.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead>`;
   html += `<tr><th rowspan="2">Product</th>`;
-  CFTC_COL_GROUPS.forEach(g=>{ html += `<th colspan="2" style="text-align:center;border-left:1px solid var(--border2);color:var(--amber);font-size:13px;letter-spacing:.08em">${g.label}</th>`; });
+  CFTC_COL_GROUPS.forEach(g=>{
+    const label = g.ref ? `${g.label}<span class="cftc-ref-sub">${yrs ? yrs+'yr · ' : ''}contracts</span>` : g.label;
+    html += `<th colspan="${g.cols.length}" class="grp-l${g.ref?' cftc-ref-h':''}" style="text-align:center;${g.ref?'':'color:var(--amber);'}font-size:13px;letter-spacing:.08em">${label}</th>`;
+  });
   html += `</tr><tr>`;
   CFTC_COL_GROUPS.forEach(g=>{
-    g.cols.forEach((c,i)=>{ html += `<th${i===0?' style="border-left:1px solid var(--border2)"':''}>${c}</th>`; });
+    g.cols.forEach((c,i)=>{ html += `<th class="${i===0?'grp-l ':''}${g.ref?'cftc-ref-h':''}">${c}</th>`; });
   });
   html += `</tr></thead><tbody>`;
 
   CFTC_GROUPS.forEach(group=>{
-    html += `<tr class="cftc-row-section"><td colspan="11">${group.label}${group.note ? `<span class="cftc-note">${group.note}</span>` : ''}</td></tr>`;
+    html += `<tr class="cftc-row-section"><td colspan="15">${group.label}${group.note ? `<span class="cftc-note">${group.note}</span>` : ''}</td></tr>`;
     group.codes.forEach(entry=>{
       const hist = (CFTC_DATA.codes && CFTC_DATA.codes[entry.code]) ? CFTC_DATA.codes[entry.code].history : null;
       html += buildCftcRow(entry, hist);
     });
   });
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
   return html;
 }
 
@@ -1031,7 +1078,7 @@ function renderCftc(){
   const yrs = CFTC_DATA._meta?.years_history;
   { const d = latestCftcDate(); setMetaLines('cftc-meta', CFTC_DATA._meta?.fetched_at, d ? 'Positions as of ' + fmtAsOfDate(d, true) : ''); }
   root.insertAdjacentHTML('beforeend', buildCftcMasterTable());
-  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut).</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="page-footnote">Managed Money (Fund) category; currencies, equities and Treasuries show Leveraged Funds (the closest equivalent in CFTC's financial-futures report) — ${yrs ? yrs+'yr lookback' : ''} — highlighted cells are top/bottom 10% of that lookback window. Small figure beside Gross Long/Short = change since last week (green = added, red = cut). Historical Max (blue-grey) = largest net long, net short, gross long and gross short over the window, in contracts; hover for the date.</div>`);
 }
 
 function loadCftc(){
@@ -1125,7 +1172,7 @@ function summaryStuPctile(usdaComm, yearDataFn){
   const latestYear = years[years.length-1];
   const v = getStu(yearDataFn(latestYear));
   if(v===null || !hist.length) return null;
-  return hist.filter(x=>x<=v).length/hist.length*100;
+  return {p: hist.filter(x=>x<=v).length/hist.length*100, v};   // rank vs history, and the actual stocks/use %
 }
 
 // Vegoils-combined equivalents of the above — sum across all 4 tracked oils instead of one commodity.
@@ -1156,7 +1203,7 @@ function summaryStuPctileCombined(commList, entityFn){
   const latestYear = years[years.length-1];
   const v = getStu(sumAcrossOils(entityFn, latestYear, commList));
   if(v===null || !hist.length) return null;
-  return hist.filter(x=>x<=v).length/hist.length*100;
+  return {p: hist.filter(x=>x<=v).length/hist.length*100, v};
 }
 
 function summaryPctileClass(p){
@@ -1167,6 +1214,28 @@ function summaryPctileClass(p){
 }
 
 function summaryPctileText(p){ return p===null||p===undefined ? '—' : cftcOrdinal(p); }
+// Stocks-to-use cell: the rank vs history is the main number, the actual stocks/use % sits small beside it
+function summaryStuCell(o, first){
+  const cls = (first ? 'grp-l ' : '') + summaryPctileClass(o ? o.p : null);
+  if(!o) return `<td class="${cls}">—</td>`;
+  return `<td class="${cls}" title="Rank vs history (higher = looser) · stocks/use ${fmtStu(o.v)}">${summaryPctileText(o.p)}<span class="stu-sm">${fmtStu(o.v)}</span></td>`;
+}
+
+// This week and the week after it. After the last slot ("Dec 28") the next week is early January; slot 0 ("Dec 29") is
+// that same New Year week, so it is skipped.
+function getSeasonalPair(productName){
+  const cur = getNextSeasonalEntry(productName);
+  if(!cur) return [null, null];
+  const vals = SEASONALS_DATA[productName];
+  const i = SEASONALS_WEEKS.indexOf(cur.label);
+  const j = (i >= SEASONALS_WEEKS.length - 1) ? 1 : i + 1;
+  return [cur, {label: SEASONALS_WEEKS[j], value: vals[j]}];
+}
+function seasonalHeaderLabels(){
+  const first = (typeof SEASONALS_DATA !== 'undefined') ? Object.keys(SEASONALS_DATA)[0] : null;
+  const pair = first ? getSeasonalPair(first) : [null, null];
+  return [pair[0] ? pair[0].label : 'This Wk', pair[1] ? pair[1].label : 'Next Wk'];
+}
 
 function getNextSeasonalEntry(productName){
   if(typeof SEASONALS_WEEKS === 'undefined' || typeof SEASONALS_DATA === 'undefined') return null;
@@ -1197,15 +1266,17 @@ function getNextSeasonalEntry(productName){
 function colPercents(weights){ const t = weights.reduce((a,b)=>a+b,0); return weights.map(w=>(w/t*100).toFixed(3)+'%'); }
 
 function buildSummaryTable(){
+  const wk = seasonalHeaderLabels();   // the two week-start dates, e.g. "Oct 19" and "Oct 26"
+  // Seasonality keeps the width it had as one column (5.5 + 5.5 = 11 of 100); the YoY wording moves into the sub-headers.
   const groups = [
-    {label:'Seasonality', cols:[{l:'This Wk', w:11}]},
-    {label:'Positioning', cols:[{l:'Net % OI', w:8}, {l:'Pctile', w:8}]},
-    {label:'Production YoY', cols:[{l:'Domestic', w:9}, {l:'Exporters', w:9}]},
-    {label:'Export Sales YoY', cols:[{l:'Total Commit.', w:16}]},
-    {label:'Stocks/Use % Rank', cols:[{l:'Domestic', w:9.5}, {l:'World', w:9.5}]},
+    {label:'Seasonality', cols:[{l:wk[0], w:5.5}, {l:wk[1], w:5.5}]},
+    {label:'Positioning', cols:[{l:'Net % OI', w:7}, {l:'Pctile', w:6.5}, {l:'Change', w:7}]},
+    {label:'Production', cols:[{l:'Domestic YoY', w:10}, {l:'Exporters YoY', w:10}]},
+    {label:'Export Sales', cols:[{l:'Total Commit. YoY', w:13}]},
+    {label:'Stocks to Use', cols:[{l:'Domestic', w:9.25}, {l:'World', w:9.25}]},
   ];
   const totalCols = 1 + groups.reduce((sum,g)=>sum+g.cols.length,0);
-  const productWidth = 20;
+  const productWidth = 17;
 
   const pcts = colPercents([productWidth, ...groups.flatMap(g=>g.cols.map(c=>c.w))]);
   let html = `<div class="tbl-wrap"><table class="summary-table"><colgroup>${pcts.map(pc=>`<col style="width:${pc}">`).join('')}`;
@@ -1227,8 +1298,8 @@ function buildSummaryTable(){
     const countries = DATA[row.usdaComm] || {};
     const expList = row.combinedList ? row.combinedExporters : (EXPORTERS[row.usdaComm]||[]).filter(c=>countries[c]);
 
-    // Seasonality (next upcoming week)
-    const seas = getNextSeasonalEntry(row.seasonalName);
+    // Seasonality: this week and next
+    const seasPair = getSeasonalPair(row.seasonalName);
 
     // Positioning (CFTC)
     const hist = (CFTC_DATA.codes && CFTC_DATA.codes[row.cftcCode]) ? CFTC_DATA.codes[row.cftcCode].history : null;
@@ -1256,23 +1327,28 @@ function buildSummaryTable(){
     }
 
     html += `<tr><td>${row.label}</td>`;
-    if(!seas){
-      html += `<td class="grp-l" style="color:var(--text3)">—</td>`;
-    } else {
-      const text = (seas.value>0?'+':'')+seas.value;
-      html += `<td class="grp-l" style="background:${seasonalColor(seas.value)};color:#111;font-weight:800" title="Week of ${seas.label}">${text}</td>`;
-    }
+    seasPair.forEach((seas, k)=>{
+      const first = k===0 ? 'grp-l' : '';
+      if(!seas){
+        html += `<td class="${first}" style="color:var(--text3)">—</td>`;
+      } else {
+        const text = (seas.value>0?'+':'')+seas.value;
+        html += `<td class="${first}" style="background:${seasonalColor(seas.value)};color:#111;font-weight:800" title="Week of ${seas.label}">${text}</td>`;
+      }
+    });
     if(!m){
-      html += `<td class="grp-l" colspan="2" style="text-align:left;color:var(--text3)">No CFTC data</td>`;
+      html += `<td class="grp-l" colspan="3" style="text-align:left;color:var(--text3)">No CFTC data</td>`;
     } else {
       html += `<td class="grp-l ${m.netPctOi>=0?'cftc-up':'cftc-dn'}">${cftcPct(m.netPctOi)}</td>`;
       html += `<td class="${netExtremeClass(m.netPctile)}">${m.netPctile===null?'—':cftcOrdinal(m.netPctile)}</td>`;
+      const chgCls = m.netPctOiChg===null ? '' : (Number(m.netPctOiChg.toFixed(1))===0 ? '' : (m.netPctOiChg>0 ? 'cftc-up' : 'cftc-dn'));
+      html += `<td class="${chgCls}" title="${posActionText(m.net, m.netPctOiChg)} (net % OI vs last week)">${fmtPP(m.netPctOiChg)}</td>`;
     }
     html += `<td class="grp-l ${domesticYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(domesticYoY,1)}</td>`;
     html += `<td class="${exportersYoY>=0?'cftc-up':'cftc-dn'}">${cftcSignedPct(exportersYoY,1)}</td>`;
     html += `<td class="grp-l ${totalCommitYoY>=0?'cftc-up':'cftc-dn'}">${totalCommitYoY===null?'—':cftcSignedPct(totalCommitYoY,1)}</td>`;
-    html += `<td class="grp-l ${summaryPctileClass(domesticStu)}">${summaryPctileText(domesticStu)}</td>`;
-    html += `<td class="${summaryPctileClass(worldStu)}">${summaryPctileText(worldStu)}</td>`;
+    html += summaryStuCell(domesticStu, true);
+    html += summaryStuCell(worldStu, false);
     html += `</tr>`;
   });
 
@@ -1502,6 +1578,8 @@ function renderSummary(){
     <li>Domestic = United States, except Canola (Canada) and Coffee/Sugar (Brazil), the actual major producers. Those rows have no Export Sales YoY.</li>
     <li>Soyoil (Vegoils) and Soymeal (Meal): Seasonality, Positioning and Export Sales use Soybean Oil / Soybean Meal. Production YoY and Stocks/Use Rank combine all oils / all meals.</li>
     <li>Cocoa: Positioning and Seasonality only. USDA doesn't track cocoa.</li>
+    <li>Seasonality: this week and next. Positioning Change = move in Net % OI vs last week; same direction as the net position = adding, opposite = unwinding.</li>
+    <li>Stocks to Use: the rank vs history (higher = looser) is the main number, with the actual stocks/use % beside it.</li>
     <li>Coffee and Sugar use USDA's semi-annual reports, not the monthly WASDE shown in the header.</li>
   </ul></div>`);
 }
