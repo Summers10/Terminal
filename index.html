@@ -92,6 +92,7 @@ if(sessionStorage.getItem('pw-ok') === '1') document.getElementById('pw-gate').s
   <button class="page-tab" data-page="cftc" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">CFTC REPORT</button>
   <button class="page-tab" data-page="seasonals" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">SEASONALS</button>
   <button class="page-tab" data-page="exports" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">EXPORTS</button>
+  <button class="page-tab" data-page="weather" style="flex:0 0 auto;padding:10px 22px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:900;letter-spacing:.08em">WEATHER</button>
   <div style="margin-left:auto;padding-right:16px;display:flex;border:1px solid #1e1e1e;border-radius:3px;overflow:hidden">
     <button class="global-theme-btn" data-t="dark" style="padding:7px 15px;background:none;border:none;color:#6a5a4a;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Dark</button>
     <button class="global-theme-btn" data-t="light" style="padding:7px 15px;background:#f5a623;border:none;color:#000;cursor:pointer;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Light</button>
@@ -124,6 +125,7 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
     document.getElementById('cftc-page').style.display = btn.dataset.page === 'cftc' ? '' : 'none';
     document.getElementById('seasonals-page').style.display = btn.dataset.page === 'seasonals' ? '' : 'none';
     document.getElementById('exports-page').style.display = btn.dataset.page === 'exports' ? '' : 'none';
+    document.getElementById('weather-page').style.display = btn.dataset.page === 'weather' ? '' : 'none';
   });
 });
 </script>
@@ -166,6 +168,13 @@ document.querySelectorAll('.page-tab').forEach(function(btn){
   <div id="exports-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
 </div>
   <div id="exports-root" style="max-width:1400px;margin:0 auto;padding:22px"></div>
+</div>
+<div id="weather-page" style="display:none">
+<div id="weather-topbar" style="padding:14px 20px;border-bottom:1px solid var(--amber);background:var(--bg);display:flex;align-items:center;gap:20px">
+  <h1 style="font-size:18px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Weather &amp; Crop Calendar</h1>
+  <div id="weather-meta" style="font-size:13px;color:var(--text3);letter-spacing:.04em;margin-left:auto">Loading...</div>
+</div>
+  <div id="weather-root" style="max-width:1300px;margin:0 auto;padding:22px"></div>
 </div>
 
 <script>
@@ -853,21 +862,21 @@ let usdaReady = false;
 let cftcReady = false;
 let exportsReady = false;
 let WEATHER_DATA = null;
-let weatherReady = false;
+let weatherState = 'loading';   // 'loading' | 'ready' | 'failed' - only the Weather page cares
 function checkSummaryReady(){
-  if(usdaReady && cftcReady && exportsReady && weatherReady && typeof renderSummary === 'function') renderSummary();
+  if(usdaReady && cftcReady && exportsReady && typeof renderSummary === 'function') renderSummary();
 }
 
 fetch('data/weather_data.json?_=' + Date.now())
   .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
   .then(data=>{
     WEATHER_DATA = data;
-    weatherReady = true;
-    checkSummaryReady();
+    weatherState = 'ready';
+    if(typeof renderWeatherPage === 'function') renderWeatherPage();
   })
   .catch(e=>{
-    weatherReady = true; // don't block the Summary tab forever if this one source fails
-    checkSummaryReady();
+    weatherState = 'failed';
+    if(typeof renderWeatherPage === 'function') renderWeatherPage();
   });
 
 function cftcFmt(v){ return (v===null||v===undefined||isNaN(v)) ? '—' : Math.round(v).toLocaleString(); }
@@ -1355,7 +1364,7 @@ function fmtHiLo(hi, lo){
 // "As of" is when the fetcher pulled the data (shown in the viewer's local time); Open-Meteo blends several
 // models that each run on their own schedule, so there is no single model-initialisation time to quote.
 function buildWeatherFootnote(){
-  if(!WEATHER_DATA) return 'Weather data unavailable.';
+  if(!WEATHER_DATA) return weatherState === 'loading' ? '' : 'Weather data unavailable.';
   const meta = WEATHER_DATA._meta || {};
   const regions = WEATHER_DATA.regions || {};
   const hasOutlook = Object.values(regions).some(r => 'outlook_temp_dep_c' in r);
@@ -1475,10 +1484,9 @@ function buildCropCalendarTable(){
 function renderSummary(){
   const root = document.getElementById('summary-root');
   root.innerHTML = '';
-  // The fetchers run together, but not every run refreshes every source (weather skips itself when its data is under
-  // 20h old, and a failed fetcher keeps its previous data) - so show the NEWEST run time here. How fresh each source's
-  // data really is is what the "Data as of" line below is for.
-  const stamps = [DATA, CFTC_DATA, EXPORTS_DATA, WEATHER_DATA]
+  // Not every run refreshes every source (a failed fetcher keeps its previous data) - so show the NEWEST run time
+  // here. How fresh each source's data really is is what the "Data as of" line below is for.
+  const stamps = [DATA, CFTC_DATA, EXPORTS_DATA]
     .map(d => d && d._meta && d._meta.fetched_at)
     .filter(Boolean)
     .sort()
@@ -1490,16 +1498,6 @@ function renderSummary(){
   setMetaLines('summary-meta', stamps.length ? stamps[0] : 'unknown', asOf.length ? 'Data as of: ' + asOf.join(' · ') : '');
   root.insertAdjacentHTML('beforeend', buildSummaryTable());
 
-  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Weather — Major Growing Regions</div>`);
-  if(WEATHER_DATA){
-    root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildWeatherTable()}</div>`);
-  }
-  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:8px 0 0">${buildWeatherFootnote()}</div>`);
-
-  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
-  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
-  root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
-
   root.insertAdjacentHTML('beforeend', `<div class="page-footnote"><ul>
     <li>Domestic = United States, except Canola (Canada) and Coffee/Sugar (Brazil), the actual major producers. Those rows have no Export Sales YoY.</li>
     <li>Soyoil (Vegoils) and Soymeal (Meal): Seasonality, Positioning and Export Sales use Soybean Oil / Soybean Meal. Production YoY and Stocks/Use Rank combine all oils / all meals.</li>
@@ -1507,6 +1505,27 @@ function renderSummary(){
     <li>Coffee and Sugar use USDA's semi-annual reports, not the monthly WASDE shown in the header.</li>
   </ul></div>`);
 }
+
+// The Weather page: the weather table + the crop calendar (static reference). Independent of the Summary page.
+function renderWeatherPage(){
+  const root = document.getElementById('weather-root');
+  if(!root) return;
+  root.innerHTML = '';
+  const stamp = WEATHER_DATA && WEATHER_DATA._meta && WEATHER_DATA._meta.fetched_at;
+  setMetaLines('weather-meta', weatherState === 'loading' ? 'loading…' : (stamp || 'unavailable'), '');
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:0">Weather — Major Growing Regions</div>`);
+  if(WEATHER_DATA){
+    root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildWeatherTable()}</div>`);
+  } else {
+    root.insertAdjacentHTML('beforeend', `<div style="padding:18px 0;color:var(--text3)">${weatherState==='loading' ? 'Loading weather…' : ''}</div>`);
+  }
+  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:8px 0 0">${buildWeatherFootnote()}</div>`);
+
+  root.insertAdjacentHTML('beforeend', `<div class="cftc-row-section" style="padding:8px 10px;border-top:2px solid var(--amber);color:var(--amber);font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:13px;margin:28px 0 0">Crop Calendar — Major Origins</div>`);
+  root.insertAdjacentHTML('beforeend', `<div style="font-size:11px;color:var(--text3);margin:10px 0"><span style="background:rgba(46,143,82,.30);padding:1px 6px;border-radius:2px">P</span> Planting &nbsp; <span style="background:rgba(230,180,20,.40);padding:1px 6px;border-radius:2px">H</span> Harvest — standard reference windows, not live data; actual dates shift with weather and region within each country.</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="tbl-wrap">${buildCropCalendarTable()}</div>`);
+}
+renderWeatherPage();   // the crop calendar is static, so draw the page right away; the weather table fills in when its data arrives
 </script>
 
 <style>
